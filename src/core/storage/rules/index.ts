@@ -21,9 +21,24 @@ export const INPUT_LONG_EDGE = 2048
 export const INPUT_JPEG_QUALITY = 0.85
 
 export const UPLOAD_URL_TTL_SECONDS = 60
+// A batch's tickets (POST /api/uploads/batch) wait in the browser while the photos ahead of them
+// compress and upload, three at a time, so they live longer; still only for keys the server chose.
+export const BATCH_UPLOAD_URL_TTL_SECONDS = 300
+// How many tickets one batch request hands out.
+export const BATCH_UPLOAD_TICKETS_MAX = 10
 
 // Long edge of the preview kept with each result once the upload itself is deleted
 // (ARCHITECTURE §8 「原图小图」); the photo page states it in its facts.
 export const INPUT_PREVIEW_PX = 768
 
 export { MATTE_DARK, MATTE_WHITE, matteCss, matteFor, type Matte } from './alpha-matte'
+
+// Every copy of a free work that leaves the server has its long edge capped here (Owner
+// 2026-11-22, storage/protect): about a phone screen, too small for print or a menu board. The
+// browser reads it to say what a free download really is.
+export const FREE_MAX_EDGE = 1080
+
+// The long edge of the file a work's download gives: the tier's size, capped for a free work.
+export function savedLongEdge(pool: 'free' | 'paid' | null | undefined, px: number): number {
+  return pool === 'free' && px > FREE_MAX_EDGE ? FREE_MAX_EDGE : px
+}

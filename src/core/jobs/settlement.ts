@@ -3,6 +3,7 @@ import 'server-only'
 import { z } from 'zod'
 
 import { callRpc, type RpcClient } from '@/core/billing'
+import { AppError } from '@/core/errors'
 
 import { providerUsage, type ProviderUsage } from './provider-usage'
 import { JOB_MODULES, JOB_SOURCES, JOB_VISIBILITIES, jobRowSchema, type Job, type JobVisibility } from './job-schema'
@@ -43,13 +44,19 @@ export async function reserveJob(client: RpcClient, input: ReserveJobInput): Pro
     p_provider: args.provider,
     p_visibility: args.visibility,
   }
-  if (args.source === 'web' && (args.inputs.batch_id || Number(args.inputs.batch_size) > 1)) {
-    return callRpc(client, 'reserve_batch_cell', common, jobRowSchema)
-  }
-  return callRpc(client, 'reserve_credits', {
-    ...common, p_source: args.source, p_idempotency_key: args.idempotencyKey, p_parent_job_id: args.parentJobId,
-  }, jobRowSchema)
+  const row = args.source === 'web' && (args.inputs.batch_id || Number(args.inputs.batch_size) > 1)
+    ? await callRpc(client, 'reserve_batch_cell', common, reservedRow)
+    : await callRpc(client, 'reserve_credits', {
+      ...common, p_source: args.source, p_idempotency_key: args.idempotencyKey, p_parent_job_id: args.parentJobId,
+    }, reservedRow)
+  // A replay (same job id or partner key) returns the existing job as it is. One the caller made
+  // for an org they have since left (企业作品, 1941) is not theirs to see any more: missing, like
+  // every other read of it, so no view or signed file is ever built from it.
+  if (row.org_access_ended_at) throw new AppError('NOT_FOUND', 'Not found')
+  return jobRowSchema.parse(row)
 }
+
+const reservedRow = z.looseObject({ org_access_ended_at: z.string().nullish() })
 
 // What the provider reported using and the cost worked out from it (T33); both optional, and
 // written in the same call that settles the job.

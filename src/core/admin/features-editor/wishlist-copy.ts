@@ -5,6 +5,11 @@ import type { SwitchCopy } from './switch-copy'
 export const WISHLIST_SWITCH_COPY = {
   title: '需求墙',
   key: 'wishlist_enabled',
+  summary: {
+    purpose: '用户提交想要的模板、互相投票。',
+    whenOn: '登录用户底部多一个 Wishlist，后台出现「需求审核」',
+    whenOff: 'Wishlist 和需求墙页面都不出现；已有需求和投票保留',
+  },
   body: '用户提交想要的模板、互相投票的页面。开关保存后马上生效，不用重新部署。',
   state: { on: '已开启', off: '已关闭' },
   stateLabel: '当前状态',

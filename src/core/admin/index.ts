@@ -43,6 +43,7 @@ export {
   type SaveCategoryPayload,
 } from './template-categories'
 export { CategoriesPanel } from './template-categories-editor'
+export { BundlesPanel, CaseStripPanel, HeroPanel, LocaleDisplayPanel, PickerSeriesProvider } from './locale-display-editor'
 export { loadEditTemplateSettings, saveEditTemplate, type EditTemplateSettings, type SaveEditTemplateInput } from './edit-template'
 export { EDIT_TEMPLATE_COPY, EditTemplateEditor } from './edit-template-editor'
 export {
@@ -65,8 +66,11 @@ export { dryRunIdentityScreen, type DryRunResult } from './identity-dry-run'
 export { IdentityDryRun } from './identity-dry-run-ui'
 export { AdminPage, AdminShell, adminNavItems, EmptyState, SHELL_COPY, StatCard, type AdminNavItem } from './shell'
 export {
+  acknowledgePayment,
   listPurchases,
   listSubscriptions,
+  loadAttentionIds,
+  unacknowledgePayment,
   applyClawback,
   loadRevenueStats,
   ORDERS_COPY,
@@ -77,12 +81,15 @@ export {
   usd,
   type AdminPurchase,
   type AdminSubscription,
+  type AcknowledgeResult,
   type ClawbackPreview,
   type ClawbackResult,
   type RevenueStats,
 } from './orders'
 export { ClawbackButton, ClawbackStatus, type ClawbackActions } from './clawback-ui'
 export { listAnnouncements, saveAnnouncement, setAnnouncementActive } from './announcements'
+export { applyBlogCover, getAdminPost, listAdminPosts, requestBlogCoverUpload, savePost, setPostStatus, type SaveOutcome } from './blog'
+export { BlogList, BLOG_COPY, emptyForm as emptyPostForm, PostEditor, toForm as postToForm, type BlogAdminActions } from './blog-editor'
 export { ANNOUNCEMENTS_COPY, AnnouncementsEditor, type AnnouncementAdminActions } from './announcements-editor'
 export { decodeCursor, encodeCursor, PAGE_SIZE, type Page } from './cursor'
 export {
@@ -101,6 +108,13 @@ export {
   unbanUser,
   batchAdjustCredits,
   batchSetBanned,
+  setUserLabel,
+  bindPartner,
+  readReferrerDetail,
+  searchPartners,
+  type UserReferrer,
+  type BindOutcome,
+  type PartnerOption,
   hasListFilters,
   listUsers,
   loadUserDetail,
@@ -115,6 +129,7 @@ export {
   type UserFilters,
   type UserJob,
   type UserListPage,
+  type UserIdentity,
   type UserListRow,
 } from './users'
 export {
@@ -178,11 +193,19 @@ export {
 } from './features'
 export {
   FEATURES_COPY,
-  FeaturesEditor,
+  FeatureGates,
+  FeatureSection,
+  FeaturesOverview,
+  ChildCard,
+  SiteSwitches,
+  FoodPlatingCard,
+  FoodTablewareCard,
+  AppShellCard,
+  ServiceWorkerCard,
   PosterPhotoCard,
   SignupGiftCard,
+  SignupLimitsCard,
   WISHLIST_SWITCH_COPY,
-  type FeatureAdminActions,
   type GallerySwitchKey,
   type GallerySwitchState,
   type WishlistSwitchState,
@@ -191,13 +214,16 @@ export {
   loadSettingSwitch,
   loadPosterPhotoPrice,
   loadSignupGift,
+  loadSignupLimits,
   loadWishlistSwitch,
   saveSettingSwitch,
   savePosterPhotoPrice,
   saveSignupGiftRules,
+  saveSignupLimits,
   saveWishlistSwitch,
   type SignupGiftRules,
   type SignupGiftState,
+  type SignupLimits,
   type SystemSettingDeps,
   type WishlistSwitch,
   type WishlistSwitchInput,
@@ -216,8 +242,8 @@ export {
   type CostKeyActions,
   type CostSettingsInput,
 } from './costs'
-export { parseFunnelDim, parsePageSort, parseRange, posthogProjectId, type FunnelDim, type PageSort, type Range } from './analytics'
-export { ANALYTICS_COPY, AnalyticsView, parseView, RangeTabs, Unconfigured, ViewTabs, type AnalyticsQuery } from './analytics-ui'
+export { parseFunnelDim, parsePageSort, parseRange, posthogOn, posthogProjectId, pvuvConnected, type FunnelDim, type PageSort, type Range } from './analytics'
+export { ANALYTICS_COPY, AnalyticsView, DetailsView, parseView, PostHogOff, PvuvFunnelsView, RangeTabs, Unconfigured, ViewTabs, type AnalyticsQuery } from './analytics-ui'
 export { GROWTH_COPY, GrowthView } from './growth-ui'
 export { cheapestCreditUsd } from './insights'
 export { INSIGHTS_COPY, InsightsPanel } from './insights-ui'

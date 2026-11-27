@@ -8,18 +8,29 @@ import type { ReactNode } from 'react'
 import { makeAgainHref } from '../again/again-start'
 import { WorkTag } from '../result/work-tag'
 import { ZipButtonLazy as ZipButton } from '../batch/zip-button-lazy'
-import { groupByBatch, type DoneEntry } from './batch-groups'
+import { groupByBatch, groupByMonth, type DoneEntry } from './batch-groups'
+import { LoadMore } from './load-more'
 import { PhotosEmpty } from './photos-empty'
 import { doneMeta, doneWhen, type PhotoItem } from './photo-item'
 import { WorkLink } from './viewer/work-link'
 import { WorksIndex } from './viewer/works-index'
+import { ShareSelectProvider } from '../work-share/select-context'
+import { SelectTile } from '../work-share/select-tile'
+import { ShareBar } from '../work-share/share-bar'
+import { ShareToggle } from '../work-share/share-toggle'
+import type { CreateShareAction } from '../work-share/share-types'
 
 // "Done", newest first (B comp photos.html): finished photos with their pool's tag, two columns
 // on phones, three from md, four from lg. Each opens the viewer over the grid (2026-11-12);
 // below it a quiet "Make again" opens the viewer on the creation form when the template is still
 // in the catalogue (an edit or a retired template has none). Empty state per DESIGN §4.6. Every tile shows the
-// work's small copy, never the full file (ARCHITECTURE §8.3「作品小图」).
-export function DoneGrid({ items, now, anyRunning, liveTemplates }: { items: PhotoItem[]; now: Date; anyRunning: boolean; liveTemplates: string[] }) {
+// work's small copy, never the full file (ARCHITECTURE §8.3「作品小图」). share: with it, a Share
+// button next to "Done" turns on picking works for one share link (§6.2「作品集分享」).
+// more: the next page's address while older works remain (LoadMore); total: every finished work.
+// Once the list spans more than one month (or has more to come) it is cut under month headings.
+type Props = { items: PhotoItem[]; now: Date; anyRunning: boolean; liveTemplates: string[]; share?: CreateShareAction; more?: string | null; total?: number }
+
+export function DoneGrid({ items, now, anyRunning, liveTemplates, share, more = null, total = items.length }: Props) {
   const t = useTranslations('app')
   const format = useFormatter()
   const day = (date: Date) => format.dateTime(date, { month: 'short', day: 'numeric', timeZone: 'UTC' })
@@ -28,30 +39,55 @@ export function DoneGrid({ items, now, anyRunning, liveTemplates }: { items: Pho
   // Display order: the viewer steps through it, and the first tiles load first.
   const ordered = entries.flatMap((entry) => (entry.kind === 'photo' ? [entry.item] : entry.items))
   const place = new Map(ordered.map((item, index) => [item.id, index]))
+  const monthName = (iso: string) => format.dateTime(new Date(iso), { year: 'numeric', month: 'long', timeZone: 'UTC' })
   const card = (item: PhotoItem) => <DoneCard item={item} meta={doneMeta(item, now, t, day)} live={liveTemplates.includes(item.templateId)} place={place.get(item.id) ?? EAGER_TILES} />
-  return (
+  const tiles = (list: DoneEntry[]) => (
+    <ul className={GRID}>
+      {list.map((entry) =>
+        entry.kind === 'photo' ? (
+          <Reveal as="li" key={entry.item.id}>
+            {card(entry.item)}
+          </Reveal>
+        ) : (
+          <li key={entry.batchId} className="col-span-full">
+            <BatchGroup entry={entry} when={doneWhen(entry.items[0]!, now, t, day)} card={card} />
+          </li>
+        ),
+      )}
+    </ul>
+  )
+  const grid = (
     <section aria-labelledby="done-h">
       <WorksIndex items={ordered} />
-      <div className="mx-(--gutter) mt-6 mb-3 flex items-baseline justify-between gap-3 md:mt-8">
+      <div className="mx-(--gutter) mt-6 mb-3 flex items-center justify-between gap-3 md:mt-8">
         <h2 id="done-h" className="text-headline leading-[1.2] font-semibold tracking-[-0.01em]">{t('photos.done')}</h2>
-        <span className="text-caption text-muted-foreground">{t('photos.newest')}</span>
+        <span className="flex items-center gap-3">
+          <span className="text-caption text-muted-foreground">{t('photos.newest')}</span>
+          {share ? <ShareToggle /> : null}
+        </span>
       </div>
-      <ul className={GRID}>
-        {entries.map((entry) =>
-          entry.kind === 'photo' ? (
-            <Reveal as="li" key={entry.item.id}>
-              {card(entry.item)}
-            </Reveal>
-          ) : (
-            <li key={entry.batchId} className="col-span-full">
-              <BatchGroup entry={entry} when={doneWhen(entry.items[0]!, now, t, day)} card={card} />
-            </li>
-          ),
-        )}
-      </ul>
+      <Months entries={entries} always={more !== null} name={monthName} tiles={tiles} />
+      {more ? <LoadMore href={more} shown={items.length} total={total} /> : null}
       <p className="mx-(--gutter) mt-4 max-w-[72ch] text-caption leading-[1.4] text-muted-foreground">{t('photos.footnote')}</p>
+      {share ? <ShareBar create={share} /> : null}
     </section>
   )
+  return share ? <ShareSelectProvider>{grid}</ShareSelectProvider> : grid
+}
+
+// Month headings once the list spans more than one month (or more pages are to come): each
+// month its own grid, so a heading never sits mid-row. One month stays one plain grid.
+function Months({ entries, always, name, tiles }: { entries: DoneEntry[]; always: boolean; name(iso: string): string; tiles(list: DoneEntry[]): ReactNode }) {
+  const months = groupByMonth(entries)
+  if (months.length < 2 && !always) return tiles(entries)
+  return months.map((month) => (
+    <section key={month.key} aria-labelledby={`month-${month.key}`} className="mt-6 first-of-type:mt-0">
+      <h3 id={`month-${month.key}`} className="mx-(--gutter) mb-3 text-body leading-[1.25] font-semibold text-muted-foreground">
+        {name(month.first)}
+      </h3>
+      {tiles(month.entries)}
+    </section>
+  ))
 }
 
 const GRID = 'grid grid-cols-2 gap-x-2 gap-y-4 px-(--gutter) md:grid-cols-3 md:gap-x-4 md:gap-y-6 lg:grid-cols-4'
@@ -66,7 +102,8 @@ const FIRST_ROW = 4
 function DoneCard({ item, meta, live, place }: { item: PhotoItem; meta: string; live: boolean; place: number }) {
   const t = useTranslations('app')
   return (
-    <div className="flex h-full flex-col transition-transform duration-250 ease-house hover:-translate-y-0.5">
+    <div className="relative flex h-full flex-col transition-transform duration-250 ease-house hover:-translate-y-0.5">
+      <SelectTile jobId={item.id} name={item.templateName} />
       <WorkLink workId={item.id} className="group press block rounded-control">
         <span className="hairline relative block aspect-[4/5] overflow-hidden rounded-control bg-muted transition-shadow group-hover:shadow-[inset_0_0_0_1px_var(--input)]">
           {item.thumbUrl ? (

@@ -3,7 +3,7 @@ import type { EditCases } from '@/core/content'
 import { caseImage } from './landing-shared'
 
 // "Edit text in an image with one sentence" on the home page (Owner 2026-11-11, shotviva-docs#7):
-// four cases of its own, not the image-to-image page's, in which only the words change. The
+// two cases of its own (four until 2026-11-24, when the chalkboard and the shop sign went to keep the phone page short), not the image-to-image page's, in which only the words change. The
 // instruction in each line is the kind of sentence a user writes; every name in them is made up.
 export const textEdits: EditCases = {
   heading: 'Edit Text in an Image With One Sentence',
@@ -22,18 +22,6 @@ export const textEdits: EditCases = {
       change: '“Change it to Eau de Toilette, 100 ml.” The bottle label and the box both update in the same engraved serif; every other letter stays.',
       before: caseImage('text-perfume-before', 'Real example: a perfume bottle and box for a made-up brand on travertine, labelled Eau de Parfum, 50 ml'),
       after: caseImage('text-perfume-after', 'Real example: the same bottle and box, the label and box now reading Eau de Toilette, 100 ml'),
-    },
-    {
-      title: 'New prices on a chalkboard',
-      change: '“Latte 4.40, pour-over 5.80, and call the oat latte Maple Oat Latte.” The new chalk lettering is in the same hand.',
-      before: caseImage('text-chalk-en-before', 'Real example: a hand-lettered café chalkboard headed Today’s Coffee with four coffees and their prices'),
-      after: caseImage('text-chalk-en-after', 'Real example: the same chalkboard with two new prices and Maple Oat Latte, written in the same chalk hand'),
-    },
-    {
-      title: 'A new name on the shop sign',
-      change: '“Rename the sign Little Moon Noodle Bar.” The same lettering and glow; the street around it stays as it was shot.',
-      before: caseImage('text-sign-en-before', 'Real phone photo: a noodle shop at night on a wet street, its red lightbox sign reading Nonna’s Noodle Bar, Hand-pulled since 1998'),
-      after: caseImage('text-sign-en-after', 'Real example: the same street and shop, the sign now reading Little Moon Noodle Bar in the same lettering'),
     },
   ],
 }

@@ -6,6 +6,8 @@ const adminNavItems = vi.fn()
 const openTicketCount = vi.fn()
 const newInquiryCount = vi.fn()
 const pendingReviewCount = vi.fn()
+const pendingPromoCount = vi.fn()
+const affiliateOn = vi.fn()
 
 vi.mock('@/core/auth', () => ({ requireAdmin: () => requireAdmin(), createAdminSupabase: () => ({}) }))
 vi.mock('@/core/admin', () => ({
@@ -15,11 +17,12 @@ vi.mock('@/core/admin', () => ({
 }))
 vi.mock('@/core/env', () => ({ serverEnv: () => ({ VERCEL_ENV: 'preview' }) }))
 vi.mock('./jobs/actions', () => ({ compensateJobAction: vi.fn(), viewWorkAction: vi.fn() }))
-vi.mock('./users/actions', () => ({ adjustCreditsAction: vi.fn(), banUserAction: vi.fn(), unbanUserAction: vi.fn(), userDetailAction: vi.fn() }))
+vi.mock('./users/actions', () => ({ adjustCreditsAction: vi.fn(), banUserAction: vi.fn(), bindPartnerAction: vi.fn(), searchPartnersAction: vi.fn(), unbanUserAction: vi.fn(), userDetailAction: vi.fn() }))
 vi.mock('@/core/support', () => ({ openTicketCount: () => openTicketCount() }))
 vi.mock('@/core/inquiries', () => ({ newInquiryCount: () => newInquiryCount() }))
 vi.mock('@/core/logger', () => ({ logger: { warn: () => undefined } }))
-vi.mock('@/core/affiliate/feature', () => ({isAffiliateEnabled: async () => false}))
+vi.mock('@/core/affiliate/feature', () => ({ isAffiliateEnabled: async () => affiliateOn() }))
+vi.mock('@/core/affiliate/admin', () => ({ pendingPromoCount: () => pendingPromoCount() }))
 vi.mock('@/core/wishlist', () => ({ isWishlistEnabled: async () => false }))
 vi.mock('@/core/admin/gallery-review', () => ({ pendingReviewCount: () => pendingReviewCount() }))
 vi.mock('@/core/gallery', () => ({ siteHasGallery: () => true }))
@@ -36,6 +39,8 @@ describe('admin layout', () => {
     openTicketCount.mockReset().mockResolvedValue(3)
     newInquiryCount.mockReset().mockResolvedValue(2)
     pendingReviewCount.mockReset().mockResolvedValue(5)
+    pendingPromoCount.mockReset().mockResolvedValue(4)
+    affiliateOn.mockReset().mockReturnValue(false)
   })
 
   it('404s non-admins before building the shell', async () => {
@@ -48,27 +53,37 @@ describe('admin layout', () => {
   it('builds the nav without the review entry while the wishlist is off', async () => {
     requireAdmin.mockResolvedValue({ id: 'admin', email: 'owner@example.test' })
     await AdminLayout({ children: null } as never)
-    expect(adminNavItems).toHaveBeenCalledWith({ wishlist: false, affiliate: false, gallery: true }, { tickets: 3, inquiries: 2, gallery: 5 })
+    expect(adminNavItems).toHaveBeenCalledWith({ wishlist: false, affiliate: false, gallery: true }, { tickets: 3, inquiries: 2, gallery: 5, affiliates: 0 })
   })
 
   it('still builds the nav, without a count, when the ticket count fails (T27)', async () => {
     requireAdmin.mockResolvedValue({ id: 'admin', email: 'owner@example.test' })
     openTicketCount.mockRejectedValue(new Error('down'))
     await AdminLayout({ children: null } as never)
-    expect(adminNavItems).toHaveBeenCalledWith({ wishlist: false, affiliate: false, gallery: true }, { tickets: 0, inquiries: 2, gallery: 5 })
+    expect(adminNavItems).toHaveBeenCalledWith({ wishlist: false, affiliate: false, gallery: true }, { tickets: 0, inquiries: 2, gallery: 5, affiliates: 0 })
   })
 
   it('still builds the nav, without a count, when the inquiry count fails (T86)', async () => {
     requireAdmin.mockResolvedValue({ id: 'admin', email: 'owner@example.test' })
     newInquiryCount.mockRejectedValue(new Error('down'))
     await AdminLayout({ children: null } as never)
-    expect(adminNavItems).toHaveBeenCalledWith({ wishlist: false, affiliate: false, gallery: true }, { tickets: 3, inquiries: 0, gallery: 5 })
+    expect(adminNavItems).toHaveBeenCalledWith({ wishlist: false, affiliate: false, gallery: true }, { tickets: 3, inquiries: 0, gallery: 5, affiliates: 0 })
   })
 
   it('shows the pending review count beside 创作库审核, and 0 when the count fails (T108)', async () => {
     requireAdmin.mockResolvedValue({ id: 'admin', email: 'owner@example.test' })
     pendingReviewCount.mockRejectedValue(new Error('down'))
     await AdminLayout({ children: null } as never)
-    expect(adminNavItems).toHaveBeenCalledWith({ wishlist: false, affiliate: false, gallery: true }, { tickets: 3, inquiries: 2, gallery: 0 })
+    expect(adminNavItems).toHaveBeenCalledWith({ wishlist: false, affiliate: false, gallery: true }, { tickets: 3, inquiries: 2, gallery: 0, affiliates: 0 })
+  })
+
+  it('shows the pending promotion grant sheets beside 联盟营销 while the program is on, and 0 when the count fails', async () => {
+    requireAdmin.mockResolvedValue({ id: 'admin', email: 'owner@example.test' })
+    affiliateOn.mockReturnValue(true)
+    await AdminLayout({ children: null } as never)
+    expect(adminNavItems).toHaveBeenCalledWith({ wishlist: false, affiliate: true, gallery: true }, { tickets: 3, inquiries: 2, gallery: 5, affiliates: 4 })
+    pendingPromoCount.mockRejectedValue(new Error('down'))
+    await AdminLayout({ children: null } as never)
+    expect(adminNavItems).toHaveBeenLastCalledWith({ wishlist: false, affiliate: true, gallery: true }, { tickets: 3, inquiries: 2, gallery: 5, affiliates: 0 })
   })
 })

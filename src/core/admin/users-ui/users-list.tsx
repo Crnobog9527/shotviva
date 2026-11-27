@@ -8,6 +8,7 @@ import type { BatchOutcome, UserListRow } from '../users/list-types'
 import { BatchBar, type BatchKind } from './batch-bar'
 import { BatchAdjustDialog, BatchBanDialog, type BatchAdjustInput, type Rejection } from './batch-dialogs'
 import { USERS_COPY } from './copy'
+import { LabelSaver, type SaveLabel } from './user-identity'
 import { useSelection } from './use-selection'
 import { UsersCards } from './users-cards'
 import { UsersTable } from './users-table'
@@ -17,6 +18,7 @@ const COPY = USERS_COPY.batch
 export type UserBatchActions = {
   adjust: (input: BatchAdjustInput & { userIds: string[] }) => Promise<ActionValue<BatchOutcome>>
   setBanned: (input: { userIds: string[]; banned: boolean; reason: string }) => Promise<ActionValue<BatchOutcome>>
+  label: SaveLabel
 }
 
 // summary: the count line, shown where the batch bar appears.
@@ -50,8 +52,9 @@ export function UsersList({ rows, actions, currentUserId, summary }: Props) {
   }
   const shared = { people, pending, error, rejection, onCancel: () => setOpen(null) }
 
+  // Room below the last card for the floating batch bar on phones.
   return (
-    // Room below the last card for the floating batch bar on phones.
+    <LabelSaver.Provider value={actions.label}>
     <div className={selection.ids.length > 0 ? 'grid gap-2 max-md:pb-36' : 'grid gap-2'}>
       <BatchBar
         count={selection.ids.length}
@@ -92,5 +95,6 @@ export function UsersList({ rows, actions, currentUserId, summary }: Props) {
         />
       ) : null}
     </div>
+    </LabelSaver.Provider>
   )
 }

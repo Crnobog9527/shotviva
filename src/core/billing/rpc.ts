@@ -16,6 +16,10 @@ export type RpcClient = {
 // SQL functions raise these exception messages (supabase/migrations/0023–0026, 0141–0142).
 const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   CREDITS_INSUFFICIENT: 'CREDITS_INSUFFICIENT',
+  // The member chose a kind of org credits that cannot cover the price (1897); never the other kind.
+  POOL_CHOICE_INSUFFICIENT: 'CREDITS_INSUFFICIENT',
+  // An org member whose org credits cannot cover the job (1897); their own credits are never used.
+  ORG_CREDITS_INSUFFICIENT: 'CREDITS_INSUFFICIENT',
   INVALID_INPUT: 'INVALID_INPUT',
   PROFILE_NOT_FOUND: 'NOT_FOUND',
   JOB_NOT_FOUND: 'NOT_FOUND',
@@ -41,6 +45,10 @@ const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   FREE_WORK_PUBLIC: 'FORBIDDEN',
   // A work from a gallery-excluded category (the posters root) is never public (§9 第 7 条).
   WORK_PRIVATE_ONLY: 'FORBIDDEN',
+  // 企业作品 (1942): a member cannot delete a work the org paid for.
+  ORG_WORK_DELETE_FORBIDDEN: 'FORBIDDEN',
+  // Account deletion (1971): an org's primary admin cannot delete their account.
+  ORG_OWNER_CANNOT_DELETE_ACCOUNT: 'ACCOUNT_OWNS_ORG',
   // Dispute evidence (T82): an unknown dispute, a Managed Payments one (Stripe answers it), and a
   // second submit of the one submission Stripe allows.
   DISPUTE_NOT_FOUND: 'NOT_FOUND',
@@ -59,6 +67,30 @@ const SQL_ERROR_CODES: Record<string, ErrorCode> = {
   PRICE_UNSET: 'NOT_FOUND',
   // The vessel library (1563): an admin edit or delete of a vessel that is gone.
   DISHWARE_NOT_FOUND: 'NOT_FOUND',
+  // Enterprise orgs (1626–1628, ARCHITECTURE §6.5). The message keeps the exact reason.
+  NOT_ORG_OWNER: 'FORBIDDEN',
+  ORG_SUSPENDED: 'FORBIDDEN',
+  ORG_OWNER_CANNOT_LEAVE: 'FORBIDDEN',
+  // The monthly report (1670–1671): the caller is neither the org's owner nor one of its members.
+  NOT_ORG_MEMBER: 'FORBIDDEN',
+  ORG_NOT_FOUND: 'NOT_FOUND',
+  ORG_PACKAGE_NOT_FOUND: 'NOT_FOUND',
+  ORG_MEMBER_NOT_FOUND: 'NOT_FOUND',
+  ORG_INVITE_INVALID: 'NOT_FOUND',
+  ORG_MEMBER_EXISTS: 'CONFLICT',
+  ORG_CHANGED: 'CONFLICT',
+  ORG_POOL_INSUFFICIENT: 'CONFLICT',
+  ORG_LIMIT_ABOVE_CAP: 'INVALID_INPUT',
+  // Enterprise affiliate (1642–1643): personal and org affiliate accounts exclude each other.
+  ORG_PERSONAL_AFFILIATE: 'CONFLICT',
+  ORG_PERSONAL_AFFILIATE_UNSETTLED: 'CONFLICT',
+  AFFILIATE_ORG_MEMBER: 'FORBIDDEN',
+  // 更换主管理员 (1930, 1990): the new owner's affiliate row is not an empty personal one, the
+  // org's account is not its owner's, or a payment/binding holds the org's rows right now.
+  ORG_NEW_OWNER_AFFILIATE: 'CONFLICT',
+  ORG_NEW_OWNER_AFFILIATE_HISTORY: 'CONFLICT',
+  ORG_AFFILIATE_MISMATCH: 'CONFLICT',
+  ORG_BUSY: 'CONFLICT',
 }
 
 export function toRpcError(fn: string, error: { message: string; code?: string }): AppError {

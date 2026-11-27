@@ -9,11 +9,11 @@ import { useAfterLoad, useConsent } from './use-consent'
 // visitors never download it, and no page's first-load JS grows.
 const ConsentBar = lazy(() => import('./consent-bar'))
 
-// Rendered once by the root layout. Without a PostHog key there is nothing to consent to.
+// Rendered once by the root layout. Without PostHog or PVUV there is nothing to consent to.
 export function ConsentSlot() {
   const { mode } = useConsent()
   const ready = useAfterLoad()
-  if (!publicEnv.NEXT_PUBLIC_POSTHOG_KEY) return null
+  if (!publicEnv.NEXT_PUBLIC_POSTHOG_KEY && !publicEnv.NEXT_PUBLIC_PVUV_SITE) return null
   if (mode === 'hidden' || (mode === 'ask' && !ready)) return null
   return (
     <Suspense fallback={null}>

@@ -6,10 +6,14 @@ import { FIRST_FRAMES } from './first-frames.generated'
 // Shared bits of the three landing pages (T44): the illustrative hero pairs in public/home
 // (example-*, 900 × 1125) and the size count.
 export const pairImage = (file: string, alt: string): ImageRef => ({ src: `/home/${file}.webp`, alt, width: 900, height: 1125 })
+// The restaurant pairs of the home hero (public/home/food-*: 880 × 1100, the -s copies 320 × 400),
+// also the steps' pictures since 2026-11-24 (restaurants and hotels lead the home page).
+export const dishImage = (file: string, alt: string, small = false): ImageRef =>
+  ({ src: `/home/${file}${small ? '-s' : ''}.webp`, alt, width: small ? 320 : 880, height: small ? 400 : 1100 })
 export const homeImage = (file: string, alt: string): ImageRef => ({ src: `/home/${file}.webp`, alt, width: 1080, height: 1350 })
-// The inner pages' own cases (public/cases, 1080 × 1350, Owner 2026-11-11): a sneaker shoot on
-// /commercial-photography; a cat in three art styles and four precise edits on
-// /image-to-image-generator. None of them repeats the home page's tote.
+// The inner pages' own cases (public/cases, 1080 × 1350, Owner 2026-11-11): the tote shoot on
+// the English /commercial-photography (Owner 2026-11-25; /zh keeps the sneaker), a cat in three art
+// styles and four precise edits on /image-to-image-generator.
 export const caseImage = (file: string, alt: string): ImageRef => ({ src: `/cases/${file}.webp`, alt, width: 1080, height: 1350 })
 
 // A hero's phone photo with its first frame (scripts/first-frames.ts). A picture the script does
@@ -23,4 +27,4 @@ export const sizeCountWord = (['zero', 'one', 'two', 'three', 'four', 'five', 's
 // The category keys a landing page's template section shows (template_categories.key, which
 // never changes, T75); the templates in them are the admin's featured ones (T53). A key the
 // Owner deletes in admin simply shows nothing.
-export const CATEGORY = { food: 'food-drink', products: 'products-resale', beauty: 'beauty-skincare' } as const
+export const CATEGORY = { food: 'food-drink', products: 'products-resale', beauty: 'beauty-skincare', spaces: 'rooms-spaces' } as const

@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
 import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
+import { useOfferedToggles } from '@/core/templates/offered-toggles'
 import { cn } from '@/core/ui/cn'
 
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
@@ -23,7 +24,8 @@ export function TemplateSettings({ template, photos, values, onChange }: Props) 
   const shared = values.copy[template.id] ?? {}
   const setShared = (copy: Record<string, string>) => onChange((current) => ({ ...current, copy: { ...current.copy, [template.id]: copy } }))
   const setToggles = (toggles: Record<string, boolean>) => onChange((current) => ({ ...current, toggles: { ...current.toggles, [template.id]: toggles } }))
-  if (template.copyFields.length === 0 && template.toggles.length === 0) return null
+  const toggles = useOfferedToggles(template.toggles)
+  if (template.copyFields.length === 0 && toggles.length === 0) return null
   return (
     <section aria-labelledby={`set-${template.id}`} className="hairline-lit rounded-panel bg-card p-3.5">
       <h3 id={`set-${template.id}`} className="text-body leading-[1.25] font-semibold">{template.name}</h3>

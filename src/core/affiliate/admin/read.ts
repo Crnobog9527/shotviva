@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { AppError } from '@/core/errors'
 import { decodeCursor, PAGE_SIZE, toPage } from '@/core/admin/cursor'
+import { feeQuote } from '../fees'
 import { endExclusive, type Filters } from './query'
 
 export function checked<T>(result: { data: T; error: { message: string } | null }): T {
@@ -39,6 +40,9 @@ export const commission = z.object({
   released_by: z.uuid().nullable(),
   confirm_after: z.string(),
   product_id: z.string(),
+  fee_cents: z.number().nullable().default(null),
+  net_base_usd: z.number().nullable().default(null),
+  paused_hold: z.boolean().default(false),
 })
 const snapshot = z.record(z.string(), z.unknown())
 const payout = z.object({
@@ -50,11 +54,16 @@ const payout = z.object({
   legacy_review_required: z.boolean(),
   payable: z.number().int().safe().nonnegative().nullable(),
   paid_amount: z.number().int().safe().nonnegative().nullable(),
+  fees: feeQuote.nullable(),
   payout_snapshot: snapshot,
   paid_at: z.string().nullable(),
   paid_reference: z.string().nullable(),
   note: z.string().nullable(),
   paid_method: z.string().nullable(),
+  // Enterprise statements (org account) are marked paid with the CNY rate and amount (§6.5).
+  account: z.object({ org_id: z.uuid().nullable() }).nullable(),
+  paid_fx_cny_per_usd: z.number().nullable(),
+  paid_amount_cny_fen: z.number().int().safe().nullable(),
   owner: z.object({ risks: z.array(z.object({ id, flags: z.array(z.string()) })) }).optional(),
 })
 export type Commission = z.infer<typeof commission>
@@ -80,16 +89,17 @@ function withFilters(q: ReturnType<typeof pageQuery>, f: Filters) {
   if (f.status) q = q.eq('status', f.status)
   return q
 }
-export const commissionColumns = 'id,created_at,payment_id,affiliate_user_id,level,rate_bp,amount,status,base_usd,flags,released_by,confirm_after,product_id'
+export const commissionColumns = 'id,created_at,payment_id,affiliate_user_id,level,rate_bp,amount,status,base_usd,flags,released_by,confirm_after,product_id,fee_cents,net_base_usd,paused_hold'
 export async function commissions(db: SupabaseClient, f: Filters) {
   let q = withFilters(pageQuery(db, 'affiliate_commissions', commissionColumns, f.cursor), f)
   if (f.flag === 'yes') q = q.neq('flags', '{}')
   if (f.flag === 'no') q = q.eq('flags', '{}')
+  if (f.flag === 'paused') q = q.eq('paused_hold', true)
   return toPage(commission.array().parse(checked(await q)), (r) => r)
 }
 export async function payouts(db: SupabaseClient, f: Filters, includeFlags = false) {
-  const cols = 'id,created_at,affiliate_user_id,period,amount,legacy_review_required,payable:affiliate_payout_payable,paid_amount,status,payout_snapshot,paid_at,paid_reference,note'
-  const fields = cols + ',paid_method' + (includeFlags ? ',owner:affiliates(risks:affiliate_commissions(id,flags))' : '')
+  const cols = 'id,created_at,affiliate_user_id,period,amount,legacy_review_required,payable:affiliate_payout_payable,fees:affiliate_payout_fees,paid_amount,status,payout_snapshot,paid_at,paid_reference,note'
+  const fields = cols + ',paid_method,paid_fx_cny_per_usd,paid_amount_cny_fen,account:affiliates(org_id)' + (includeFlags ? ',owner:affiliates(risks:affiliate_commissions(id,flags))' : '')
   let q = withFilters(pageQuery(db, 'affiliate_payouts', fields, f.cursor), f)
   if (includeFlags)
     q = q

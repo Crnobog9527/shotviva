@@ -7,6 +7,7 @@ import { logger } from '@/core/logger'
 import type { Locale } from '@/core/i18n/locales'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 import { ShareCta } from '@/modules/image/share-page'
+import { signupGiftCreditsForSite } from '@/site/billing/signup-gift'
 import { creditFacts, fillCredits, freeImagesIn } from '@/site/content'
 
 type Props = { templateId: string; shareId: string | null; locale: Locale; text: Awaited<ReturnType<typeof shareCtaText>> }
@@ -17,13 +18,14 @@ export async function shareCtaText(locale: Locale) {
 }
 
 // "3 free Standard images", worked out exactly as the home page does.
-async function giftOf(locale: Locale) {
-  return fillCredits(freeImagesIn(locale), creditFacts(await cachedWebCatalogue(locale)))
+export async function giftOf(locale: Locale) {
+  const [live, gift] = await Promise.all([cachedWebCatalogue(locale), signupGiftCreditsForSite()])
+  return fillCredits(freeImagesIn(locale), creditFacts(live, gift))
 }
 
 // A shared link is often someone's first page: an auth hiccup shows the signed-out action, as
 // the home page does, never an error page.
-async function signedIn(): Promise<boolean> {
+export async function signedIn(): Promise<boolean> {
   try {
     return Boolean((await getSessionUser())?.verified)
   } catch (error) {

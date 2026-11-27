@@ -75,8 +75,7 @@ function useSeriesView(items: SeriesListItem[], draft: string[] | null, filter: 
 function CatalogueHeader({ editing }: { editing: boolean }) {
   return <header className="flex flex-wrap items-center gap-4">
     <h1 className="mr-auto text-xl font-semibold">{copy.title}</h1>
-    {!editing && <><Link className="text-sm underline" href="/admin/templates">{copy.templates}</Link>
-      <Button asChild><Link href={SERIES_PATH + '?new=1'} scroll={false}>{copy.create}</Link></Button></>}
+    {!editing && <Button asChild><Link href={SERIES_PATH + '?new=1'} scroll={false}>{copy.create}</Link></Button>}
   </header>
 }
 

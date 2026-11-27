@@ -7,6 +7,7 @@ import { Checkbox } from '@/core/ui/checkbox'
 import { REVIEW_COPY as COPY } from '../gallery-review/copy'
 import type { ReviewWork } from '../gallery-review/types'
 import { formatBeijing } from '../shell/format'
+import { UserLink } from '../users-ui/user-link'
 
 type Props = {
   work: ReviewWork
@@ -26,6 +27,7 @@ function Facts({ work }: { work: ReviewWork }) {
   return (
     <div className="grid gap-1 text-xs text-muted-foreground">
       <p className="font-medium text-foreground">{work.templateName}</p>
+      <UserLink userId={work.userId} jobId={work.id} className="justify-self-start text-xs">{COPY.openUser}</UserLink>
       <p>
         {formatBeijing(work.createdAt)} · {COPY.pool[work.creditPool]}
       </p>
@@ -46,8 +48,11 @@ export function WorkCard({ work, selected, disabled, onSelect, onApprove, onReje
     <li className="grid content-start gap-2 rounded-lg border border-border bg-card p-2">
       <div className="relative aspect-square overflow-hidden rounded-md bg-muted">
         {work.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- a signed private URL, not optimisable
-          <img src={work.imageUrl} alt={work.templateName} loading="lazy" className="size-full object-contain" />
+          // The image opens its maker's user dialog over this page, the same one /admin/users uses.
+          <UserLink userId={work.userId} jobId={work.id} title={COPY.openUser} className="block size-full cursor-pointer">
+            {/* eslint-disable-next-line @next/next/no-img-element -- a signed private URL, not optimisable */}
+            <img src={work.imageUrl} alt={work.templateName} loading="lazy" className="size-full object-contain" />
+          </UserLink>
         ) : (
           <p className="grid size-full place-items-center text-xs text-muted-foreground">{COPY.noImage}</p>
         )}

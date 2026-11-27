@@ -1,3 +1,4 @@
+import { tierPool } from '@/core/billing/pools'
 import { limitsFor } from '@/core/billing/tier-limits'
 import { MAX_BATCH_TEMPLATES } from '@/core/jobs/batch/limits'
 import type { ImageOptions } from '@/core/templates/image-options'
@@ -30,19 +31,22 @@ export type MatrixValues = {
   aspect: OutputAspect
 }
 
-export const EMPTY_MATRIX: MatrixValues = { templateIds: [], removed: [], copy: {}, overrides: {}, toggles: {}, resolution: '1k', aspect: 'original' }
+export const EMPTY_MATRIX: MatrixValues = { templateIds: [], removed: [], copy: {}, overrides: {}, toggles: {}, resolution: '2k', aspect: 'original' }
 
 export type MatrixPhoto = { id: string; originalRatio?: number }
 
 export type MatrixCell = { key: CellKey; template: CatalogueTemplate; photo: MatrixPhoto; credits: number; removed: boolean; copy: Record<string, string> }
 
 // What every chosen template can make: the sizes and resolutions they share. A batch is one
-// size and one resolution (the preflight refuses a mixed one).
+// size and one resolution (the preflight refuses a mixed one). A batch is paid credits only and
+// 1K is free credits only (1996), so a batch never offers 1K.
+const BATCH_RESOLUTIONS = RESOLUTIONS.filter((tier) => tierPool(tier) === 'paid')
+
 export function sharedOptions(templates: readonly CatalogueTemplate[]): ImageOptions {
   const all = templates.map((template) => template.imageOptions).filter((options): options is ImageOptions => options !== undefined)
-  if (all.length === 0) return { resolutions: [...RESOLUTIONS], aspectRatios: [], originalRatio: true }
+  if (all.length === 0) return { resolutions: [...BATCH_RESOLUTIONS], aspectRatios: [], originalRatio: true }
   return {
-    resolutions: RESOLUTIONS.filter((tier) => all.every((options) => options.resolutions.includes(tier))),
+    resolutions: BATCH_RESOLUTIONS.filter((tier) => all.every((options) => options.resolutions.includes(tier))),
     aspectRatios: all[0]!.aspectRatios.filter((ratio) => all.every((options) => options.aspectRatios.includes(ratio))),
     originalRatio: all.every((options) => options.originalRatio),
     ...(all.some((options) => options.exactPixels === false) && { exactPixels: false }),

@@ -8,7 +8,8 @@ import { cn } from '@/core/ui/cn'
 // Phone tag so it reads as part of the picture's labelling, not as a button.
 // A copy lives in the public pages (core/content/blocks/series-card.tsx, marketing.css
 // .mk-sbadge; core cannot import modules): change both together.
-export function SeriesBadge({ className, onPhoto = true }: { className?: string; onPhoto?: boolean }) {
+// `bundle`: a 精选组合 in the public template panel says 「组合」 / "Set" with the same glyph.
+export function SeriesBadge({ className, onPhoto = true, bundle = false }: { className?: string; onPhoto?: boolean; bundle?: boolean }) {
   const t = useTranslations('app.series')
   return (
     <span className={cn('inline-flex min-h-7 items-center gap-1.5 rounded-tag px-2.5 py-1 text-caption leading-none font-semibold',
@@ -17,7 +18,7 @@ export function SeriesBadge({ className, onPhoto = true }: { className?: string;
         <rect x="2" y="5.5" width="9" height="8" rx="1.5" />
         <path d="M5 3.5h7.5A1.5 1.5 0 0 1 14 5v6.5" strokeLinecap="round" />
       </svg>
-      {t('badge')}
+      {t(bundle ? 'bundleBadge' : 'badge')}
     </span>
   )
 }

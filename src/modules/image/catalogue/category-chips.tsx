@@ -1,6 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
+import type { WheelEvent } from 'react'
 
 import { cn } from '@/core/ui/cn'
 
@@ -17,6 +18,9 @@ type Props = {
   labels: ChipLabels
   // Hidden while a search is typed (the search covers every category).
   hidden?: boolean
+  // Every row one line at every width, scrolled sideways (a mouse wheel scrolls it too): the home
+  // picker, where wrapped rows took half the column from the list under them (Owner 2026-11-25).
+  rail?: boolean
 }
 
 export type ChipLabels = { all: string; filter: string; filterWithin(name: string): string }
@@ -29,7 +33,7 @@ type Chip = { key: string; name: string; pressed: boolean; select: Selection; he
 // leads with its own All (the level above, unnarrowed) and marks its choice with a bone rim, not
 // a fill, so the eye reads one solid chip as the place and the rims as narrowing within it.
 // Each row is its own horizontal rail on phones (§8.3) and wraps from md up (B comp create.html).
-export function CategoryChips({ filters, saved, value, onChange, labels, hidden }: Props) {
+export function CategoryChips({ filters, saved, value, onChange, labels, hidden, rail = false }: Props) {
   const savedName = useTranslations('app.favorites')('saved')
   const rows = chipRows(filters, value.path)
   const root: Chip[] = [
@@ -40,7 +44,7 @@ export function CategoryChips({ filters, saved, value, onChange, labels, hidden 
   if (hidden) return null
   return (
     <div className="grid gap-2">
-      <ChipRow chips={root} label={labels.filter} depth={0} onChange={onChange} />
+      <ChipRow chips={root} label={labels.filter} depth={0} rail={rail} onChange={onChange} />
       {rows.slice(1).map((nodes, index) => {
         const parent = value.path.slice(0, index + 1)
         const chosen = value.path[index + 1]
@@ -49,22 +53,34 @@ export function CategoryChips({ filters, saved, value, onChange, labels, hidden 
           ...nodes.map((node) => ({ key: node.slug, name: node.name, pressed: chosen === node.slug, select: { saved: false, path: [...parent, node.slug] } })),
         ]
         const parentName = rows[index]?.find((node) => node.slug === parent.at(-1))?.name ?? ''
-        return <ChipRow key={parent.join('/')} chips={chips} label={labels.filterWithin(parentName)} depth={index + 1} onChange={onChange} />
+        return <ChipRow key={parent.join('/')} chips={chips} label={labels.filterWithin(parentName)} depth={index + 1} rail={rail} onChange={onChange} />
       })}
     </div>
   )
 }
 
-type RowProps = { chips: Chip[]; label: string; depth: number; onChange(next: Selection): void }
+type RowProps = { chips: Chip[]; label: string; depth: number; rail: boolean; onChange(next: Selection): void }
 
-function ChipRow({ chips, label, depth, onChange }: RowProps) {
+// A vertical wheel turn scrolls a one-line rail sideways (nothing else scrolls under the chips).
+function wheelSideways(event: WheelEvent<HTMLDivElement>) {
+  if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) event.currentTarget.scrollLeft += event.deltaY
+}
+
+function ChipRow({ chips, label, depth, rail, onChange }: RowProps) {
   return (
-    <div role="group" aria-label={label} className={cn('no-scrollbar flex gap-2 overflow-x-auto px-(--gutter) md:flex-wrap md:overflow-visible', depth > 0 && 'chip-row-in')}>
+    <div
+      role="group"
+      aria-label={label}
+      onWheel={rail ? wheelSideways : undefined}
+      className={cn('no-scrollbar flex gap-2 overflow-x-auto px-(--gutter)', !rail && 'md:flex-wrap md:overflow-visible', depth > 0 && 'chip-row-in')}
+    >
       {chips.map((chip) => (
         <button
           key={chip.key}
           type="button"
           aria-pressed={chip.pressed}
+          // An open action Create's app shell may replay (ARCHITECTURE §18.3).
+          data-open={`chip:${depth}:${chip.key}`}
           onClick={(event) => {
             onChange(chip.select)
             event.currentTarget.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })

@@ -12,6 +12,7 @@ import { offeredMethods } from "../stripe/catalog"
 import { holdsMembership, NO_STANDING, type MemberStanding } from "../subscription/standing"
 import { PaymentChannelContext, WechatPayContext } from "./channel-context"
 import { PerkFactsContext, type PerkFacts } from "./perk-facts"
+import { memberPackOff } from "./perks"
 import { StandingContext } from "./standing-context"
 import { usePaywallState, type PaywallMoment, type PaywallOpenOptions } from "./use-paywall-state"
 
@@ -64,11 +65,12 @@ export function PaywallProvider({ products, perkFacts, channel, wechatPay, child
     [reset, standing],
   )
   const held = useMemo(() => ({ standing, setStanding }), [standing])
+  const facts = useMemo(() => ({ ...perkFacts, packMemberOff: memberPackOff(products) }), [perkFacts, products])
   return (
     <PaymentChannelContext.Provider value={channel}>
       <WechatPayContext.Provider value={wechatPay}>
         <StandingContext.Provider value={held}>
-          <PerkFactsContext.Provider value={perkFacts}>
+          <PerkFactsContext.Provider value={facts}>
             <PaywallContext.Provider value={api}>
               {children}
               <PaywallSheet open={open} onOpenChange={setOpen} trigger={trigger} moment={moment.moment} needed={moment.needed} momentTier={moment.tier} products={products} state={state} />
@@ -84,4 +86,10 @@ export function usePaywall(): PaywallApi {
   const api = useContext(PaywallContext)
   if (!api) throw new Error("usePaywall needs a PaywallProvider")
   return api
+}
+
+// Null where no PaywallProvider is mounted: the public pages' template panel signed out, which
+// never opens the paywall (its primary is sign-up).
+export function usePaywallIfAny(): PaywallApi | null {
+  return useContext(PaywallContext)
 }

@@ -13,12 +13,24 @@ import { waffoConfig } from './config'
 // auth: RSA-SHA256 over METHOD \n PATH \n TIMESTAMP \n base64(sha256(body)). The key decides
 // test or prod; there is no environment header to get wrong. No retries: create-session has no
 // idempotency, so a retried create could leave two payable sessions; a cancel the buyer can
-// press again.
+// press again. The one exception is billing-detail.ts: after a 4xx (no session was created) it
+// retries once without the company title.
 
 export const WAFFO_API_ORIGIN = 'https://api.waffo.ai'
 const CREATE_SESSION_PATH = '/v1/actions/checkout/create-session'
 const CANCEL_SUBSCRIPTION_PATH = '/v1/actions/subscription-order/cancel-order'
 const TIMEOUT_MS = 20_000
+
+// Pre-fills the buyer side of Waffo's invoice (billing-detail.ts). country and isBusiness are
+// required by Waffo whenever billingDetail is sent.
+export type WaffoBillingDetail = {
+  country: string
+  isBusiness: true
+  businessName: string
+  taxId: string
+  postcode?: string
+  state?: string
+}
 
 export type WaffoSessionRequest = {
   productId: string
@@ -29,10 +41,14 @@ export type WaffoSessionRequest = {
   metadata: Record<string, string>
   orderMerchantExternalId: string
   language: 'en' | 'zh-Hans'
-  // A card subscription offers cards only (T50); one-time sessions offer what the currency has.
+  // Always sent (checkout.ts waffoMethods): Waffo refuses a method the product type and currency
+  // do not take (a subscription with Alipay: 400), so the paywall row decides what the page shows.
   includePaymentMethods?: readonly string[]
+  // A blacklist (mutually exclusive with the whitelist); methods the currency lacks are ignored.
+  excludePaymentMethods?: readonly string[]
   withTrial?: false
   allowPromotionCodes?: false
+  billingDetail?: WaffoBillingDetail
 }
 
 // cancel-order answers the order, its new status (`canceling` until the period ends, or
@@ -56,7 +72,29 @@ export function signWaffoRequest(input: { path: string; timestamp: string; body:
   return sign('sha256', Buffer.from(canonical), input.privateKey).toString('base64')
 }
 
-type Envelope = { data?: unknown; errors?: { message?: unknown }[] }
+type Envelope = { data?: unknown; errors?: { message?: unknown; code?: unknown; extensions?: { code?: unknown } }[] }
+
+// A failed Waffo call, with Waffo's HTTP status so callers can tell a rejected request (4xx: no
+// session was created) from an outage.
+export class WaffoHttpError extends AppError {
+  readonly httpStatus: number
+  constructor(label: string, httpStatus: number) {
+    super('INTERNAL', `Waffo ${label} failed (${httpStatus})`)
+    this.httpStatus = httpStatus
+  }
+}
+
+// Only Waffo's validation answers (400, 422) count as a refused request; auth, rate-limit,
+// conflict or timeout statuses do not prove that no session exists.
+export const isWaffoRejection = (error: unknown) => error instanceof WaffoHttpError && (error.httpStatus === 400 || error.httpStatus === 422)
+
+// Waffo's error codes only, never its message text: a message can echo what we sent (buyer
+// company name, tax ID).
+function errorCodes(envelope: Envelope | null): string[] {
+  return (envelope?.errors ?? []).slice(0, 3)
+    .map((e) => String(e.code ?? e.extensions?.code ?? ''))
+    .filter((code) => /^[A-Za-z0-9_.-]{1,64}$/.test(code))
+}
 
 async function post(request: typeof fetch, path: string, payload: unknown, label: string): Promise<unknown> {
   const config = waffoConfig()
@@ -72,10 +110,9 @@ async function post(request: typeof fetch, path: string, payload: unknown, label
   })
   const envelope = (await response.json().catch(() => null)) as Envelope | null
   if (!response.ok || !envelope?.data || envelope.errors?.length) {
-    // Status and Waffo's own messages only; never the request (it names the buyer).
-    const notes = (envelope?.errors ?? []).slice(0, 3).map((e) => String(e.message ?? '').slice(0, 200))
-    logger.error(`waffo ${label} failed`, { status: response.status, errors: notes.map(note => note.replace(/PROD_[A-Za-z0-9]+/g, '[product]')) })
-    throw new AppError('INTERNAL', `Waffo ${label} failed (${response.status})`)
+    // Status and Waffo's error codes only; never the request or Waffo's message text.
+    logger.error(`waffo ${label} failed`, { status: response.status, codes: errorCodes(envelope) })
+    throw new WaffoHttpError(label, response.status)
   }
   return envelope.data
 }
@@ -94,4 +131,9 @@ export function waffoClient(request: typeof fetch = fetch): WaffoApi {
 
 export function readWaffoCatalog(query: string, variables: Record<string, unknown>) {
   return post(fetch, '/v1/graphql', { query, variables }, 'catalog')
+}
+
+// F4: a read-only GraphQL query (settlement figures). Same signing as every other call.
+export function readWaffoGraphql(query: string, variables: Record<string, unknown>, request: typeof fetch = fetch) {
+  return post(request, '/v1/graphql', { query, variables }, 'graphql')
 }

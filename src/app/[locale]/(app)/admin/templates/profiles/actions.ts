@@ -1,6 +1,7 @@
 'use server'
 
-import { revalidatePath, updateTag } from 'next/cache'
+import { revalidatePath } from 'next/cache'
+import { updateCatalogueTag } from '@/core/templates/catalogue-invalidation'
 import { z } from 'zod'
 
 import { runAdminQuery } from '@/core/admin/templates'
@@ -8,6 +9,7 @@ import type { SaveProfileInput, SwitchInput } from '@/core/admin/template-profil
 import { getProfileDetail, saveTemplateProfile, switchTemplateProfiles } from '@/core/admin/template-profiles/repository'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 import { TEMPLATES_CACHE_TAG } from '@/core/templates'
+import { warmPublicPagesSoon } from '@/app/warm-public-pages'
 
 const detailInput = z.object({ id: z.string().min(1).max(64), profile: z.enum(['openai', 'seedream']) })
 
@@ -35,7 +37,8 @@ export async function switchProfilesAction(input: SwitchInput) {
     const rows = await switchTemplateProfiles(createAdminSupabase(), admin.id, input)
     if (!input.validateOnly && rows.some(row => row.ok && !row.unchanged)) {
       // Prices, tiers and the model of the switched templates show on every catalogue page.
-      updateTag(TEMPLATES_CACHE_TAG)
+      await updateCatalogueTag(TEMPLATES_CACHE_TAG)
+      warmPublicPagesSoon()
       revalidatePath('/[locale]/admin/templates', 'page')
       revalidatePath('/[locale]/admin/templates/profiles', 'page')
     }

@@ -82,13 +82,14 @@ it('keeps the old signup amount when a candidate requests 100 before activation'
   expect(result.rows[0].free_credits).toBe(6)
 })
 
-it('awards 100 only for a post-switch signup, even from a stale client; replay does not award twice', async () => {
+// 2008: the amount is signup_gift_credits, default 200 (Owner 2026-11-27).
+it('awards the signup gift (default 200) only for a post-switch signup, even from a stale client; replay does not award twice', async () => {
   await db.query("update public.profiles set created_at=now()-interval '1 day' where id=$1",[user])
   await db.query(`insert into public.system_settings(key,value,updated_at) values('pricing_catalog_version','"v2"',now())
     on conflict(key) do update set value=excluded.value,updated_at=excluded.updated_at`)
   const signup = (id: string) => db.query("select * from public.grant_credits($1::uuid,6,'signup','signup:'||($1::uuid)::text,'free')",[id])
   expect((await signup(user)).rows[0].applied).toBe(false)
   const newcomer = await createUser(db)
-  expect((await signup(newcomer)).rows[0]).toMatchObject({ applied:true, free_credits:100 })
-  expect((await signup(newcomer)).rows[0]).toMatchObject({ applied:false, free_credits:100 })
+  expect((await signup(newcomer)).rows[0]).toMatchObject({ applied:true, free_credits:200 })
+  expect((await signup(newcomer)).rows[0]).toMatchObject({ applied:false, free_credits:200 })
 })

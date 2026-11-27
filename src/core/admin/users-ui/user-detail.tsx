@@ -10,6 +10,7 @@ import { GraylumBlock, RequestsBlock, SameIpBlock, SubscriptionBlock } from './a
 import { USERS_COPY as COPY } from './copy'
 import { UserCodesRow } from './user-codes-row'
 import { PaymentsBlock } from './payments-block'
+import { BindPartnerButton } from './bind-partner-button'
 import { UserActions, type UserAdminActions } from './user-actions'
 import { LedgerTable, UserJobsTable } from './user-tables'
 
@@ -43,6 +44,7 @@ export function UserDetailView({ data, actions, support, onLedgerPage, onCodesPa
       </div>
       <UserCodesRow history={extras.codeHistory} onPage={onCodesPage} />
       <UserActions userId={user.id} banned={user.bannedAt !== null} balances={{ free: user.freeCredits, paid: user.credits }} actions={actions} />
+      <BindPartnerButton userId={user.id} banned={user.bannedAt !== null} referrer={user.referrer} actions={actions} />
       <section className="grid gap-2">
         <h3 className="font-semibold">{COPY.detail.recentJobs(RECENT_JOBS)}</h3>
         <UserJobsTable jobs={jobs} actions={support.jobActions} highlight={support.focusJobId ?? undefined} />

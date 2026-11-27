@@ -7,7 +7,7 @@ import { AppError, toAppError } from '../errors'
 import { GALLERY_CACHE_TAG } from '../gallery/cache'
 import { logger } from '../logger'
 import { accountStorage, r2Store } from '../storage'
-import { deleteAccount, type AccountStorage, type CancelSubscriptions } from './account-deletion'
+import { deleteAccount, type AccountStorage, type ArchiveOrgWorks, type CancelSubscriptions } from './account-deletion'
 import { assertSameOrigin } from './api-guards'
 import { getSessionUser } from './session'
 import { createAdminSupabase } from './supabase-admin'
@@ -15,7 +15,7 @@ import { createSessionSupabase } from './supabase-server'
 
 const bodySchema = z.object({ confirm: z.literal('DELETE') })
 
-type RouteDeps = { cancelSubscriptions: CancelSubscriptions; storage?: AccountStorage }
+type RouteDeps = { cancelSubscriptions: CancelSubscriptions; archiveOrgWorks: ArchiveOrgWorks; storage?: AccountStorage }
 
 async function run(request: NextRequest, deps: Required<RouteDeps>) {
   assertSameOrigin(request)
@@ -27,6 +27,7 @@ async function run(request: NextRequest, deps: Required<RouteDeps>) {
   const admin = createAdminSupabase()
   await deleteAccount(user.id, {
     cancelSubscriptions: deps.cancelSubscriptions,
+    archiveOrgWorks: deps.archiveOrgWorks,
     storage: deps.storage,
     authAdmin: { deleteUser: (id) => admin.auth.admin.deleteUser(id) },
   })
@@ -48,7 +49,11 @@ async function run(request: NextRequest, deps: Required<RouteDeps>) {
 // Stripe would not cancel answers 502 SUBSCRIPTION_CANCEL_FAILED, with nothing deleted.
 export async function handleDeleteAccount(request: NextRequest, deps: RouteDeps) {
   try {
-    await run(request, { cancelSubscriptions: deps.cancelSubscriptions, storage: deps.storage ?? accountStorage(r2Store) })
+    await run(request, {
+      cancelSubscriptions: deps.cancelSubscriptions,
+      storage: deps.storage ?? accountStorage(r2Store),
+      archiveOrgWorks: deps.archiveOrgWorks,
+    })
     return NextResponse.json({ ok: true })
   } catch (error) {
     const appError = toAppError(error)

@@ -91,7 +91,7 @@ it('uses the setting at each trigger, preserves historical amounts and finalizes
   expect(await ledgerOf(db, owner)).toHaveLength(0)
 
   const next = await signup()
-  expect(await redeem(next, true)).toMatchObject({ status: 'ok', credits_granted: 0 })
+  expect(await redeem(next)).toMatchObject({ status: 'ok', credits_granted: 0 })
   expect(await redeem(next)).toMatchObject({ status: 'used' })
   expect((await profileOf(db, next)).free_credits).toBe(benefits.freeCredits)
   expect(await ledgerOf(db, next)).toHaveLength(1)

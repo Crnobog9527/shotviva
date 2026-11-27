@@ -1,14 +1,16 @@
 'use client'
 
+import { localeOfPath } from '../../i18n/paths'
 import { logger } from '../../logger'
 import { publicEnv } from '../../public-env'
-import { persistenceFor } from '../consent/decision'
+import { cookiesAllowed, persistenceFor } from '../consent/decision'
 import { onConsentChange, readConsent } from '../consent/store'
 import { categorySlug } from '../event-values'
 import type { BrowserEventName, EventProps } from '../events'
 import { sentryOptions } from '../sentry-options'
 import { clearPosthogStorage, syncPosthog } from './consent-sync'
 import { posthogConfig } from './posthog-config'
+import { clearPvuvStorage, isPvuvExcluded, loadPvuv, pvuvEvent, pvuvIdentify, pvuvLoaded } from './pvuv'
 import { afterLoad, loadedSdks, loadSdks, withSdks } from './sdk'
 
 let started = false
@@ -21,8 +23,11 @@ export function initBrowserAnalytics(): void {
   started = true
   const sentry = sentryOptions()
   const key = publicEnv.NEXT_PUBLIC_POSTHOG_KEY
-  if (!sentry.enabled && !key) return
+  const pvuvSite = publicEnv.NEXT_PUBLIC_PVUV_SITE
+  if (!sentry.enabled && !key && !pvuvSite) return
   afterLoad(() => {
+    // PVUV.ai: its own script tag, only where cookies are allowed (watchPvuvConsent for the rest).
+    if (pvuvSite && cookiesAllowed(readConsent())) loadPvuv(pvuvSite)
     void loadSdks({
       sentry: sentry.enabled
         ? async () => {
@@ -43,6 +48,35 @@ export function initBrowserAnalytics(): void {
     })
   })
   if (key) watchConsent()
+  if (pvuvSite) watchPvuvConsent(pvuvSite)
+}
+
+// The same answer rule as PostHog's persistence (ARCHITECTURE §16.1): "Accept" (or an open region)
+// lets the script in, even on a page opened before the answer. "Necessary only" removes what it
+// left and, if the script is running, reloads the page without it.
+function watchPvuvConsent(site: string): void {
+  // A visitor who answered "Necessary only" (or an EU visitor not yet asked) keeps nothing of PVUV's,
+  // also what a script wrote while the page was closing.
+  if (!cookiesAllowed(readConsent())) clearPvuvStorageSafely()
+  onConsentChange((consent) => {
+    if (cookiesAllowed(consent)) {
+      if (document.readyState === 'complete') loadPvuv(site)
+      return
+    }
+    const running = pvuvLoaded()
+    clearPvuvStorageSafely()
+    // A script that is already running cannot be unloaded and would write its cookies again on
+    // the next navigation: reload, and the page comes back without it (consent rule: not allowed).
+    if (running) window.location.reload()
+  })
+}
+
+function clearPvuvStorageSafely(): void {
+  try {
+    clearPvuvStorage(document, [window.localStorage, window.sessionStorage])
+  } catch {
+    // Storage blocked: there is nothing of ours in it either.
+  }
 }
 
 // ARCHITECTURE §16.1 (T70): cookies or memory follow the visitor's region and answer; an answer
@@ -68,7 +102,11 @@ function clearStorage(): void {
   }
 }
 
-const enabled = () => started && Boolean(publicEnv.NEXT_PUBLIC_POSTHOG_KEY)
+const posthogOn = () => started && Boolean(publicEnv.NEXT_PUBLIC_POSTHOG_KEY)
+// PVUV gets events and the sign-in id only where its script may run (cookies allowed, the same rule
+// as loading it); otherwise they are dropped, as PostHog's memory mode keeps nothing either.
+const pvuvOn = () => started && Boolean(publicEnv.NEXT_PUBLIC_PVUV_SITE) && cookiesAllowed(readConsent())
+const enabled = () => posthogOn() || pvuvOn()
 
 // The dictionary's zod schemas (about 30 KB gzip with zod) load with the first event, not with
 // the page: every marketing page used to carry them in its first-load JavaScript (mobile
@@ -87,6 +125,8 @@ export function track<E extends BrowserEventName>(event: E, props: EventProps<E>
       return
     }
     withSdks(({ posthog }) => posthog?.capture(event, checked.props))
+    // Not on the pages the script must not measure (/admin, the signed-in app, invite links).
+    if (pvuvOn() && !isPvuvExcluded(window.location.pathname)) pvuvEvent(event, { ...checked.props, locale: localeOfPath(window.location.pathname) })
   })
 }
 
@@ -138,7 +178,8 @@ export function trackUploadError(reason: EventProps<'upload_error'>['reason']): 
 
 // The Supabase user id, nothing else: no email or name as person properties (§16.1).
 export function identify(userId: string): void {
-  if (!enabled()) return
+  if (pvuvOn()) pvuvIdentify(userId)
+  if (!posthogOn()) return
   withSdks(({ posthog }) => {
     if (posthog && posthog.get_distinct_id() !== userId) posthog.identify(userId)
   })
@@ -146,7 +187,8 @@ export function identify(userId: string): void {
 
 // Call on sign-out before the redirect, so the next visitor on this tab is anonymous.
 export function resetIdentity(): void {
-  if (enabled()) withSdks(({ posthog }) => posthog?.reset())
+  if (started && pvuvLoaded()) clearPvuvStorageSafely()
+  if (posthogOn()) withSdks(({ posthog }) => posthog?.reset())
 }
 
 // Next calls this on every client navigation. Before Sentry is in there is nothing to record

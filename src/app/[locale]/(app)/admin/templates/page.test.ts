@@ -9,16 +9,31 @@ const listAdminTemplates = vi.fn()
 const listAdminCategoryTree = vi.fn()
 const readPricingOptions = vi.fn()
 const listAdminSeriesOptions = vi.fn()
+const after = vi.fn()
+const drainReferenceDeletions = vi.fn()
+
+vi.mock('next/server', async (original) => ({ ...(await original<typeof import('next/server')>()), after: (task: () => unknown) => after(task) }))
+vi.mock('@/core/admin/reference-library/object-cleanup', () => ({ drainReferenceDeletions: (...args: unknown[]) => drainReferenceDeletions(...args) }))
 
 vi.mock('@/core/auth', () => ({ requireAdmin: () => requireAdmin(), createAdminSupabase: () => ({}) }))
 vi.mock('@/core/admin', () => ({
   listAdminTemplates: (client: unknown) => listAdminTemplates(client),
   TemplatesEditor: () => null,
   CategoriesPanel: () => null,
+  LocaleDisplayPanel: () => null,
+  BundlesPanel: () => null,
+  CaseStripPanel: () => null,
+  HeroPanel: () => null,
 }))
+vi.mock('@/core/templates/locale-display-read', () => ({ readLocaleDisplay: async () => ({ categoryOrder: {}, featured: {} }), readFeaturedBundles: async () => undefined }))
 vi.mock('@/core/admin/template-categories', () => ({ listAdminCategoryTree: (db: unknown) => listAdminCategoryTree(db) }))
 vi.mock('@/core/admin/template-series', () => ({ seriesCopy: { title: "系列管理" }, listAdminSeriesOptions: (db: unknown) => listAdminSeriesOptions(db) }))
-vi.mock('./category-actions', () => ({ moveTemplateCategoryAction: vi.fn() }))
+vi.mock('@/core/templates/home-case-strip-read', () => ({ readHomeCaseStrip: async () => ({}) }))
+vi.mock('@/core/templates/home-hero-read', () => ({ readHomeHero: async () => ({}) }))
+vi.mock('./home-hero-action', () => ({ saveHomeHeroAction: vi.fn() }))
+vi.mock('./case-strip-action', () => ({ saveHomeCaseStripAction: vi.fn() }))
+vi.mock('./bundle-actions', () => ({ saveFeaturedBundleAction: vi.fn(), deleteFeaturedBundleAction: vi.fn(), setDefaultFeaturedBundlesAction: vi.fn() }))
+vi.mock('./category-actions', () => ({ moveTemplateCategoryAction: vi.fn(), saveLocaleDisplayAction: vi.fn() }))
 vi.mock('@/site/template-pricing', () => ({ readPricingOptions: (client: unknown) => readPricingOptions(client) }))
 vi.mock('./actions', () => ({
   saveTemplateAction: vi.fn(),
@@ -65,6 +80,10 @@ describe('admin templates page', () => {
     expect(listAdminSeriesOptions).toHaveBeenCalledOnce()
     expect(listAdminCategoryTree).toHaveBeenCalledOnce()
     expect(readPricingOptions).toHaveBeenCalledOnce()
+    // The retired 素材参考库's deletion queue drains after this page (2026-11-27).
+    expect(after).toHaveBeenCalledOnce()
+    await after.mock.calls[0][0]()
+    expect(drainReferenceDeletions).toHaveBeenCalledWith({}, 'admin')
   })
 })
 

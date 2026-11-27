@@ -1,9 +1,9 @@
 export const seriesCopy = {
-  title: '系列管理', create: '新建系列', edit: '编辑系列', templates: '返回模板列表', back: '返回系列列表',
+  title: '系列管理', create: '新建系列', edit: '编辑系列', back: '返回系列列表',
   empty: '还没有系列', name_zh: '中文名称', name_en: '英文名称', slug: '系列网址标识',
   description_zh: '中文说明', description_en: '英文说明', category: '所属分类', sort_order: '显示顺序',
   sortHint: '数值小的排在前面', active: '上架系列', published: '已上架', unpublished: '已下架',
-  showMembers: '成员也在分类中单独展示', publicationHint: '已上架的系列至少有一个站内可见的上架成员时，才会出现在前台。',
+  publicationHint: '已上架的系列至少有一个站内可见的上架成员时，才会出现在前台。',
   members: '系列成员', emptyMembers: '尚未选择成员', remove: '移出', add: '加入', included: '已加入',
   other: '已属其他系列', search: '按模板名称或标识搜索', searchButton: '搜索', more: '加载更多',
   candidates: '选择模板', noMatch: '没有匹配的模板', memberCover: '设为系列封面', usingCover: '当前封面',
@@ -18,14 +18,14 @@ export const seriesCopy = {
   memberTaken: '有模板已加入其他系列。请先从原系列移出，再重新加入。',
   invalidCategory: '请选择有效的模板分类。', slugTaken: '这个系列网址标识已被使用（已删除的系列也会占用它的标识）。',
   forbidden: '只有管理员可以修改系列。', transient: '操作失败，请重试。',
-  seriesSearch: '按系列中文名搜索', noSeriesMatch: '没有匹配的系列', saved: '系列已保存', selectStatus: '展示方式', separate: '系列及独立成员', onlySeries: '仅系列',
+  seriesSearch: '按系列中文名搜索', noSeriesMatch: '没有匹配的系列', saved: '系列已保存',
   // 系列管理 list tools (Owner 2026-11-12).
   cover: '封面', coverCustom: '自定义', coverAuto: '自动', noCover: '无封面', drag: '排序',
   dragFiltered: '搜索时不能拖动排序，请先清空搜索。', editOrder: '编辑排序', editOrderHint: '点击编辑排序后调整顺序。',
   saveOrder: '保存排序', orderDraft: '调整完成后点击保存排序。', orderSaved: '顺序已保存', orderFailed: '顺序未保存，请重试。',
   listChanged: '系列列表已被修改，请刷新页面后重试。', batchInvalid: '批量操作的参数不对，请重新选择。',
   selectAll: '全选', selectRow: (name: string) => `选择 ${name}`, selected: (n: number) => `已选 ${n} 个系列`, clear: '取消选择',
-  batchPublish: '上架', batchUnpublish: '下架', batchShowOn: '开启成员单独展示', batchShowOff: '关闭成员单独展示',
+  batchPublish: '上架', batchUnpublish: '下架',
   batchTitle: (label: string, n: number) => `${label} ${n} 个系列？`, batchConfirm: '确认', batchReason: '下架原因（必填）',
   batchDone: (label: string, changed: number, total: number) => `已${label}：${changed} 个有变化，${total - changed} 个本来就是这样。`,
   // 换封面 from the list (Owner 2026-11-13).

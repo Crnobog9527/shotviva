@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
 
 import { Button } from '@/core/ui/button'
@@ -9,6 +10,7 @@ import { useAdminAction } from '../shell/use-admin-action'
 import type { ActionValue } from '../templates/types'
 import { AdjustDialog, type AdjustInput, type PoolBalances } from './adjust-dialog'
 import { BanDialog } from './ban-dialog'
+import type { BindActions } from './bind-partner-button'
 import { USERS_COPY } from './copy'
 
 const COPY = USERS_COPY.actions
@@ -17,7 +19,7 @@ export type UserAdminActions = {
   adjust: (input: AdjustInput & { userId: string }) => Promise<ActionValue<null>>
   ban: (input: { userId: string; reason: string }) => Promise<ActionValue<null>>
   unban: (input: { userId: string; reason: string }) => Promise<ActionValue<null>>
-}
+} & Partial<BindActions>
 
 type Open = 'adjust' | 'ban' | 'unban' | null
 
@@ -53,6 +55,8 @@ export function UserActions({ userId, banned, balances, actions }: Props) {
         <Button variant="outline" onClick={() => show(banned ? 'unban' : 'ban')}>
           {banned ? COPY.unban : COPY.ban}
         </Button>
+        {/* Opens the new-org form on /admin/orgs with this account filled in as the owner. */}
+        {banned ? null : <Button variant="outline" asChild><Link href={`/admin/orgs?owner=${encodeURIComponent(userId)}`}>{COPY.setOrgOwner}</Link></Button>}
       </div>
       {notice ? <p className="text-sm text-success">{notice}</p> : null}
       {open === 'ban' || open === 'unban' ? (

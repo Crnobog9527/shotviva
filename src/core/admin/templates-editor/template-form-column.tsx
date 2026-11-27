@@ -121,7 +121,7 @@ function ProfileNote({ id, active }: { id: string; active: 'openai' | 'seedream'
   return (
     <p className="text-muted-foreground text-xs">
       这里改的是在用的{active === 'seedream' ? ' Seedream ' : ' ChatGPT '}配置。另一套在
-      <Link className="underline underline-offset-4" href={`/admin/templates/profiles?q=${encodeURIComponent(id)}`}>供应商配置</Link>
+      <Link className="underline underline-offset-4" href={`/admin/templates/profiles?q=${encodeURIComponent(id)}`}>模板出图配置</Link>
       里编辑和切换。
     </p>
   )

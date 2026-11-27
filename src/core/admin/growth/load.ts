@@ -6,6 +6,8 @@ import { createAdminSupabase } from '../../auth'
 import { posthogAccess } from '../analytics/access'
 import { readBlock, type Block } from '../analytics/load'
 import { PostHogQueryError, queryRunner } from '../analytics/posthog-query'
+import { readPvuvBreakdown, readPvuvOverview, type PvuvState } from '../analytics/pvuv-load'
+import type { PvuvBreakdown, PvuvOverview } from '../analytics/pvuv-read'
 import { windowFor, type Range, type Window } from '../analytics/range'
 import { loadPeople, type People, type PeopleInput } from './people'
 import { loadPromoterSlugs } from './promoters'
@@ -73,4 +75,18 @@ export async function readSources(range: Range, end: number, db: GrowthStats): P
   const current = db.periods.current
   const userIds = [...new Set([...current.cohort, ...current.buyers.map((b) => b.user_id)])].sort()
   return readBlock('growth.sources', () => cachedSources(range, end, db.admin_ids, userIds))
+}
+
+// While PostHog is not read (switched off 2026-11-21), the overview's visitors, top sources and
+// top pages come from PVUV.ai. Null while PostHog is read: PVUV is then not asked. Three reads in
+// parallel, each failing on its own.
+export type OverviewPvuv = {
+  overview: Promise<PvuvState<PvuvOverview>>
+  sources: Promise<PvuvState<PvuvBreakdown>>
+  pages: Promise<PvuvState<PvuvBreakdown>>
+}
+
+export function readOverviewPvuv(range: Range): OverviewPvuv | null {
+  if (posthogAccess()) return null
+  return { overview: readPvuvOverview(range), sources: readPvuvBreakdown(range, 'source'), pages: readPvuvBreakdown(range, 'page') }
 }

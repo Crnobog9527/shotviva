@@ -9,6 +9,7 @@ import type { UserListRow } from '../users/list-types'
 import { USERS_COPY as COPY } from './copy'
 import type { Selection } from './use-selection'
 import { UserLink } from './user-link'
+import { IdentityLines } from './user-identity'
 
 // Pieces shared by the desktop table and the phone cards of the users list.
 
@@ -21,6 +22,7 @@ export function AccountCell({ row }: { row: UserListRow }) {
         {label}
       </UserLink>
       {row.email && row.phone ? <span className="font-mono text-xs text-muted-foreground">{formatAdminPhone(row.phone)}</span> : null}
+      <IdentityLines row={row} />
     </div>
   )
 }

@@ -115,6 +115,17 @@ describe('session_identity()', () => {
   })
 })
 
+// The auth client logs every refused refresh with console.error. Below, that refusal is the case
+// under test, so only those 429s stay out of the log (they read like a failure in CI); anything
+// else is still printed.
+function hideRefusedRefreshLogs() {
+  const error = console.error.bind(console)
+  vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+    if (args.length === 1 && (args[0] as { code?: string } | null)?.code === 'over_request_rate_limit') return
+    error(...args)
+  })
+}
+
 describe('proxy session check with a real session', () => {
   type Gate = typeof import('@/core/auth/proxy-gates').proxyGate
   let proxyGate: Gate
@@ -187,6 +198,7 @@ describe('proxy session check with a real session', () => {
       }
       return real(input, init)
     })
+    hideRefusedRefreshLogs()
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(Date.now() + 2 * 3600 * 1000) // the access token is now expired
 
@@ -242,6 +254,7 @@ describe('proxy session check with a real session', () => {
       }
       return real(input, init)
     })
+    hideRefusedRefreshLogs()
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime((exp - 60) * 1000)
 

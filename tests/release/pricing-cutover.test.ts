@@ -30,6 +30,15 @@ beforeAll(async () => {
     insert into public.template_prompts(template_id,body) select t.id,'fixture'
       from public.templates t join admin.template_tariffs_v2 c on c.id=t.id
       on conflict(template_id) do update set provider_id=null;`)
+  // 作品编辑 runs on Seedream (Owner 2026-11-23): its tariff (2K 15) no longer waives the GPT floor
+  // (1997), so on the GPT line activation would rightly refuse it. Bind it to a cheap Seedream line.
+  await release.query(`with ark as (
+      insert into public.ai_providers(label,model,adapter,is_active,resolutions,capabilities,estimated_image_costs)
+      values('cutover seedream','doubao-seedream-test','ark_images',false,'{1k,2k,4k}',
+        '{"resolutions":["1k","2k","4k"],"aspectRatios":["1:1","4:5"],"originalRatio":true,"minReferences":0,"maxReferences":10,"fetchedAt":"2026-11-01T00:00:00Z"}',
+        '{"1k":0.01,"2k":0.01,"4k":0.02}')
+      returning id)
+    update public.template_prompts set provider_id=(select id from ark) where template_id='edit'`)
   buyer = await createUser(release)
 }, 30000)
 
@@ -102,7 +111,7 @@ it('grants exactly one new signup gift when two verified users on the same IP cl
   const gift = (db: Client, id: string) => db.query(
     "select * from grant_credits($1::uuid,6,'signup','signup:'||($1::uuid)::text,'free')", [id])
   const claims = await Promise.all([gift(release, ids[0]), gift(callback, ids[1])])
-  expect(claims.map(r => r.rows[0].free_credits).sort((a, b) => a - b)).toEqual([0, 100])
+  expect(claims.map(r => r.rows[0].free_credits).sort((a, b) => a - b)).toEqual([0, 200]) // 2008: default gift 200 (Owner 2026-11-27)
   for (const id of ids) expect((await gift(callback, id)).rows[0].applied).toBe(false)
   const pending = await release.query("select count(*)::int as n from profiles where id = any($1::uuid[]) and signup_gift_refusal = 'same_ip_pending'", [ids])
   expect(pending.rows[0].n).toBe(1)

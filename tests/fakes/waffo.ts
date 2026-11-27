@@ -21,7 +21,7 @@ type OrderInput = {
   userId: string
   productId: string
   eventId?: string
-  method?: 'card' | 'alipay'
+  method?: 'card' | 'alipay' | 'wechat_pay'
   paymentStatus?: string
   metadata?: unknown
   storeId?: string
@@ -49,8 +49,8 @@ export function orderCompleted(input: OrderInput) {
       chargedAmount: '21.49',
       paymentId: id,
       paymentStatus: input.paymentStatus ?? 'succeeded',
-      paymentMethod: input.method === 'alipay' ? 'ewallet' : 'card',
-      paymentMethodBrand: input.method === 'alipay' ? 'alipay' : 'visa',
+      paymentMethod: input.method === 'alipay' || input.method === 'wechat_pay' ? 'ewallet' : 'card',
+      paymentMethodBrand: input.method === 'alipay' ? 'alipay' : input.method === 'wechat_pay' ? 'wechatpay' : 'visa',
     },
   }
 }

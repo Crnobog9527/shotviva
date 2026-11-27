@@ -5,20 +5,35 @@ import { getSessionUser } from '@/core/auth'
 import { localized } from '@/core/i18n/server'
 import { Link } from '@/core/i18n/ui'
 import { isAffiliateEnabled } from '../feature'
-import { publishedTerms } from './terms'
+import { mustAcceptTerms, publishedTerms } from './terms'
 import { CommissionList } from './commission-list'
 import { viewHref } from './format'
 import { SettingsForm } from './settings-form'
+import { TermsGate } from './terms-gate'
 import { dashboardViews, searchSchema, type Account, type Query, type SearchParams } from './models'
 import { Overview } from './overview'
 import { PayoutList, ReferralList, TeamReport } from './reports'
 import { readAccount, readSettings } from './repository'
 
+// `?a=1&b=2` of the search params as received (first value of a repeated key), or ''.
+function queryString(raw: SearchParams): string {
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(raw)) {
+    const first = Array.isArray(value) ? value[0] : value
+    if (first) params.set(key, first)
+  }
+  return params.size ? '?' + params.toString() : ''
+}
+
 async function guard() {
   await connection()
   if (!(await isAffiliateEnabled())) notFound()
 }
-async function Dashboard({ user, account, query }: { user: string; account: Account; query: Query }) {
+export async function Dashboard({ user, account, query }: { user: string; account: Account; query: Query }) {
+  // Every view (personal and enterprise) of an active account waits for acceptance of the current terms version;
+  // a suspended account cannot accept, so it keeps its read-only view.
+  const settings = await readSettings()
+  if (await mustAcceptTerms(account, settings.terms_version)) return <TermsGate version={settings.terms_version} />
   switch (query.view) {
     case 'commissions':
       return <CommissionList user={user} query={query} />
@@ -41,6 +56,8 @@ export async function PartnerScreen({ search }: { search: Promise<SearchParams> 
   const [user, t, raw] = await Promise.all([getSessionUser(), getTranslations('affiliate'), search])
   const query = searchSchema.parse(raw)
   const account = user?.verified ? await readAccount(user.id) : null
+  // An org's account lives on the enterprise dashboard (card E4); its links keep the same query.
+  if (account?.org_id) redirect(await localized('/partners/enterprise' + queryString(await search)))
   if (!user?.verified || account?.status !== 'active') redirect(await localized('/partners/join'))
   return (
     <div className="af-dash">

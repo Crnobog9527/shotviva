@@ -12,7 +12,7 @@ import { usePathname } from '../navigation'
 import { keepQuery } from './keep-query'
 import { LanguageHintBubble, useLanguageHint } from './language-hint'
 
-type Props = { translatedPaths: readonly string[]; className?: string }
+type Props = { translatedPaths: readonly string[]; className?: string; homeOnly?: boolean }
 
 // Open state of the menu (design/comps-v3-b js/marketing.js langMenu()): a click outside closes
 // it; opening moves focus to the checked item.
@@ -61,11 +61,12 @@ function onMenuKeys(event: KeyboardEvent<HTMLDivElement>, close: () => void) {
 // aria-haspopup / aria-expanded, menuitemradio items, arrow keys). It stays in the top bar on
 // phones; the footer keeps plain links for anyone without JavaScript. For a Chinese-reading
 // visitor who has not chosen yet, the globe pulses and offers 「切换到中文？」 (language-hint).
-export function LocaleMenu({ translatedPaths, className }: Props) {
+export function LocaleMenu({ translatedPaths, className, homeOnly = false }: Props) {
   const raw = useLocale()
   const current: Locale = isLocale(raw) ? raw : 'en'
   const t = useTranslations('locale.menu')
-  const path = usePathname()
+  const pathname = usePathname()
+  const path = homeOnly ? '/' : pathname
   const { open, setOpen, wrap } = useMenu()
   const menuId = useId()
   const hint = useLanguageHint(translatedPaths)

@@ -27,7 +27,7 @@ describe('web app manifest', () => {
     const en = await enManifest().json()
     const zh = await zhManifest().json()
     expect(en).toMatchObject({ start_url: '/', lang: 'en', display: 'browser' })
-    expect(zh).toMatchObject({ start_url: '/zh', lang: 'zh-Hans', description: 'AI 影棚', display: 'browser' })
+    expect(zh).toMatchObject({ start_url: '/zh', lang: 'zh-Hans', description: 'AI改图工具', display: 'browser' })
     expect(enManifest().headers.get('content-type')).toContain('application/manifest+json')
   })
 

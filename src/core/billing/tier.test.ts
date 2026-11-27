@@ -10,7 +10,8 @@ describe('TIER_LIMITS (ARCHITECTURE §6.2, one table)', () => {
       pro: { concurrency: 3, perWindow: 40, batchMax: 10, supportHours: 48, voteWeight: 1 },
       max: { concurrency: 6, perWindow: 80, batchMax: 30, supportHours: 24, voteWeight: 3 },
     })
-    expect(MAX_BATCH_SIZE).toBe(30)
+    // The request ceiling, above Max: an org can lift a member past it (ARCHITECTURE §6.5).
+    expect(MAX_BATCH_SIZE).toBe(200)
   })
 
   it('treats no tier as Starter', () => {

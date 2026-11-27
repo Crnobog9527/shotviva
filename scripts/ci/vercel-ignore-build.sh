@@ -37,6 +37,8 @@ APP_PATHS=(
   # `pnpm build` runs these before `next build` (package.json).
   scripts/public-css-sources.ts
   scripts/public-css-sources-lib.ts
+  scripts/presize-public.ts
+  scripts/presize-public-lib.ts
   scripts/check-waffo-catalog.ts
   # This decision itself.
   scripts/ci/vercel-ignore-build.sh

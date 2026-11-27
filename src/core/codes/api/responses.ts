@@ -9,6 +9,7 @@ const failures: Record<string, readonly [ErrorCode, string] | undefined> = {
   full: ['CODE_FULL', 'This code has been fully claimed'],
   used: ['CODE_USED', 'You have already used this code'],
   new_users_only: ['CODE_NEW_USERS_ONLY', 'This code is for new accounts only'],
+  signup_only: ['CODE_INVITE_SIGNUP_ONLY', 'Invite codes can only be used when signing up'],
   own: ['CODE_OWN', 'You cannot use your own invite code'],
   already_invited: ['CODE_ALREADY_INVITED', 'You have already joined with an invite'],
   needs_confirm: ['CODE_NEEDS_CONFIRM', 'Confirm replacement of the existing discount'],

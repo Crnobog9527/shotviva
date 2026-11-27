@@ -39,12 +39,15 @@ export function DirectoryTable({ items, filters }: { items: Dossier[]; filters: 
               <TableCell>
                 <Link prefetch={false} className="block font-medium text-primary hover:underline"
                   href={href({ tab: filters.tab, review: filters.review, id: r.user_id })}>
-                  {r.name || DOSSIER.unnamed}
+                  {r.admin_label || r.name || DOSSIER.unnamed}
                   <span className="block font-mono text-xs text-muted-foreground">{r.slug}</span>
                 </Link>
               </TableCell>
               <TableCell><div>{r.email ?? '—'}</div><div className="text-xs text-muted-foreground">{r.phone ?? '—'}</div></TableCell>
-              <TableCell><Badge variant="outline">{enrollmentLabel(r)}</Badge></TableCell>
+              <TableCell>
+                <Badge variant="outline">{enrollmentLabel(r)}</Badge>
+                {r.is_org && <Badge className="ml-1" variant="secondary">{DOSSIER.orgTag}</Badge>}
+              </TableCell>
               <TableCell className="tabular-nums">{r.team_enabled ? r.team_count : '—'}</TableCell>
               {metrics.map((key) => <TableCell key={key} className="tabular-nums">{money(r[key])}</TableCell>)}
             </TableRow>

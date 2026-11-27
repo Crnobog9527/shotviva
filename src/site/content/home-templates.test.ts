@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { FALLBACK_COUNT, SERIES_PAIRS, featuredSections, featuredTemplates, seriesHref, tryTemplates } from './home-templates'
+import { FALLBACK_COUNT, SERIES_PAIRS, featuredSections, featuredTemplates, seriesHref, seriesLayerPairs, tryTemplates } from './home-templates'
 
 // What localizeTemplate attaches from template_categories (T75): name and intro in the page's
 // language, its place in the 分类管理 order, and whether it is the drag compare.
@@ -43,6 +43,14 @@ describe('featured templates from the database', () => {
     expect(featuredTemplates(rows).map((t) => t.id)).toEqual(['t7', 't6', 't5', 't4', 't3', 't2'].slice(0, FALLBACK_COUNT))
   })
 
+  it('shows no featured sections when nothing is featured, and still opens the generator on a template', () => {
+    const rows = Array.from({ length: 8 }, (_, i) => live(`t${i}`, 'food-drink'))
+    const { categories, media, defaultId } = featuredSections(rows, ['food-drink'])
+    expect(categories).toEqual([])
+    expect(media).toEqual({})
+    expect(defaultId).toBe('t0')
+  })
+
   // T75: names, intros and order come from 分类管理; the drag compare follows card_style.
   it('groups in the admin\'s category order with the stored names and intros, hiding empty ones', () => {
     const rows = [live('new', 'fresh', { rank: 1 }), live('pet', 'pets', { rank: 2 }), live('art', 'art-styles', { rank: 3 }), live('dish', 'food-drink', { rank: 4 })]
@@ -80,7 +88,7 @@ describe('series on the template sections', () => {
     expect(categories[0]?.templates.map((card) => card.id)).toEqual(['solo', 'series-s', 'other'])
     expect(categories[0]?.templates[1]).toEqual({
       id: 'series-s', name: 'Series s', use: 'All of s',
-      series: { href: '/generate?series=s-set', members: ['m1', 'm2', 'm3'], count: 3 },
+      series: { href: '/generate?series=s-set', slug: 's-set', members: ['m1', 'm2', 'm3'], count: 3 },
     })
     // Not in the live catalogue (not on sale): neither pictured nor counted.
     // The pictured members' covers are in the lookup, the unfeatured m3 included.
@@ -108,5 +116,17 @@ describe('series on the template sections', () => {
     expect(tryTemplates(rows, [series('s', ['m1', 'm2'])])).toEqual([
       { id: 'series-s', name: 'Series s', use: 'All of s', href: seriesHref('s-set'), before: 'https://shotviva.com/assets/covers/m2/b.webp', after: 'https://shotviva.com/assets/covers/m2/a.webp' },
     ])
+  })
+
+  it('gives the browser each series card\'s later pairs under the card\'s key, as the card pictures them', () => {
+    const ids = Array.from({ length: SERIES_PAIRS + 2 }, (_, i) => `m${i}`)
+    const rows = ids.map((id, i) => live(id, 'pets', { rank: i + 1, covers: i !== 1 }))
+    const one = live('one', 'pets')
+    const layers = seriesLayerPairs([...rows, one], [series('s', ids), series('lone', ['one', 'gone'])])
+    const { categories } = featuredSections(rows, undefined, [series('s', ids)])
+    const [first, ...later] = categories[0]?.templates[0]?.series?.members ?? []
+    expect(first).toBe('m0')
+    // Each with the member it shows, so the card opens the panel on that one.
+    expect(layers).toEqual({ 'series-s': later.map((id) => [`https://shotviva.com/assets/covers/${id}/b.webp`, `https://shotviva.com/assets/covers/${id}/a.webp`, id]) })
   })
 })

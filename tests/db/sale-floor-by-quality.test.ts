@@ -19,7 +19,8 @@ beforeEach(async () => {
   db = await connectAdmin()
   await db.query('begin')
   await db.query("select pg_advisory_xact_lock_shared(hashtextextended('shotviva.template_catalog',0))")
-  user = await createUser(db, { credits: 1000 })
+  // 1996: the 1K reserves here are paid from free credits, 2K from paid credits.
+  user = await createUser(db, { credits: 1000, freeCredits: 1000 })
   medium = await createPricedTemplate(db, prices, 'medium')
   high = await createPricedTemplate(db, prices, 'high')
   await db.query(`insert into public.ai_providers(id,label,adapter,model,resolutions,estimated_image_costs)

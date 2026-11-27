@@ -26,7 +26,8 @@ let owner: string
 
 beforeAll(async () => {
   db = await connectAdmin()
-  owner = await linkedUser(db, { credits: 10 })
+  // The line makes 1K only, which free credits pay on the web (1996).
+  owner = await linkedUser(db, { credits: 10, freeCredits: 10 })
   await db.query(`insert into public.ai_providers(id,module,adapter,label,model,resolutions,capabilities)
     values ($1,'image','openrouter_images','Reference minimum fixture','fixture/minimum','{1k}',$2)`, [providerId,caps])
   const { error } = await serviceSupabase().rpc('admin_upsert_template', {

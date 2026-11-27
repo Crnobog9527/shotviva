@@ -22,7 +22,8 @@ function items(todo: TodoCounts, wishlist: boolean): Item[] {
     { key: 'stuck', href: '/admin/jobs', label: COPY.stuck, value: String(todo.stuckJobs), alert: todo.stuckJobs > 0 },
     { key: 'fail1h', href: '/admin/jobs?status=failed', label: COPY.fail1h, value: rate(todo.failures1h), alert: todo.failures1h.failed > 0 },
     { key: 'fail24h', href: '/admin/jobs?status=failed', label: COPY.fail24h, value: rate(todo.failures24h), alert: false },
-    { key: 'issues', href: '/admin/orders', label: COPY.paymentIssues, value: String(todo.paymentIssues), alert: todo.paymentIssues > 0 },
+    // ?attention=1: the payments this counts, each with 「标记已知晓」 (1882).
+    { key: 'issues', href: '/admin/orders?attention=1', label: COPY.paymentIssues, value: String(todo.paymentIssues), alert: todo.paymentIssues > 0 },
     { key: 'purchase', href: '/admin/orders', label: COPY.lastPurchase, value: formatBeijing(todo.lastPurchaseAt) ?? COPY.never, alert: false },
     { key: 'provider', href: '/admin/providers', label: COPY.provider, value: todo.provider ? `${todo.provider.label} · ${todo.provider.model}` : COPY.noProvider, alert: !todo.provider },
   ]

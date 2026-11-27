@@ -115,7 +115,10 @@ function failure(status: number, code: string | undefined, usage: ProviderUsage 
   const detail = `ark image request failed (HTTP ${status} code=${code ?? '-'})`
   if (code && REFUSAL.test(code)) return new ProviderError('content_rejected', detail, { usage })
   const timeout = status === 408 || status === 504
-  return new ProviderError(timeout ? 'timeout' : 'failed', detail, { usage })
+  // Ark answers 429 both for its per-minute limit and for AccountQuotaExceeded; only the first
+  // clears by waiting.
+  const limited = status === 429 && !(code && /quota|billing|credit|balance/i.test(code))
+  return new ProviderError(limited ? 'rate_limited' : timeout ? 'timeout' : 'failed', detail, { usage })
 }
 
 // Which network failure a thrown fetch was (undici puts it on `cause.code`, e.g. ECONNRESET or
@@ -127,20 +130,68 @@ export function networkCode(error: unknown): string {
   return typeof code === 'string' && /^[A-Z0-9_]{2,40}$/.test(code) ? code : error instanceof Error ? error.name : 'unknown'
 }
 
-async function send(config: ArkImageConfig, input: ProviderInput, request: ArkRequest): Promise<Response> {
-  try {
-    input.signal.throwIfAborted()
-    return await (config.fetch ?? fetch)(`${config.baseUrl ?? ARK_BASE_URL}/images/generations`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(request),
-      signal: input.signal,
-      redirect: 'error',
-      cache: 'no-store',
-    })
-  } catch (error) {
-    if (input.signal.aborted) throw new ProviderError('timeout', 'ark request aborted at deadline')
-    throw new ProviderError('failed', `ark request failed (${networkCode(error)})`)
+// Failures where the connection was never made, so Ark never saw the request and nothing was
+// generated or billed: safe to try again. ECONNRESET and socket errors are not here, since the
+// request may already have reached Ark. On 2026-11-26 four jobs in four minutes failed with
+// UND_ERR_CONNECT_TIMEOUT on the cross-border route; each was refunded, none retried.
+// ENETUNREACH/EHOSTUNREACH are left out: Linux also raises them on an established connection whose
+// retransmits fail, after the body may have reached Ark.
+const CONNECT_FAILURES = new Set(['UND_ERR_CONNECT_TIMEOUT', 'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN'])
+// Extra attempts after the first, and the wait before each (ms); all inside the job's deadline.
+export const ARK_CONNECT_RETRY_DELAYS = [1_000, 3_000] as const
+
+export function isConnectFailure(code: string): boolean {
+  return CONNECT_FAILURES.has(code)
+}
+
+function wait(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(done, ms)
+    function done() {
+      signal.removeEventListener('abort', stop)
+      resolve()
+    }
+    function stop() {
+      clearTimeout(timer)
+      reject(signal.reason)
+    }
+    signal.addEventListener('abort', stop, { once: true })
+  })
+}
+
+function post(config: ArkImageConfig, input: ProviderInput, request: ArkRequest): Promise<Response> {
+  input.signal.throwIfAborted()
+  return (config.fetch ?? fetch)(`${config.baseUrl ?? ARK_BASE_URL}/images/generations`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+    signal: input.signal,
+    redirect: 'error',
+    cache: 'no-store',
+  })
+}
+
+// After a thrown fetch: wait and go on when the connection was never made and a retry is left,
+// else the ProviderError the job records.
+async function afterThrow(error: unknown, attempt: number, delays: readonly number[], signal: AbortSignal): Promise<void> {
+  if (signal.aborted) throw new ProviderError('timeout', 'ark request aborted at deadline')
+  const code = networkCode(error)
+  const delay = delays[attempt]
+  if (!isConnectFailure(code) || delay === undefined) {
+    throw new ProviderError('failed', `ark request failed (${code}${attempt > 0 ? `, ${attempt + 1} attempts` : ''})`)
+  }
+  await wait(delay, signal).catch(() => {
+    throw new ProviderError('timeout', 'ark request aborted at deadline')
+  })
+}
+
+async function send(config: ArkImageConfig, input: ProviderInput, request: ArkRequest, delays: readonly number[]): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await post(config, input, request)
+    } catch (error) {
+      await afterThrow(error, attempt, delays, input.signal)
+    }
   }
 }
 
@@ -166,13 +217,13 @@ async function readOutput(response: Response, input: ProviderInput, config: ArkI
   }
 }
 
-export function createArkImageProvider(config: ArkImageConfig): GenerationProvider {
+export function createArkImageProvider(config: ArkImageConfig, retryDelays: readonly number[] = ARK_CONNECT_RETRY_DELAYS): GenerationProvider {
   return {
     id: 'ark-image',
     honoursBackground: true,
     async generate(input): Promise<ProviderOutput> {
       const request = arkRequest(config.model, input)
-      const response = await send(config, input, request)
+      const response = await send(config, input, request, retryDelays)
       return readOutput(response, input, config, arkSize(input))
     },
   }

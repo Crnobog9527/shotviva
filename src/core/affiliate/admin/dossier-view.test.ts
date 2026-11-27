@@ -15,8 +15,8 @@ const profile: DossierDetail = {
   earned: 1600, confirmed: 800, unwithdrawn: -149, paid: 1496, registered_at: '2025-10-01T23:12:00Z',
   created_at: '2026-05-03T12:00:00Z', approved_at: null, approved_by: null, parent_user_id: null,
   country: 'CN', payout_method: 'wise', payout_details: 'QA', us_person: false, terms_version: 'v2',
-  terms_accepted_at: null, reject_reason: null, reapply_allowed: false, rates: [], admin_note: null,
-  application: { channel_type: 'xiaohongshu', audience: '1k_10k' },
+  terms_accepted_at: null, reject_reason: null, reapply_allowed: false, rates: [], admin_note: null, admin_label: null,
+  application: { channel_type: 'xiaohongshu', audience: '1k_10k' }, is_org: false, org_l2_defaults: null,
 }
 
 it('renders searchable identities and all four amounts, including a negative unwithdrawn balance', () => {
@@ -26,6 +26,13 @@ it('renders searchable identities and all four amounts, including a negative unw
   }
   expect(html).toMatch(/>-[^<]*1\.49</)
   expect(html).toContain('id=' + profile.user_id)
+})
+it('tags enterprise accounts with 企业 in the directory and the profile, and personal ones not', () => {
+  const personal = renderToStaticMarkup(createElement(DirectoryTable, { items: [profile], filters: { tab: 'affiliates' } }))
+  expect(personal).not.toContain('>企业<')
+  const org = { ...profile, is_org: true }
+  expect(renderToStaticMarkup(createElement(DirectoryTable, { items: [org], filters: { tab: 'affiliates' } }))).toContain('>企业<')
+  expect(renderToStaticMarkup(createElement(ProfileFacts, { member: org }))).toContain('· 企业')
 })
 it('shows the account registration time separately from joining the program; #419 and older answers both display', () => {
   const html = renderToStaticMarkup(createElement(ProfileFacts, { member: profile }))
@@ -59,4 +66,12 @@ it.each(['affiliates', 'applications'] as const)('keeps the private search on th
   expect(clean).toContain('commission=21&historyCursor=next')
   expect(clean).not.toContain('q=')
   expect(href({ ...filters, cursor: 'list-page' })).toContain('q=unrelated-person%40example.test')
+})
+it('shows the admin label instead of the unnamed placeholder, and falls back to it when none is set', () => {
+  const render = (item: DossierDetail) => renderToStaticMarkup(createElement(DirectoryTable, { items: [item], filters: { tab: 'affiliates' } }))
+  const blank = { ...profile, name: null }
+  expect(render(blank)).toContain('未填写姓名')
+  const labelled = render({ ...blank, admin_label: '小红书-阿杰' })
+  expect(labelled).toContain('小红书-阿杰')
+  expect(labelled).not.toContain('未填写姓名')
 })

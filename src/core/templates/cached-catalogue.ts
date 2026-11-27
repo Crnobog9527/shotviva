@@ -7,18 +7,58 @@ import { createAdminSupabase } from '../auth/supabase-admin'
 import { FAILED_READ_LIFE } from '../cache-life'
 import type { Locale } from '../i18n/locales'
 import { logger } from '../logger'
+import { settle, unwrap, type Settled } from '../shared-read'
 import { PROVIDERS_CACHE_TAG } from '../providers/cache-tag'
 import { TEMPLATES_CACHE_TAG } from './cache'
-import { listTemplatesIn } from './list-templates'
+import { listTemplates, listTemplatesIn, webTemplatesIn } from './list-templates'
+import { applyLocaleDisplay, type LocaleDisplay } from './locale-display'
+import { readLocaleDisplay } from './locale-display-read'
 import type { LocalizedTemplate } from './localize'
+import type { Template } from './types'
 
 export const CATALOGUE_LIFE = { revalidate: 3600, expire: 86_400 } as const
+
+// The live web rows, series members and poster templates included, read once for every server
+// instance and both languages. web_templates() checks each template's sale floor and takes
+// 0.4-0.75 s on average, up to 6-8 s, on production (pg_stat_statements, 2026-11-23); under a plain
+// 'use cache' every new instance read it again for each language and each list below (up to six
+// reads), and concurrent reads ran into the statement timeout (listTemplates, 2026-11-23 and
+// 2026-11-11). 'use cache: remote' keeps one copy for the region (Next allows a remote cache inside
+// a regular one, so the callers stay prerenderable). A failed read is kept a minute only, as the
+// callers already keep their empty fallback, and reaches them as an error (../shared-read: an error
+// thrown inside the remote cache would fail the prerender of every page that reads it).
+async function settledWebTemplates(): Promise<Settled<Template[]>> {
+  'use cache: remote'
+  cacheTag(TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG)
+  const result = await settle(() => listTemplates(createAdminSupabase(), 'web', { includeSeriesMembers: true }))
+  cacheLife(result.ok ? CATALOGUE_LIFE : FAILED_READ_LIFE)
+  return result
+}
+const sharedWebTemplates = async (): Promise<Template[]> => unwrap(await settledWebTemplates())
+
+// Each language's category order and featured list (migration 1575), one copy for the region: the
+// catalogue, Create's index and the home page all ask for it, and under a plain 'use cache' each new
+// server instance read both tables again for every caller (~2k reads a day each on the test
+// database, 2026-11-27). A failed read is kept a minute only; the caller gets it as an error.
+async function settledLocaleDisplay(): Promise<Settled<LocaleDisplay>> {
+  'use cache: remote'
+  cacheTag(TEMPLATES_CACHE_TAG)
+  const result = await settle(() => readLocaleDisplay(createAdminSupabase()))
+  cacheLife(result.ok ? CATALOGUE_LIFE : FAILED_READ_LIFE)
+  return result
+}
+export const sharedLocaleDisplay = async (): Promise<LocaleDisplay> => unwrap(await settledLocaleDisplay())
 
 type Read = (locale: Locale) => Promise<LocalizedTemplate[]>
 // Every live web template, series members included (T102): these pages look templates up by id
 // (featured picks, ?open=, the home picker's saved templates) and price the catalogue (credit
 // facts, the paywall's photo estimate); a member is as live and as priced as any other template.
-export const readCatalogue: Read = (locale) => listTemplatesIn(createAdminSupabase(), locale, { includeSeriesMembers: true })
+export const readCatalogue: Read = async (locale) => {
+  const [rows, display] = await Promise.all([sharedWebTemplates(), sharedLocaleDisplay()])
+  const live = webTemplatesIn(rows, locale)
+  // This language's category order and featured list (migration 1575); the shared ones until set.
+  return applyLocaleDisplay(live, display, locale)
+}
 
 // The cached body, apart for tests: the live list with the normal lifetime, or, when the read
 // fails (a build without a database, an outage, a column the database does not have yet), an
@@ -57,7 +97,8 @@ export async function cachedWebTemplates(locale: Locale, includeSeriesMembers: b
   'use cache'
   cacheTag(TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG)
   cacheLife(CATALOGUE_LIFE)
-  return listTemplatesIn(createAdminSupabase(), locale, { includeSeriesMembers })
+  if (!includeSeriesMembers) return listTemplatesIn(createAdminSupabase(), locale, { includeSeriesMembers })
+  return webTemplatesIn(await sharedWebTemplates(), locale)
 }
 
 // The dense-text poster templates (ARCHITECTURE §5.3), which the catalogue above leaves out:
@@ -66,7 +107,7 @@ export async function cachedPosterTemplates(locale: Locale): Promise<LocalizedTe
   'use cache'
   cacheTag(TEMPLATES_CACHE_TAG, PROVIDERS_CACHE_TAG)
   cacheLife(CATALOGUE_LIFE)
-  return listTemplatesIn(createAdminSupabase(), locale, { posters: true })
+  return webTemplatesIn(await sharedWebTemplates(), locale, { posters: true })
 }
 
 type TemplateReads = {

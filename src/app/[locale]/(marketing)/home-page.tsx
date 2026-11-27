@@ -2,37 +2,45 @@ import type { Metadata } from 'next'
 
 import { ExperimentBeacon } from '@/core/analytics/browser'
 import { HomePageView } from '@/core/content'
-import { localizePath } from '@/core/i18n'
+import { localizePath, type Locale } from '@/core/i18n'
 import { currentLocale } from '@/core/i18n/server'
 import { JsonLdScript, faqPageLd, organizationLd, pageMetadata, softwareApplicationLd } from '@/core/seo'
-import { isWishlistEnabled } from '@/core/wishlist'
-import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
+import { cachedFeaturedBundles } from '@/core/templates/cached-bundles'
+import { cachedCaseStrip } from '@/core/templates/cached-case-strip'
 import { cachedCatalogueIndex } from '@/core/templates/cached-taxonomy'
+import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 import { openingCovers } from '@/core/templates/cover-ratio'
 import { cachedPublicSeries } from '@/core/templates/public-series'
-import { pickerBrowse, toCatalogueTemplate } from '@/modules/image/marketing'
+import { homePanelTemplates } from '@/modules/image/marketing'
 import { displayProducts } from '@/site/billing/display-products'
-import { creditFacts, featuredSections, fillCredits, freeImagesIn, homePageIn, isLinkEnabled, offersShownIn } from '@/site/content'
-import { heroOptionContent } from '@/site/experiments'
+import { signupGiftCreditsForSite } from '@/site/billing/signup-gift'
+import { HOME_CATEGORIES, bundleOpeningIds, bundleSection, generatorOpening, creditFacts, featuredSections, fillCredits, freeImagesIn, homeCaseStrip, homePageIn, isLinkEnabled, liveSpaces, offersShownIn } from '@/site/content'
+import { HERO_DEFAULT_OPTION, heroOptionContent } from '@/site/experiments'
 import { site } from '@/site/site.config'
 
 import { HomeGeneratorSlot } from './home-generator-slot'
-import { HomeWishCtaSlot } from './home-wish-cta-slot'
+import { homeHeroPictures } from './home-hero-admin'
+
 
 // The home page, shared by `/` (today's hero) and the A/B hero options the proxy rewrites `/` to
 // (x/hero/[option], ARCHITECTURE §16.5). An option swaps only the hero pictures, adds one line and
 // opens the generator on its template; title, H1, copy, JSON-LD and canonical stay those of `/`.
 
-// The copy with "from N credits" and the image counts filled from the live catalogue (建站规格 G3, G4).
+// The copy with "from N credits" and the image counts filled from the live catalogue (建站规格 G3, G4),
+// and the signup gift from its setting.
 async function load() {
   const locale = await currentLocale()
-  const [live, series, index, wishlistOpen, products] = await Promise.all([
-    cachedWebCatalogue(locale), cachedPublicSeries(locale), cachedCatalogueIndex(locale), isWishlistEnabled(site), displayProducts(),
+  const [live, series, products, bundles, cases, index, gift] = await Promise.all([
+    cachedWebCatalogue(locale), cachedPublicSeries(locale), displayProducts(), cachedFeaturedBundles(locale), cachedCaseStrip(locale),
+    // Where each template sits, for the bundle cards' "All … templates" chip (Owner 2026-11-25).
+    cachedCatalogueIndex(locale),
+    // The signup gift's amount, the admin's setting (2008).
+    signupGiftCreditsForSite(),
   ])
-  const facts = creditFacts(live)
+  const facts = creditFacts(live, gift)
   const page = fillCredits(homePageIn(locale, products), facts)
   const meta = { path: '/', title: page.title, description: page.description }
-  return { locale, live, series, index, products, page, wishlistOpen, free: fillCredits(freeImagesIn(locale), facts), meta }
+  return { locale, live, series, products, bundles, cases, index, page, free: fillCredits(freeImagesIn(locale), facts), meta }
 }
 
 export async function homeMetadata(): Promise<Metadata> {
@@ -40,18 +48,34 @@ export async function homeMetadata(): Promise<Metadata> {
   return pageMetadata(site, meta, locale)
 }
 
+// Restaurants and hotels lead (Owner 2026-11-24): `/` is the registry's default option (food), its
+// pictures, line and strip. Another option's page (/x/hero/…) shows its own pictures and opens the
+// generator on its template; `tote` has none here, so it shows the page content's own hero. Which
+// template the generator opens on otherwise: home-opening.ts (Owner 2026-11-26).
+function heroFor(heroOption: string | undefined, locale: Locale, live: readonly { id: string }[]) {
+  const option = heroOptionContent(heroOption ?? HERO_DEFAULT_OPTION, locale)
+  const opens = heroOption ? option?.generatorTemplate : undefined
+  return { option, heroTemplate: opens && live.some((template) => template.id === opens) ? opens : null }
+}
+
 // The live catalogue is a cached read (expired by every admin save, featured list included);
 // only the generator's visitor half waits for the request.
 export async function HomeContent({ heroOption }: { heroOption?: string }) {
-  const { locale, live, series, index, products, page, wishlistOpen, free, meta } = await load()
-  const option = heroOption ? heroOptionContent(heroOption, locale) : null
+  const { locale, live, series, products, bundles, cases, index, page, free, meta } = await load()
   const ldMeta = { ...meta, path: localizePath(meta.path, locale) }
-  const catalogue = live.map(toCatalogueTemplate)
-  // Series show as one card each, in the admin's order (T102, Owner 2026-11-12).
-  const { defaultId: featuredId, ...sections } = featuredSections(live, undefined, series)
-  const defaultId = option && live.some((template) => template.id === option.generatorTemplate) ? option.generatorTemplate : featuredId
-  const initialCovers = await openingCovers(live.find((template) => template.id === defaultId))
-  const shown = option ? { ...page, hero: { ...page.hero, ...option.hero } } : page
+  // Series show as one card each, in the admin's order (T102, Owner 2026-11-12). Only food and
+  // spaces (hotels) on the home page (Owner 2026-11-24); the generator still offers every template.
+  const { featuredId, ...featured } = featuredSections(live, HOME_CATEGORIES, series)
+  // 精选组合 (Owner 2026-11-25): their own group, ahead of the categories.
+  const bundled = bundleSection(live, bundles, locale, index)
+  const sections = { categories: bundled.category ? [bundled.category, ...featured.categories] : featured.categories, media: { ...featured.media, ...bundled.media } }
+  const { option, heroTemplate } = heroFor(heroOption, locale, live)
+  const { defaultId, shuffle } = generatorOpening({ heroTemplate, featuredId, bundleIds: bundleOpeningIds(live, bundles) })
+  const { templates, opening } = homePanelTemplates(live, defaultId, bundles.flatMap((bundle) => bundle.memberIds))
+  const [initialCovers, optionHero] = await Promise.all([openingCovers(opening), homeHeroPictures(option, heroOption !== undefined, locale, live)])
+  // Hotels: each case shows its template's own covers while that template is live.
+  const spaced = { ...page, spaces: liveSpaces(page.spaces, live) }
+  const shown = optionHero ? { ...spaced, hero: { ...spaced.hero, ...optionHero } } : spaced
   return (
     <>
       {/* Offers: the plans this page shows (the three monthly cards), never the whole catalog (03-S2). */}
@@ -64,12 +88,11 @@ export async function HomeContent({ heroOption }: { heroOption?: string }) {
         isLinkEnabled={isLinkEnabled}
         templates={sections}
         heroTagline={option?.tagline}
-        heroStrip={option?.strip}
+        // 「更多真实案例」: the admin's picks for this language, else the option's built-in row.
+        heroStrip={homeCaseStrip(option?.strip, cases, live, locale)}
         generator={
-          <HomeGeneratorSlot templates={catalogue} browse={pickerBrowse(index, catalogue, locale === 'zh')} defaultId={defaultId} homePath={localizePath('/', locale)} freeImages={free} initialCovers={initialCovers} />
+          <HomeGeneratorSlot templates={templates} catalogue={{ locale }} defaultId={opening?.id ?? null} homePath={localizePath('/', locale)} freeImages={free} initialCovers={initialCovers} shuffle={shuffle} />
         }
-        // Gone with the wishlist switch (cached read); signed out, sign-up returns to the wall.
-        wishlistCta={wishlistOpen ? <HomeWishCtaSlot cta={page.wishlist.cta} next={localizePath('/wishlist', locale)} /> : null}
       />
     </>
   )

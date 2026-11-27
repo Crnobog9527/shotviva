@@ -1,3 +1,6 @@
+import { TIER_LIMITS } from '@/core/billing/tier-limits'
+import { MAX_BATCH_TEMPLATES } from '@/core/jobs/batch/limits'
+
 import { baselineOffers, planLabel, plansSentence, type OfferFacts } from '../offer'
 import { defineContentPage, type CostBills, type ShootDemo } from '@/core/content'
 
@@ -5,7 +8,7 @@ import { site } from '../../site.config'
 import { caseImage, CATEGORY, sizeCountWord, withFirstFrame } from '../landing-shared'
 import { pricingRelated } from '../shared'
 import {
-  foodHalfDayUsd,
+  foodShootUsd,
   freeImagesLabel,
   FreeImagesShort,
   MENU_DISHES,
@@ -33,13 +36,13 @@ function menuBills({ planFrom }: OfferFacts): CostBills {
     intro: `${MENU_DISHES} dishes for a menu and a delivery app. The same job, two bills.`,
     photographer: {
       title: "A food photographer's quote",
-      total: { amount: usdRange(foodHalfDayUsd), when: 'a half-day shoot, plus edits' },
+      total: { amount: usdRange(foodShootUsd), when: 'one shoot, plus edits' },
       lines: [
-        { label: 'Half-day food shoot', value: usdRange(foodHalfDayUsd) },
-        { label: 'Food stylist', value: 'usually extra' },
+        { label: 'Food photography session', value: usdRange(foodShootUsd) },
+        { label: 'Styling, props, licensing', value: 'often extra' },
         { label: 'Booking, shoot, edits', value: 'days' },
       ],
-      fine: `Published US half-day food photography rates, 2025–2026 (PricingLink, Jobbers, FoodShot): about ${usdRange(foodHalfDayUsd)}; food stylists are usually billed separately. Your quotes will vary.`,
+      fine: `Published US food photography rates, 2025–2026 (PricingLink, FoodShot): about ${usdRange(foodShootUsd)} a session; styling, props and licensing often cost extra. Your quotes will vary.`,
     },
     site: {
       title: brand,
@@ -54,34 +57,37 @@ function menuBills({ planFrom }: OfferFacts): CostBills {
   }
 }
 
-const fishPhone = caseImage('menu-fish-phone', 'Real phone photo: pickled mustard fish in a white enamel bowl on a steel kitchen pass, harsh green-tinted overhead light')
-const fishDark = caseImage('menu-fish-dark', 'Real example: the same pickled mustard fish re-plated in a white porcelain bowl on dark rough timber, warm side light and rising steam')
+// The hero (Owner 2026-11-25: Western dishes on the English pages): the Rustic Board template's
+// own cover pair, a sirloin plate shot on the kitchen pass and the same plate on a wooden board.
+const steakPhone = caseImage('menu-steak-phone', 'Real phone photo: sliced sirloin steak with fries and asparagus on a white plate on a steel kitchen pass, plate stacks and squeeze bottles behind')
+const steakBoard = caseImage('menu-steak-board', 'Real example: the same sliced sirloin, fries and asparagus on the same white plate on a dark wooden board, warm side light, herbs and a fork beside it')
 
-// One dish through three looks. The food stays the same; the bowl, the set and the light change.
+// One dish through three looks (Owner 2026-11-25: a three-star wagyu course on the English page).
+// The plate stays as served; the surface, the light and the service change.
 const shoot: ShootDemo = {
   heading: { lead: 'One phone photo of a dish → ', emphasis: 'a full menu shoot' },
-  intro: 'Fresh chili bullfrog, shot on the kitchen pass in a steel basin. Three finished pictures, the same dish in every one: the bullfrog, the green and red chilies, the green peppercorns.',
+  intro: 'A5 wagyu striploin, shot on the kitchen pass during service. Three finished pictures, the same plate in every one: the two seared slices, the potato tuile, the jus pearls, the black garlic dots.',
   phone: {
-    image: caseImage('menu-frog-phone', 'Real phone photo: fresh chili bullfrog in a steel basin on a kitchen counter, fluorescent light, tickets and bowls behind'),
+    image: caseImage('menu-finesteak-phone', 'Real phone photo: two seared slices of A5 wagyu with a potato tuile, jus pearls and black garlic dots on a stoneware plate on a steel kitchen pass'),
     file: 'IMG_2706.jpg',
-    caption: 'As shot on a phone. Fluorescent light, a steel basin, order tickets behind.',
+    caption: 'Real phone photo. Steel pass, flat kitchen light, a cloth at the edge.',
   },
   arrow: 'Three looks, same dish',
   results: [
     {
-      image: caseImage('menu-frog-dark', 'Real example: the same bullfrog dish in a charcoal stone bowl on slate, dark painted backdrop, warm side light'),
+      image: caseImage('menu-finesteak-hero', 'Real example: the same wagyu plate on dark honed stone, soft window light from the left'),
       title: 'Menu hero',
-      template: 'Dark set, sculpted side light',
+      template: 'Dark stone, soft window light',
     },
     {
-      image: caseImage('menu-frog-pour', 'Real example: hot oil poured from a white jug onto the same dish in a white bowl on raw timber, steam caught mid-air'),
-      title: 'Sizzle shot',
-      template: 'Hot oil poured, steam caught mid-air',
+      image: caseImage('menu-finesteak-pour', 'Real example: jus poured from a small copper saucier onto the same wagyu plate, the stream caught mid-air'),
+      title: 'Sauce service',
+      template: 'Jus poured at the table',
     },
     {
-      image: caseImage('menu-frog-poster-en', 'Real example: a menu poster of the same dish on a warm brown backdrop, headed Chef\'s Signature, Fresh Chili Bullfrog'),
+      image: caseImage('menu-finesteak-poster-en', 'Real example: a tasting-menu card of the same plate on dark stone, headed Tasting Menu, Sixth Course, A5 Wagyu Striploin'),
       title: 'Menu poster',
-      template: 'Dish name, one line and the price',
+      template: 'Course name, one line and the price',
     },
   ],
 }
@@ -94,12 +100,12 @@ const copy = {
   title: `AI Restaurant Menu Photos From Your Phone (2026) | ${brand}`,
   description: `AI restaurant menu photos from the dish photo you already took: delivery-app, menu and promo shots with the plate kept as served. ${FreeImagesShort}.`,
   h1: 'AI Restaurant Menu Photos From One Phone Shot',
-  subtitle: 'Your real phone photo of a dish you serve, with a new bowl, light and setting. No dish is invented.',
-  answerBlock: `AI restaurant menu photos start from your own photo of a dish you serve: the food stays as served; only the bowl, light and setting change. With ${brand} you upload one phone photo, pick Delivery Menu, Dark Dining or Promo Poster, and download it in ${tierList}. New users get ${freeImagesLabel}.`,
+  subtitle: 'Your real phone photo of a dish you serve, with new light and a new setting. No dish is invented.',
+  answerBlock: `AI restaurant menu photos start from your own photo of a dish you serve: the food stays as served; only the light, the setting and sometimes the plate change. With ${brand} you upload one phone photo, pick Delivery Menu, Dark Dining or Promo Poster, and download it in ${tierList}. New users get ${freeImagesLabel}.`,
   hero: {
-    before: withFirstFrame(fishPhone),
-    after: fishDark,
-    caption: 'Your phone photo → a menu hero: the same fish, a new bowl and set',
+    before: withFirstFrame(steakPhone),
+    after: steakBoard,
+    caption: 'Your phone photo → a menu hero: the same steak, a new table and light',
     cta: { label: 'Upload photo', href: '/generate' },
   },
   facts: [
@@ -113,7 +119,7 @@ const copy = {
     },
     {
       label: 'The Dish Stays the Dish',
-      value: `Delivery apps want photos of the food you actually serve. ${brand} starts from your own phone photo and changes the bowl, the light and the background, not the food.`,
+      value: `Delivery apps want photos of the food you actually serve. ${brand} starts from your own phone photo and changes the plate or bowl, the light and the setting, not the food.`,
     },
   ],
   headings: {
@@ -139,7 +145,7 @@ export const makeAiRestaurantMenu = (offers: OfferFacts) => defineContentPage({
   faq: [
     {
       question: 'Can I use AI photos on my delivery-app menu?',
-      answer: `Delivery apps ask for photos that show the dish you actually serve. ${brand} starts from your own phone photo and keeps the food as served, changing the bowl, the light and the background, so the photo is still of your food. Check your app's current photo rules before you upload.`,
+      answer: `Delivery apps ask for photos that show the dish you actually serve. ${brand} starts from your own phone photo and keeps the food as served, changing the plate or bowl, the light and the setting, so the photo is still of your food. Check your app's current photo rules before you upload.`,
     },
     {
       question: 'What size should restaurant menu photos be?',
@@ -147,7 +153,7 @@ export const makeAiRestaurantMenu = (offers: OfferFacts) => defineContentPage({
     },
     {
       question: 'How much does a food photographer cost?',
-      answer: `Published US rates are about ${usdRange(foodHalfDayUsd)} for a half day, with a food stylist usually billed separately. ${brand} makes a menu photo from your phone shot in about ${photoSeconds} seconds. ${plansSentence(offers)}`,
+      answer: `Published US rates are about ${usdRange(foodShootUsd)} a session, with styling, props and licensing often billed on top. ${brand} makes a menu photo from your phone shot in about ${photoSeconds} seconds. ${plansSentence(offers)}`,
     },
     {
       question: 'Do I need to write prompts?',
@@ -156,7 +162,7 @@ export const makeAiRestaurantMenu = (offers: OfferFacts) => defineContentPage({
     },
     {
       question: 'Can it make the whole menu?',
-      answer: `${brand} makes photos, one dish at a time, and a single promo poster. Laying out a multi-dish menu or a price list is not something it does.`,
+      answer: `${brand} makes the photos for your menu, not the menu layout. Pro takes up to ${TIER_LIMITS.pro.batchMax} dish photos in one batch and Max up to ${TIER_LIMITS.max.batchMax} results from up to ${MAX_BATCH_TEMPLATES} templates, so a 40-dish menu is two batches on Max with the same template. Poster templates take your headline, dish names and prices before they generate; the result is one finished image, not an editable design file, so place the photos in your own menu layout.`,
     },
   ],
   related: [

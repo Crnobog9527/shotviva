@@ -41,7 +41,15 @@ to prepare the separate invitation acceptance account.
 | `qa-fresh` | qa-fresh@shotviva.com | Deleted and recreated every run: no credits, no works, no ledger. Its first sign-in grants the 6 signup credits through the real first-sign-in path |
 | `qa-max` | qa-max@shotviva.com | Max tier from a `max_yearly` purchase (paid until a year after the first run), 6 free + 3360 paid credits |
 | `qa-free` | qa-free@shotviva.com | Signup credits only: 6 free, 0 paid, no tier |
+| `qa-graylum` | qa-graylum@shotviva.com | Graylum connection tests only. Deleted and recreated by its own reset: the free pool keeps whatever the real signup grant gives (as for a new account, so a partner generation can succeed), 0 paid, no tier, no Graylum link |
 | `qa-invitee` | qa-invitee@shotviva.com | Created by its own reset with a fixed test signup IP, the configured signup grant in the free pool and no prior payment or invitation |
+
+For Graylum connection tests, use only `qa-graylum`: `pnpm qa:reset qa-graylum`, then
+`pnpm qa:login qa-graylum`. Every reset gives it a new identity, so a rerun starts unlinked.
+Do not use `qa-free` for enterprise (org) tests. Once it owns an org, its reset can no longer delete
+it: the org and promo tables have no `ON DELETE CASCADE` and `service_role` may only read them, so
+`deleteUser` fails with "Database error deleting user". Enterprise checks use a dedicated persona
+whose org is never expected to be reset. Affiliate checks that create no org may keep using `qa-free`.
 
 For invitation acceptance, reset `qa-invitee` before the first purchase and use
 `pnpm qa:login qa-invitee`. Resetting recreates this test identity, records `192.0.2.94`
@@ -122,13 +130,95 @@ lands on `next` (default `/account`).
 > From the repo root, which has the preview `.env.local`. For each browser window, run
 > `pnpm qa:login <persona>` (add `--next /path` to land on a specific page) and open the
 > printed link in that window only. Personas: `qa-admin`, `qa-creator`, `qa-fresh`, `qa-max`,
-> `qa-free`, `qa-invitee`. Never paste the links anywhere; each works once. The window must already be through
+> `qa-free`, `qa-invitee`, `qa-graylum` (Graylum connection tests only). Never paste the links anywhere; each works once. The window must already be through
 > Vercel's deployment protection.
+>
+> Sign-up steps: sign up with `delivered+<pr>-<step>-<yyyymmddhhmm>@resend.dev`, then
+> `pnpm qa:confirm-link <that address> --host user` and open the link only in the browser the
+> step names. To get back into that account later: `pnpm qa:login-email <that address>`.
 >
 > If your persona is not in its starting state, run `pnpm qa:reset <persona>` for **your own
 > lane's persona only**, then sign in again. Never run `pnpm qa:accounts` while validating in
 > parallel: it resets all five personas, including the ones other lanes are using. Only run it
 > when you are the only one validating, before you start.
+
+## Sign-up validations without the inbox
+
+Sign-up checks (enterprise `?ref=` bonus, cross-device referral) need a **new** account made
+through the real sign-up form, then its confirmation link. Two scripts get those links from the
+test project directly, so nobody forwards emails. Both refuse QA persona addresses (use
+`pnpm qa:login`), refuse anything but the test project `pnzkiqvktkzznfbyhphe` (production
+`irbqamjuazkkyvnnzupf` is always refused), print the link to stdout only and never print a key or
+a connection string.
+
+### Which address to sign up with
+
+The test project's Auth email goes out through Resend (`docs/decisions.md` D13). Use Resend's test
+inbox with a label per run:
+
+```
+delivered+<pr>-<step>-<yyyymmddhhmm>@resend.dev
+```
+
+Resend accepts it as delivered and sends nothing to a real mailbox, so there are no bounces or
+spam complaints against `shotviva.com`. Use a fresh label every sign-up: an address that already
+has an account cannot test sign-up. Never use `bounced@` or `complained@resend.dev` (they hurt
+the sending reputation), and never a made-up domain or someone's real address.
+If the sign-up page answers that the address is not authorised, the test project is on
+Supabase's built-in mailer instead of Resend; tell the control window rather than switching to
+a real inbox.
+
+### Confirming a new sign-up
+
+```bash
+pnpm qa:confirm-link delivered+961-s2-202611271530@resend.dev --host user
+```
+
+prints exactly the link the confirmation email carries:
+`<host>/auth/confirm?next=…&token_hash=…&type=signup`. `--host` is `user` (default,
+`shotviva-qa-user`), `admin` (`shotviva-qa-admin`) or `preview` (the branch URL); `--next /path`
+sets the landing page (default: the account page in the account's language). The email's own
+`next` is not stored anywhere, so a step that depends on it must pass the same `--next`.
+
+- It **only reads** the pending token (`auth.users.confirmation_token`). It never resends:
+  a new email moves `confirmation_sent_at`, which by design (migration 2021) drops the
+  account's stored referral and would falsify a referral test.
+- It refuses an address with no account, one that is already confirmed, one with no pending
+  token, and one whose email is older than the link lifetime. It assumes `otp_expiry` = 1 hour
+  (`supabase/config.toml`, and what the email says); the hosted value is not readable from here.
+- **Use the link only where the handoff says.** Open it once, in the browser/device the step
+  names (for a cross-device test, the *other* browser, signed out). Opening it anywhere else, or
+  twice, tests something else and uses the token up. Never paste it into a PR, issue or chat.
+
+### Signing back in to an account you created
+
+```bash
+pnpm qa:login-email delivered+961-s2-202611271530@resend.dev --host user --next /account
+```
+
+works like `pnpm qa:login` for any **confirmed**, non-admin test account that is not a persona.
+It refuses unconfirmed accounts (a magic link would confirm them and skip the sign-up path; use
+`qa:confirm-link`) and never creates an account.
+
+### One-time setup (Owner)
+
+`qa:login-email` uses the same `.env.local` as `qa:login`. `qa:confirm-link` also needs read
+access to `auth.users`, which the Supabase API does not expose, so it connects to Postgres:
+
+1. Supabase → project **shotviva-preview** (`pnzkiqvktkzznfbyhphe`) → **Connect** (top bar) →
+   **Connection string** → **Session pooler** → copy the **URI**
+   (`postgresql://postgres.pnzkiqvktkzznfbyhphe:[YOUR-PASSWORD]@aws-….pooler.supabase.com:5432/postgres`).
+2. Replace `[YOUR-PASSWORD]` with the preview database password (Settings → Database → reset it
+   there if nobody has it) and add one line to `.env.local`:
+
+   ```
+   QA_TEST_DB_URL=postgresql://postgres.pnzkiqvktkzznfbyhphe:<password>@aws-….pooler.supabase.com:5432/postgres
+   ```
+
+   Paste the URI as is, with no `?…` parameters (they are refused: Postgres clients let them
+   override the host and user). Never the production project's string. The script refuses any
+   host or user that is not the test project before connecting, then checks the QA personas
+   exist in the database it reached, inside one read-only transaction.
 
 ## Phone sign-in persona (T63, Chinese pages)
 

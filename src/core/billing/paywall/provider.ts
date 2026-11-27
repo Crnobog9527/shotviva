@@ -4,4 +4,4 @@
 // JavaScript; the home page and the marketing landings only need these two (mobile
 // Lighthouse, 2026-11-11). The drawer itself still loads on first open (paywall-context.tsx).
 export { PaywallButton } from './paywall-button'
-export { PaywallProvider, usePaywall, type PaywallTrigger } from './paywall-context'
+export { PaywallProvider, usePaywall, usePaywallIfAny, type PaywallTrigger } from './paywall-context'

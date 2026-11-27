@@ -1,9 +1,10 @@
+import { spendableBalance } from '@/core/org'
 import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getTranslations } from 'next-intl/server'
 
-import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
+import { effectiveLimits, readBalance } from '@/core/billing'
 import { fileUrlFor, findOwnJob, hasInputPreview, jobRefOrShort, keptInputsOf, originalUrlFor, type Job } from '@/core/jobs'
 import type { Locale } from '@/core/i18n'
 import { logger } from '@/core/logger'
@@ -31,7 +32,7 @@ type Req = { userId: string; jobId: string }
 export async function loadWorkView(deps: Deps, req: Req): Promise<WorkView | null> {
   const [job, around] = await Promise.all([findOwnJob(deps.admin, req.userId, req.jobId), readAround(deps, req)])
   if (!job || job.status !== 'succeeded') return null
-  const { offer, balance, tier, reference, t } = around
+  const { offer, balance, limits, reference, t } = around
   const [{ kept, parent, lookup }, poster] = await Promise.all([readFromJob(deps, req.userId, job), loadPosterWork(deps.admin, job)])
   const names = { fallback: t('photos.fallbackName'), edited: t('photos.editedName'), titleEdited: (name: string) => t('edit.titleEdited', { name }) }
   const { item, source, change } = editDisplay(job, parent, lookup, names, fileUrlFor)
@@ -44,7 +45,7 @@ export async function loadWorkView(deps: Deps, req: Req): Promise<WorkView | nul
     // findOwnJob leaves out a deleted work (T41), so a parent id with no parent row means deleted.
     parentDeleted: job.parentJobId !== null && parent === null,
     change,
-    ...actionsFor(job, lookup, poster, offer && { ...offer, balance, concurrency: limitsFor(tier).concurrency }),
+    ...actionsFor(job, lookup, poster, offer && { ...offer, balance, concurrency: limits.concurrency }),
     shareText: deps.shareText,
   }
 }
@@ -63,15 +64,15 @@ function actionsFor(job: Job, lookup: TemplateLookup, poster: WorkView['poster']
 // What the view needs besides the job: the edit offer, balance and tier, the reference number
 // and the messages.
 async function readAround(deps: Deps, req: Req) {
-  const [offer, balance, tier, reference, t] = await Promise.all([
+  const [offer, balance, limits, reference, t] = await Promise.all([
     loadEditOffer(deps.db),
-    readBalance(deps.db, req.userId),
-    // effective_tier() (an unbanned admin counts as Max) is service-role only; the user's own id comes from the session.
-    effectiveTier(deps.admin, req.userId),
+    readBalance(deps.db, req.userId).then((own) => spendableBalance(deps.admin, req.userId, own)),
+    // effective_limits() (tier, an unbanned admin as Max, plus the org lift) is service-role only; the user's own id comes from the session.
+    effectiveLimits(deps.admin, req.userId),
     jobRefOrShort(deps.admin, req.jobId),
     getTranslations({ locale: deps.locale, namespace: 'app' }),
   ])
-  return { offer, balance, tier, reference, t }
+  return { offer, balance, limits, reference, t }
 }
 
 // What depends on the job: the upload preview's HEAD (an edit has no upload of its own, T30),

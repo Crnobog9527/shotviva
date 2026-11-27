@@ -1,9 +1,8 @@
 import Link from 'next/link'
 
-import type { ClawbackActions } from '../clawback-ui'
 import type { Page } from '../cursor'
 import { ORDERS_COPY as COPY } from './copy'
-import { PurchasesTable } from './purchases-table'
+import { PurchasesTable, type PurchaseActions } from './purchases-table'
 import type { AdminPurchase, AdminSubscription } from './repository'
 import type { RevenueStats } from './revenue'
 import { RevenueByProduct, RevenueCards } from './revenue-summary'
@@ -16,12 +15,15 @@ type Props = {
   // Which cursor each list is on, to build the other list's links.
   cursors: { purchases: string | null; subscriptions: string | null }
   stripeLive: boolean
-  // T71: 「扣回剩余积分」 on each purchase.
-  clawback?: ClawbackActions
+  // T71 「扣回剩余积分」 and 1881 「标记已知晓」 on each purchase.
+  actions?: PurchaseActions
+  // ?attention=1, from the overview counter: only the payments it counts.
+  attention: boolean
 }
 
-function pageHref(purchases: string | null, subscriptions: string | null) {
+function pageHref(purchases: string | null, subscriptions: string | null, attention = false) {
   const params = new URLSearchParams()
+  if (attention) params.set('attention', '1')
   if (purchases) params.set('p', purchases)
   if (subscriptions) params.set('s', subscriptions)
   const query = params.toString()
@@ -46,21 +48,33 @@ function Pager({ current, next, href }: { current: string | null; next: string |
 }
 
 // /admin/orders (ARCHITECTURE §10, Plan A): list-price revenue, purchases, subscriptions.
-export function OrdersView({ stats, purchases, subscriptions, cursors, stripeLive, clawback }: Props) {
+function PurchasesTitle({ attention }: { attention: boolean }) {
+  if (!attention) return <h2 className="font-semibold">{COPY.purchasesTitle}</h2>
+  return (
+    <div className="flex flex-wrap items-baseline gap-3">
+      <h2 className="font-semibold">{COPY.attention.title}</h2>
+      <Link href="/admin/orders" className="text-sm text-primary hover:underline">
+        {COPY.attention.showAll}
+      </Link>
+    </div>
+  )
+}
+
+export function OrdersView({ stats, purchases, subscriptions, cursors, stripeLive, actions, attention }: Props) {
   return (
     <div className="grid gap-6">
       <p className="text-sm text-muted-foreground">{COPY.priceNote}</p>
       <RevenueCards stats={stats} />
       <RevenueByProduct stats={stats} />
       <section className="grid gap-2">
-        <h2 className="font-semibold">{COPY.purchasesTitle}</h2>
-        <PurchasesTable purchases={purchases.items} stripeLive={stripeLive} clawback={clawback} />
-        <Pager current={cursors.purchases} next={purchases.nextCursor} href={(c) => pageHref(c, cursors.subscriptions)} />
+        <PurchasesTitle attention={attention} />
+        <PurchasesTable purchases={purchases.items} stripeLive={stripeLive} actions={actions} empty={attention ? COPY.attention.none : undefined} />
+        <Pager current={cursors.purchases} next={purchases.nextCursor} href={(c) => pageHref(c, cursors.subscriptions, attention)} />
       </section>
       <section className="grid gap-2">
         <h2 className="font-semibold">{COPY.subscriptionsTitle}</h2>
         <SubscriptionsTable subscriptions={subscriptions.items} counts={stats.subscriptions} stripeLive={stripeLive} />
-        <Pager current={cursors.subscriptions} next={subscriptions.nextCursor} href={(c) => pageHref(cursors.purchases, c)} />
+        <Pager current={cursors.subscriptions} next={subscriptions.nextCursor} href={(c) => pageHref(cursors.purchases, c, attention)} />
       </section>
     </div>
   )

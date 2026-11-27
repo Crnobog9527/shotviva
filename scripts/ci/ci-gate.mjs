@@ -6,7 +6,7 @@
  * Lighthouse decision itself is the `if:` of the lighthouse jobs; `lighthouseDecision` explains
  * it in the same order, from the same inputs.
  *
- * Env: CHECKS, DB, LIGHTHOUSE, BASE (job results); CODE, FORCE, REASON (change detection);
+ * Env: CHECKS, BUILD, DB, LIGHTHOUSE, BASE (job results; Lighthouse waits on BUILD only); CODE, FORCE, REASON (change detection);
  * PAGES, BASE_PAGES (fingerprints per page, JSON); EVENT.
  */
 import { appendFileSync } from 'node:fs'
@@ -32,7 +32,7 @@ export function lighthouseDecision(env) {
   const changed = rows.filter((row) => row.changed).map((row) => row.name)
   let why
   if (env.EVENT === 'push') why = 'not run on pushes to main'
-  else if (env.CHECKS !== 'success') why = 'not run: lint · typecheck · test · build did not pass'
+  else if ((env.BUILD ?? env.CHECKS) !== 'success') why = 'not run: the build did not pass'
   else if (env.CODE !== 'true') why = 'not needed: docs-only change'
   else if (env.BASE !== 'success') why = `run: the baseline job did not finish (${env.BASE}), so nothing to compare`
   else if (env.FORCE !== 'false') why = `run: forced (${env.REASON || 'unknown reason'})`

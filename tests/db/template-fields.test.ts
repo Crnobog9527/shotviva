@@ -50,8 +50,9 @@ afterAll(async () => {
   await db.end()
 })
 
+// 1K jobs, which free credits pay (1996).
 async function setup() {
-  const userId = await createUser(db, { credits: 5 })
+  const userId = await createUser(db, { freeCredits: 5 })
   const r2 = createMemoryStore()
   const inputKey = newInputKey(userId, 'image/jpeg')
   r2.upload(inputKey, await jpeg(1600, 1200), 'image/jpeg')

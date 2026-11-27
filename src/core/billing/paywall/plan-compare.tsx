@@ -1,6 +1,7 @@
 "use client"
 
 import { useFormatter, useLocale, useTranslations } from "next-intl"
+import { useLayoutEffect, useRef } from "react"
 
 import { pricingV2 } from "../../public-env"
 import { offerLabel, productFor, type Period, type TierOffer } from "./offer"
@@ -9,17 +10,39 @@ import { Tick } from "./perk-list"
 import { PhotoEstimateNote, useRangeText } from "./photo-estimate-line"
 import { compareRows, type CompareCell } from "./plan-compare-rows"
 
-// Below the three plans on /pricing: the same rows as the cards, side by side, closed by
-// default. A native <details>, so it works before hydration and every row is in the HTML
-// (建站规格 R5). Four narrow columns fit a 375px phone without scrolling sideways.
+// The md breakpoint: from here the table starts open (Owner 2026-11-25).
+const DESKTOP = "(min-width: 768px)"
+
+// Opens the <details> just before it on a desktop-width screen and marks it decided. Plain ES5,
+// runs while the HTML is parsed, so the table is open in the first paint: no shift, no flash.
+export const OPEN_ON_DESKTOP = `(function(s){try{var d=s.previousElementSibling;d.setAttribute("data-decided","");if(matchMedia(${JSON.stringify(DESKTOP)}).matches)d.open=true}catch(e){}})(document.currentScript)`
+
+// Below the three plans on /pricing: the same rows as the cards, side by side. A native
+// <details>, so it toggles before hydration and every row is in the HTML (建站规格 R5). Four
+// narrow columns fit a 375px phone without scrolling sideways.
+//
+// Open by default on desktop (≥768px), closed on phones. The server cannot know the width, so
+// it renders the table closed with the inline script after it deciding during parsing, as
+// google-mainland-note.tsx does; React never owns `open` (no prop), so hydration leaves the
+// browser's state alone and later renders (the Monthly / Yearly switch) keep the buyer's toggle.
+// A table React mounts itself (client navigation) gets no script run, so the effect decides
+// once, before paint; it skips a table the script already decided.
 export function PlanCompare({ offers, period }: { offers: readonly TierOffer[]; period: Period }) {
   const t = useTranslations("paywall")
   const locale = useLocale()
   const products = offers.map(o => productFor(o, period))
   const facts = usePerkFacts()
-  const rows = compareRows(offers, { ...facts, memberPacks: pricingV2 }, period)
+  const rows = compareRows(offers, { ...facts, memberPacks: pricingV2 ? facts.packMemberOff : null }, period)
+  const ref = useRef<HTMLDetailsElement>(null)
+  useLayoutEffect(() => {
+    const details = ref.current
+    if (!details || details.hasAttribute("data-decided")) return
+    details.setAttribute("data-decided", "")
+    if (window.matchMedia(DESKTOP).matches) details.open = true
+  }, [])
   return (
-    <details className="group hairline-lit mt-4 rounded-media bg-card md:mt-6">
+    <>
+    <details ref={ref} suppressHydrationWarning className="group hairline-lit mt-4 rounded-media bg-card md:mt-6">
       <summary className="press flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 text-label font-semibold [&::-webkit-details-marker]:hidden">
         {t("compare.title")}
         <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 flex-none text-bone-dim transition-transform duration-200 group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
@@ -57,6 +80,8 @@ export function PlanCompare({ offers, period }: { offers: readonly TierOffer[]; 
         <PhotoEstimateNote className="mt-2 px-1" />
       </div>
     </details>
+    <script dangerouslySetInnerHTML={{ __html: OPEN_ON_DESKTOP }} />
+    </>
   )
 }
 

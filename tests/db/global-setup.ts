@@ -8,6 +8,17 @@ export const TEST_SIGNUP_GIFT_CAP = 100_000
 // same-IP tests expect the second account on a network to go without, so it runs with 1;
 // signup-gift-claims.test.ts sets its own and puts this one back.
 export const TEST_SIGNUP_GIFT_PER_IP = 1
+// 1760: the generation lanes (queue-fairness Q3) refuse past 120 slots a minute in a lane, and the
+// suite starts far more jobs than that in one run, so it runs with lanes no run fills;
+// generation-lanes.test.ts sets its own small ones and puts these back.
+export const TEST_GENERATION_LANES = {
+  lanes: {
+    gpt: { per_minute: 10_000, inflight: 10_000 },
+    seedream: { per_minute: 10_000, inflight: 10_000 },
+    other: { per_minute: 10_000, inflight: 10_000 },
+  },
+  single_reserve_pct: 20, org_inflight_max: 1000, orgs_share_pct: 100, slot_ttl_seconds: 360,
+}
 
 export default async function setup() {
   const db = await connectAdmin()
@@ -15,6 +26,7 @@ export default async function setup() {
     for (const [key, value] of [
       ['signup_gift_daily_cap', TEST_SIGNUP_GIFT_CAP],
       ['signup_gift_per_ip', TEST_SIGNUP_GIFT_PER_IP],
+      ['generation_lanes', TEST_GENERATION_LANES],
     ] as const) {
       await db.query(
         `insert into public.system_settings (key, value) values ($1, $2::jsonb)

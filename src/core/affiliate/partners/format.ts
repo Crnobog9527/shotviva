@@ -11,10 +11,10 @@ export const date = (locale: Locale, iso: string) =>
 export const percent = (locale: Locale, bp: number) =>
   new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 2 }).format(bp / 10000)
 
-export function viewHref(query: Partial<Query>) {
+export function viewHref({ base = '/partners', ...query }: Partial<Query>) {
   const params = new URLSearchParams()
   for (const [key, value] of Object.entries(query)) if (value) params.set(key, value)
-  return '/partners' + (params.size ? '?' + params.toString() : '')
+  return base + (params.size ? '?' + params.toString() : '')
 }
 
 export function productLabel(id: string, t: Translate) {

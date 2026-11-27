@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { AppError } from '@/core/errors'
 
 import type { SystemSettingDeps } from './commands'
-import { saveSignupGiftRules } from './signup-gift'
+import { loadSignupGift, saveSignupGiftRules } from './signup-gift'
 
 // 1350 + 1480: the signup gift's rules on /admin/features. One RPC per rule (the database checks
 // the admin, the key and the range again), then the settings cache.
@@ -14,15 +14,17 @@ function deps() {
   return { rpc, invalidate, deps: { db: { rpc }, invalidate } satisfies SystemSettingDeps }
 }
 
-const rules = { cap: 30, perIp: 5, claimPhone: true, claimGoogle: false }
+const rules = { credits: 100, cap: 30, perIp: 5, perIpPartner: 20, claimPhone: true, claimGoogle: false }
 
 describe('saveSignupGiftRules', () => {
   it('saves every rule with its own key and type, the admin as actor', async () => {
     const d = deps()
     await saveSignupGiftRules(d.deps, 'admin-1', rules)
     expect(d.rpc.mock.calls).toEqual([
+      ['admin_set_system_setting', { p_key: 'signup_gift_credits', p_value: 100, p_actor: 'admin-1' }],
       ['admin_set_system_setting', { p_key: 'signup_gift_daily_cap', p_value: 30, p_actor: 'admin-1' }],
       ['admin_set_system_setting', { p_key: 'signup_gift_per_ip', p_value: 5, p_actor: 'admin-1' }],
+      ['admin_set_system_setting', { p_key: 'signup_gift_per_ip_partner', p_value: 20, p_actor: 'admin-1' }],
       ['admin_set_system_setting', { p_key: 'signup_gift_claim_phone', p_value: true, p_actor: 'admin-1' }],
       ['admin_set_system_setting', { p_key: 'signup_gift_claim_google', p_value: false, p_actor: 'admin-1' }],
     ])
@@ -31,16 +33,31 @@ describe('saveSignupGiftRules', () => {
 
   it.each([0, 100_000])('accepts the cap at its bounds (%s)', async (cap) => {
     const d = deps()
-    await saveSignupGiftRules(d.deps, 'admin-1', { ...rules, cap, perIp: cap === 0 ? 0 : 1000 })
-    expect(d.rpc).toHaveBeenCalledTimes(4)
+    await saveSignupGiftRules(d.deps, 'admin-1', { ...rules, cap, perIp: cap === 0 ? 0 : 1000, perIpPartner: cap === 0 ? 0 : 1000 })
+    expect(d.rpc).toHaveBeenCalledTimes(6)
+  })
+
+  // 2008: the amount, 1 to 5000 (the pause, not 0, stops the gift).
+  it.each([1, 5000])('accepts the amount at its bounds (%s)', async (credits) => {
+    const d = deps()
+    await saveSignupGiftRules(d.deps, 'admin-1', { ...rules, credits })
+    expect(d.rpc).toHaveBeenCalledWith('admin_set_system_setting', { p_key: 'signup_gift_credits', p_value: credits, p_actor: 'admin-1' })
   })
 
   it.each([
+    { ...rules, credits: 0 },
+    { ...rules, credits: 5001 },
+    { ...rules, credits: 2.5 },
+    { ...rules, credits: '300' },
+    { cap: 30, perIp: 5, claimPhone: true, claimGoogle: false },
     { ...rules, cap: -1 },
     { ...rules, cap: 1.5 },
     { ...rules, cap: 100_001 },
     { ...rules, perIp: 1001 },
     { ...rules, perIp: -1 },
+    { ...rules, perIpPartner: 1001 },
+    { ...rules, perIpPartner: -1 },
+    { credits: 100, cap: 30, perIp: 5, claimPhone: true, claimGoogle: false },
     { ...rules, claimPhone: 'yes' },
     { cap: 30 },
     null,
@@ -49,5 +66,26 @@ describe('saveSignupGiftRules', () => {
     const error = await saveSignupGiftRules(d.deps, 'admin-1', input).catch((e: unknown) => e)
     expect(error).toBeInstanceOf(AppError)
     expect(d.rpc).not.toHaveBeenCalled()
+  })
+})
+
+// Review P3 on #942: the card loads the stored amount (or the default 200), never the amount in
+// effect, which is 6 on a database without the v2 cutover and would be saved with the next rule.
+describe('loadSignupGift', () => {
+  const today = { granted: 3, cap: 30, per_ip: 5, per_ip_partner: 20, claim_phone: true, claim_google: true, credits: 6 }
+  function db(stored: unknown) {
+    // Only the amount row exists; the pause has never been saved.
+    const query = (key = '') => ({
+      select: () => query(key),
+      eq: (_column: string, value: string) => query(value),
+      maybeSingle: async () => ({ data: key === 'signup_gift_credits' && stored !== undefined ? { value: stored } : null, error: null }),
+    })
+    return { rpc: async () => ({ data: today, error: null }), from: () => query() } as unknown as Parameters<typeof loadSignupGift>[0]
+  }
+  it.each([[300, 300], [undefined, 200], [0, 200], ['300', 200]])('stored %o loads as %s, not the 6 in effect', async (stored, expected) => {
+    const state = await loadSignupGift(db(stored))
+    expect(state.rules.credits).toBe(expected)
+    expect(state.granted).toBe(3)
+    expect(state.rules.perIpPartner).toBe(20)
   })
 })

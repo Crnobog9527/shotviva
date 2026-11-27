@@ -49,8 +49,9 @@ afterAll(async () => {
   await db.end()
 })
 
+// 1K works are paid from free credits only (1996), so the user holds both kinds.
 async function work(note = 'keep the chain gold') {
-  const userId = await createUser(db, { credits: 5 })
+  const userId = await createUser(db, { credits: 5, freeCredits: 5 })
   const r2 = createMemoryStore()
   const inputKey = newInputKey(userId, 'image/jpeg')
   r2.upload(inputKey, await jpeg(800, 1000), 'image/jpeg')
@@ -146,7 +147,7 @@ describe('deleting a work', () => {
   })
 
   it('deletes a failed work too', async () => {
-    const userId = await createUser(db, { credits: 5 })
+    const userId = await createUser(db, { credits: 5, freeCredits: 5 })
     const r2 = createMemoryStore()
     const inputKey = newInputKey(userId, 'image/jpeg')
     r2.upload(inputKey, await jpeg(640, 480), 'image/jpeg')
@@ -170,7 +171,7 @@ describe('admin', () => {
     await deleteOwnWork({ db: service, store: r2.store }, { userId, jobId: job.id })
     const page = await listJobs(service, parseJobFilters({ template: templateId }))
     expect(page.items.find((item) => item.id === job.id)).toMatchObject({ status: 'succeeded', deletedByUser: true })
-    expect(await viewWork({ db: service, store: r2.store }, job.id)).toEqual({ output: null, input: null, inputExpired: false, deleted: true, slotCount: 0 })
+    expect(await viewWork({ db: service, store: r2.store }, job.id)).toEqual({ output: null, input: null, inputExpired: false, deleted: true, slotCount: 0, userInput: { isEdit: false, entries: [], options: [] }, sourceWork: null })
     const audit = await db.query("select 1 from public.admin_audit_log where action = 'view_work' and target_id = $1", [job.id])
     expect(audit.rowCount).toBe(1)
   })

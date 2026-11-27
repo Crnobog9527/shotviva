@@ -5,11 +5,12 @@ import { Button } from '@/core/ui/button'
 import { COPY, STATUS } from './copy'
 import { href, type Filters } from './query'
 
-export function Field({ label, ...props }: InputHTMLAttributes<HTMLInputElement> & { label: string }) {
+export function Field({ label, hint, ...props }: InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: string }) {
   return (
     <label className="grid min-w-0 gap-1 text-sm">
       <span>{label}</span>
       <Input {...props} />
+      {hint && <span className="text-muted-foreground">{hint}</span>}
     </label>
   )
 }
@@ -31,7 +32,10 @@ export function Select({
   return (
     <label className="grid gap-1 text-sm">
       <span>{label}</span>
-      <select className="h-9 rounded-md border border-input bg-background px-2" name={name} defaultValue={initial}>
+      {/* React applies a changed defaultValue to a mounted <select> only on remount, and resets a form
+          to that stale default after its action. Keyed by the saved value, the select remounts when the
+          page refreshes with new data, so a saved 已暂停 never snaps back to 已开通 (and is never re-saved). */}
+      <select key={initial} className="h-9 rounded-md border border-input bg-background px-2" name={name} defaultValue={initial}>
         {all && <option value="">{COPY.all}</option>}
         {values.map((value) => (
           <option key={value} value={value}>

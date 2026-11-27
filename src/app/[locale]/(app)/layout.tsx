@@ -9,12 +9,13 @@ import { Suspense, type ReactNode } from 'react'
 
 import { isStaffAccount } from '@/core/analytics'
 import { AnalyticsIdentify } from '@/core/analytics/browser'
+import { WebVitalsSlot } from '@/core/analytics/vitals'
 import { AnnouncementBanner } from '@/core/announcements'
 import { AdminLink, adminEntryFor, AppFrame, BrandProvider, TabBar, TabBarSlot, type TabItem } from '@/core/app-shell'
 import { getSessionUser } from '@/core/auth'
 import { clientMessages } from '@/core/i18n'
 import { PaywallProvider } from '@/core/billing/paywall'
-import { wechatPayEnabled } from '@/core/billing/stripe'
+import { walletOffersWechat } from '@/core/billing/wallet'
 import { StandingSlot } from '@/core/billing/standing'
 import { paymentChannel } from '@/core/billing/waffo'
 import { isModuleEnabled } from '@/core/config'
@@ -22,7 +23,7 @@ import { appShellMetadata } from '@/core/seo'
 import { SupportTabBadge } from '@/core/support'
 import { LivingBackground } from '@/core/ui/living-background'
 import { isWishlistEnabled, WishlistTabBadge } from '@/core/wishlist'
-import { GenerationOwner, GenerationRunner, HideWhileGenerating, PhotosTabBadge } from '@/modules/image'
+import { GenerationOwner, GenerationRunner, HideWhileGenerating, PhotosTabBadge } from '@/modules/image/app-shell'
 import { displayProducts } from '@/site/billing/display-products'
 import { site } from '@/site/site.config'
 
@@ -83,7 +84,7 @@ async function Tabs({ items }: { items: TabItem[] }) {
 async function Paywall({ children }: { children: ReactNode }) {
   const [perkFacts, products] = await Promise.all([paywallPerkFacts(), displayProducts()])
   return (
-    <PaywallProvider products={products} perkFacts={perkFacts} channel={paymentChannel()} wechatPay={wechatPayEnabled()}>
+    <PaywallProvider products={products} perkFacts={perkFacts} channel={paymentChannel()} wechatPay={walletOffersWechat()}>
       {children}
       <StandingSlot />
     </PaywallProvider>
@@ -156,6 +157,8 @@ export default function AppLayout({ children }: LayoutProps<'/[locale]'>) {
             </main>
             <GenerationRunner />
             <WishlistHintSlot />
+            {/* Anonymous speed numbers (Owner 2026-11-24: numbers only); app tab roots only, never /admin. */}
+            <WebVitalsSlot />
           </BrandProvider>
           {/* DESIGN §5 「全站流动背景」 (T54); it renders nothing on /admin. */}
           <LivingBackground />

@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 import { cn } from '../../ui/cn'
 import { WhiteGroundImage } from '../../ui/white-ground-image'
 import type { ImageRef } from '../page-content'
+import { CoverFill } from './cover-fill'
 
 type Props = {
   before: ImageRef
@@ -18,6 +19,8 @@ type Props = {
   // here made every plate download at twice the pixels it shows.
   sizes: string
   className?: string
+  decorative?: boolean
+  showcase?: boolean
 }
 
 // The side-by-side pair (DESIGN §6.9 item 1): the phone photo on the left, the AI result on the
@@ -35,9 +38,10 @@ const afterLoading = (preload: boolean) => (preload ? ({ loading: 'eager', fetch
 // later, and the full picture covers it as soon as it has loaded (same crop, same filter). A
 // plain <img> with `decoding="sync"`, so the frame is decoded for the very first paint; as a CSS
 // background it was decoded off-thread and appeared a few frames late, behind hydration.
-export function BeforePane({ image, preload, sizes }: { image: ImageRef; preload: boolean; sizes: string }) {
+export function BeforePane({ image, preload, sizes, showcase = false }: { image: ImageRef; preload: boolean; sizes: string; showcase?: boolean }) {
   return (
     <span className="mk-pane">
+      {showcase ? <CoverFill /> : null}
       {/* eslint-disable-next-line @next/next/no-img-element -- a data: URI, nothing for next/image to resize */}
       {preload && image.firstFrame ? <img className="mk-ff" src={image.firstFrame} width={image.width} height={image.height} alt="" aria-hidden decoding="sync" /> : null}
       <Image className="mk-b" src={image.src} alt={image.alt} width={image.width} height={image.height} sizes={sizes} preload={preload} loading={preload ? undefined : 'lazy'} />
@@ -45,14 +49,29 @@ export function BeforePane({ image, preload, sizes }: { image: ImageRef; preload
   )
 }
 
-export function PhotoPair({ before, after, size = 'card', preload = false, sizes, className }: Props) {
+type AfterProps = { after: ImageRef; sizes: string; preload: boolean; showcase: boolean; alt: string }
+
+// The AI result. In a showcase the plate is fitted to its frame over a blurred fill of itself.
+function AfterImage({ after, sizes, preload, showcase, alt }: AfterProps) {
+  const plate = <WhiteGroundImage className="mk-a" src={after.src} alt={alt} width={after.width} height={after.height} sizes={sizes} fitPlate={showcase || undefined} {...afterLoading(preload)} />
+  if (!showcase) return plate
+  return (
+    <span className="mk-result">
+      <CoverFill />
+      {plate}
+    </span>
+  )
+}
+
+export function PhotoPair({ before, after, size = 'card', preload = false, sizes, className, decorative, showcase = false }: Props) {
   const t = useTranslations('marketing.home')
   return (
-    <span className={cn('mk-pair', size === 'lg' && 'mk-pair-lg', className)}>
-      <BeforePane image={before} preload={preload} sizes={sizes} />
+    <span className={cn('mk-pair', size === 'lg' && 'mk-pair-lg', className)} aria-hidden={decorative || undefined}>
+      <BeforePane image={decorative ? { ...before, alt: '' } : before} preload={preload} sizes={sizes} showcase={showcase} />
       <span className="mk-pane">
+        {showcase ? <CoverFill /> : null}
         <Image className="mk-ph" src={before.src} alt="" aria-hidden width={before.width} height={before.height} sizes={sizes} loading="lazy" />
-        <WhiteGroundImage className="mk-a" src={after.src} alt={after.alt} width={after.width} height={after.height} sizes={sizes} {...afterLoading(preload)} />
+        <AfterImage after={after} sizes={sizes} preload={preload} showcase={showcase} alt={decorative ? '' : after.alt} />
         <span className="mk-ws" aria-hidden />
       </span>
       <span className="mk-hl" aria-hidden />

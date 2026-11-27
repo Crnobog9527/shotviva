@@ -1,14 +1,16 @@
 import type { PendingDiscount } from "../../codes"
 import type { PaymentChannel } from "../../config"
 import type { CheckoutMethod } from "../stripe/catalog"
+import { overWechatLimit } from "../wechat-limit"
 import type { Period } from "./offer"
 
 // Which paywall message each payment line uses (DESIGN §4.5, ARCHITECTURE §6.3). On both
 // channels a card plan renews and can be cancelled anytime, the wallet line buys one period that
-// does not renew, and packs are one-time (Waffo card subscriptions since T50). The channel
-// changes two labels: Waffo's subscription page takes cards, not Apple Pay or Google Pay, and
-// its wallet is Alipay alone, while Stripe's wallet checkout lists Alipay and WeChat Pay (T73)
-// once STRIPE_WECHAT_PAY is on (`wechatPay`); off, it reads Alipay as before. 中国银行卡
+// does not renew, and packs are one-time (Waffo card subscriptions since T50). On both channels the
+// card line takes Apple Pay and Google Pay, for plans and packs (Waffo subscriptions too, 2026-11-25).
+// The channel changes two labels: Waffo's card line reads 银行卡 on zh pages where Stripe's reads
+// 海外银行卡 (Stripe adds 中国银行卡 beside it), and the wallet line names WeChat Pay beside Alipay when the channel's checkout offers it
+// (`wechatPay`: STRIPE_WECHAT_PAY on Stripe, T73; WAFFO_WECHAT_PAY on Waffo); off, it reads Alipay. 中国银行卡
 // (zh pages on Stripe, T64) reads like a card: plans renew, packs are one-time. On zh pages the
 // Managed Payments card is worded 海外银行卡 by the zh catalog itself. Pure, so every line is
 // unit-tested.
@@ -16,9 +18,18 @@ import type { Period } from "./offer"
 export type PaywallMessage = { key: string; values?: Record<string, string> }
 
 export function methodLabel(channel: PaymentChannel, method: CheckoutMethod, wechatPay = false): PaywallMessage {
-  if (method === "card") return { key: channel === "waffo" ? "cardOnly" : "card" }
+  if (method === "card") return { key: channel === "waffo" ? "cardWallets" : "card" }
   if (method === "cn_card") return { key: "cnCard" }
-  return { key: channel === "stripe" && wechatPay ? "wallet" : "alipay" }
+  return { key: wechatPay ? "wallet" : "alipay" }
+}
+
+// Waffo's WeChat Pay takes at most CN¥1,000 a payment and a month (wechat-limit.ts); Alipay has no
+// cap. Shown before the buyer leaves for Waffo, only while Waffo offers WeChat Pay; a price over
+// the cap gets the stronger line. Stripe's WeChat Pay has no such cap in this copy.
+export function wechatCapNote(channel: PaymentChannel, wechatPay: boolean, cents: number | null): (PaywallMessage & { over: boolean }) | null {
+  if (channel !== "waffo" || !wechatPay) return null
+  const over = cents !== null && overWechatLimit(cents)
+  return { key: over ? "wechatCapOver" : "wechatCap", over }
 }
 
 export function methodNote(
@@ -36,11 +47,6 @@ export function planFinePrint(
   return input.method === "alipay"
     ? { key: "finePlanWallet", values: { period: input.period } }
     : { key: "finePlanCard", values: { period: input.period, price: input.price } }
-}
-
-// /pricing's "Pay with" rows cover plans and packs at once (comps-v3-b pricing.html).
-export function pricingMethodNote(_channel: PaymentChannel, method: CheckoutMethod): PaywallMessage {
-  return { key: method === "alipay" ? "payNoteWallet" : "payNoteCard" }
 }
 
 // Stripe repeating windows run from the first payment in calendar months. A yearly invoice

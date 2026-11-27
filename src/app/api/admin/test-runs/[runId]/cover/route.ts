@@ -1,4 +1,5 @@
-import { revalidateTag } from 'next/cache'
+
+import { revalidateCatalogueTag } from '@/core/templates/catalogue-invalidation'
 import type { NextRequest } from 'next/server'
 
 import { errorResponse, jsonResponse } from '@/core/api-response'
@@ -8,6 +9,7 @@ import { publicEnv } from '@/core/public-env'
 import { r2PublicStore, r2Store } from '@/core/storage'
 import { TEMPLATES_CACHE_TAG } from '@/core/templates'
 import { setTestRunCover, testCoverBodySchema } from '@/modules/image'
+import { warmPublicPagesSoon } from '@/app/warm-public-pages'
 
 // 「设为封面」 on an admin test result (ARCHITECTURE §10.b, T85): result → "after", its test photo →
 // "before", compressed by the cover rules and published; then the catalogue cache expires like
@@ -24,7 +26,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!body.success) throw new AppError('INVALID_INPUT', 'unknown language')
     const deps = { db: createAdminSupabase(), store: r2Store(), assets: r2PublicStore(), assetsBaseUrl: publicEnv.NEXT_PUBLIC_ASSETS_BASE_URL }
     const templateId = await setTestRunCover(deps, admin.id, runId, body.data.locale ?? null)
-    revalidateTag(TEMPLATES_CACHE_TAG, { expire: 0 })
+    await revalidateCatalogueTag(TEMPLATES_CACHE_TAG)
+    warmPublicPagesSoon()
     return jsonResponse({ template_id: templateId })
   } catch (error) {
     return errorResponse(error, 'admin-test-run-cover')

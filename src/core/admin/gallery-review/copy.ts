@@ -39,6 +39,7 @@ export const REVIEW_COPY = {
   flagged: (categories: string) => `自动审核标记：${categories}`,
   reports: (n: number, reasons: string) => `被举报 ${n} 次：${reasons}`,
   copyLabel: '展示的文字',
+  openUser: '查看用户档案',
   noImage: '图片暂时打不开',
   confirm: {
     approve: (n: number) => ({

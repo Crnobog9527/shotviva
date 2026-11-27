@@ -11,6 +11,10 @@ export type MemberStanding = {
   // current_tier(): the tier of the latest membership purchase while paid_until runs. For a
   // one-time period (Alipay, Waffo one-time) this is all there is; it carries no interval.
   tier: MembershipTier | null
+  // An active org staff member, not the owner (Owner 2026-11-22): buys nothing personally, so every buy button in the
+  // paywall is locked with the reason. The checkout route refuses whatever the page shows (409
+  // ORG_MEMBER_CHECKOUT); this only spares the click.
+  orgMember?: boolean
 }
 
 export const NO_STANDING: MemberStanding = { subscription: null, tier: null }

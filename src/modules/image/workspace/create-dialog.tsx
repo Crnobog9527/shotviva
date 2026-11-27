@@ -1,9 +1,10 @@
 'use client'
 
+
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
-import { limitsFor } from '@/core/billing/tier-limits'
+import { batchMaxFor } from '@/core/billing/tier-limits'
 import { useRouter } from '@/core/i18n'
 import { navTypesFor } from '@/core/ui/nav-motion'
 
@@ -11,21 +12,25 @@ import { matchesStore } from '@/core/store-profile'
 
 import { FormWeeklyTools } from '../again/form-weekly-tools'
 import { useFormWeekly } from '../again/use-form-weekly'
+import { CatalogueFormStatus } from '../catalogue/catalogue-form-status'
 import { isSlotTemplate, type CatalogueTemplate } from '../catalogue/catalogue-template'
 import { preloadBatchDialog } from '../matrix/batch-dialog-slot'
 import { openBatch } from '../matrix/batch-query'
 import { isCompareSample } from '../catalogue/template-sample'
+import { useCatalogueForms } from '../catalogue/use-catalogue-forms'
 import { ZoomableSample } from '../catalogue/zoomable-sample'
 import { ShareButton } from '../share/share-button'
 import { FavoriteButton } from '../favorites/favorite-button'
 import { CreateSheet } from './create-sheet'
 import { FormAction } from './form-action'
+import { PendingCatalogueForm } from './pending-catalogue-form'
 import { useSubmitOnce } from './use-submit-once'
 import { useWarmRoute } from './use-warm-route'
-import { useWorkspaceDraft, type DraftInput } from './use-workspace-draft'
+import { useWorkspaceDraft, type CreateContext } from './use-workspace-draft'
 import { WorkspaceForm } from './workspace-form'
 
-export type CreateContext = Omit<DraftInput, 'template'>
+
+export type { CreateContext }
 
 type Props = CreateContext & { template: CatalogueTemplate | null; onClose(): void }
 
@@ -44,7 +49,16 @@ export function CreateDialog({ template, onClose, ...context }: Props) {
 
 type BodyProps = CreateContext & { template: CatalogueTemplate; open: boolean; onClose(): void }
 
-function CreateBody({ template, open, onClose, ...context }: BodyProps) {
+function CreateBody(props: BodyProps) {
+  const forms = useCatalogueForms([props.template])
+  const template = forms.fill(props.template)
+  if (template.formDeferred && (template.hasDeferredSlots || template.hasDeferredGroups)) {
+    return <PendingCatalogueForm {...props} failed={forms.failed} retry={forms.retry} />
+  }
+  return <CreateForm {...props} template={template} forms={forms} />
+}
+
+function CreateForm({ template, open, onClose, forms, ...context }: BodyProps & { forms: ReturnType<typeof useCatalogueForms> }) {
   const t = useTranslations('app.template')
   const router = useRouter()
   const draft = useWorkspaceDraft({ template, ...context, single: true })
@@ -53,7 +67,7 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
   // Generate moves to the template's workspace page, kept prefetched while the dialog is open.
   useWarmRoute(workspace, open)
   // A slot template is single-run only (§5.1e): no way to a batch.
-  const batch = limitsFor(context.tier).batchMax > 1 && template.photoInput !== 'none' && !isSlotTemplate(template) && draft.photos.photos.length === 0
+  const batch = batchMaxFor(context.tier, context.batch) > 1 && template.photoInput !== 'none' && !isSlotTemplate(template) && draft.photos.photos.length === 0
   const tall = isCompareSample(template)
   const submitOnce = useSubmitOnce(open)
   const generate = () => {
@@ -81,10 +95,10 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
         </div>
       }
       form={<>
-        <FormWeeklyTools weekly={weekly} names={{ [template.id]: template.name }} storeFields={matchesStore(template.copyFields)} />
+        {forms.ready ? <FormWeeklyTools weekly={weekly} names={{ [template.id]: template.name }} storeFields={matchesStore(template.copyFields)} /> : null}
         <WorkspaceForm
           template={template}
-          balance={context.balance}
+          balance={draft.choice.balance}
           tier={context.tier}
           photos={draft.photos}
           slots={draft.slots}
@@ -92,10 +106,11 @@ function CreateBody({ template, open, onClose, ...context }: BodyProps) {
           onChange={draft.change}
           surface="create_dialog"
           examples={draft.fromExamples}
+          detailsStatus={!forms.ready && <CatalogueFormStatus failed={forms.failed} retry={forms.retry} />}
           photoExtra={batch ? <BatchLink templateId={template.id} onGo={onClose} /> : null}
         />
       </>}
-      bar={<FormAction state={draft.state} resolution={draft.values.resolution} batch={draft.photos.batchMax > 1} onGenerate={generate} placement="sheet" limit={context.concurrency.limit} privateOnly={template.privateOnly} examplesLeft={draft.examplesLeft} />}
+      bar={<FormAction state={draft.state} resolution={draft.values.resolution} batch={draft.photos.batchMax > 1} onGenerate={generate} placement="sheet" limit={context.concurrency.limit} privateOnly={template.privateOnly} examplesLeft={draft.examplesLeft} orgOnly={draft.choice.orgOnly} />}
     />
   )
 }

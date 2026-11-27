@@ -1,3 +1,4 @@
+export { acknowledgePayment, loadAttentionIds, unacknowledgePayment, type AcknowledgeResult } from './acknowledge'
 export { applyClawback, previewClawback, type ClawbackPreview, type ClawbackResult } from './clawback'
 export { ORDERS_COPY } from './copy'
 export { formatMinor, usd } from './money'

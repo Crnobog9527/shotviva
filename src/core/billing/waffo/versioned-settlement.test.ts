@@ -22,7 +22,7 @@ it('passes actual charge and tax to the versioned RPC with one unchanged payment
   await expect(fulfilWaffoOrder(deps, event)).resolves.toBe('applied')
   await expect(fulfilWaffoOrder(deps, event)).resolves.toBe('replayed')
   expect(deps.db.rpc).toHaveBeenCalledWith('settle_waffo_order_v2', expect.objectContaining({ p_payment_id: 'PAY_order', p_amount_total: 4442, p_amount_tax: 200 }))
-  expect(deps.trackBuy).toHaveBeenCalledExactlyOnceWith(USER, expect.objectContaining({ credits: 4990, amount_usd: 42.42 }), 'en')
+  expect(deps.trackBuy).toHaveBeenCalledExactlyOnceWith(USER, expect.objectContaining({ credits: 4990, amount_usd: 42.42 }), 'en', expect.any(String))
   expect(deps.applyCodes).toHaveBeenCalledWith(expect.objectContaining({ codeId: null, amountDiscount: 0 }))
 })
 

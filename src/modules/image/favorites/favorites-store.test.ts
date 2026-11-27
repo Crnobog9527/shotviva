@@ -122,3 +122,14 @@ describe('failureOf', () => {
     expect(failureOf(null)).toBe('failed')
   })
 })
+
+// Create streams the saved list after its first paint (Owner 2026-11-24, 方案 A).
+describe('a saved list that arrives after the page', () => {
+  it('fills the store and keeps a tap made before it arrived on top', () => {
+    const store = createFavoritesStore([], () => new Promise(() => {}))
+    store.set('new', true)
+    store.seed(['a', 'b'])
+    expect(store.ids()).toEqual(['new', 'a', 'b'])
+  })
+
+})

@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import { AdminPage, listUsers, LOOKUP_PARAM, lookupHref, lookupUser, parseUserFilters, USERS_COPY, usersHref, UsersListView } from '@/core/admin'
 import { createAdminSupabase, requireAdmin } from '@/core/auth'
 
-import { batchAdjustCreditsAction, batchSetBannedAction } from './actions'
+import { batchAdjustCreditsAction, batchSetBannedAction, setUserLabelAction } from './actions'
 
 // /admin/users (ARCHITECTURE §10.a, T77): the list of users, 50 a page, filtered and sorted from
 // the URL. Pressing 查找 (?lookup=1) runs admin_lookup once: a unique hit (id, order number, an
@@ -33,7 +33,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps<'/[loca
   )
   return (
     <AdminPage title={USERS_COPY.title} actions={suspicious}>
-      <UsersListView filters={filters} list={list} actions={{ adjust: batchAdjustCreditsAction, setBanned: batchSetBannedAction }} currentUserId={admin.id} />
+      <UsersListView filters={filters} list={list} actions={{ adjust: batchAdjustCreditsAction, setBanned: batchSetBannedAction, label: setUserLabelAction }} currentUserId={admin.id} />
     </AdminPage>
   )
 }

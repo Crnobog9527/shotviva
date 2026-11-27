@@ -18,7 +18,8 @@ async function inviteCode(user: string): Promise<string> {
   return result.data
 }
 
-async function redeem(user: string, code: string, replace = false, context = 'account') {
+// Invite codes are for sign-up only (2030); campaign codes ignore the context.
+async function redeem(user: string, code: string, replace = false, context = 'signup') {
   const { data, error } = await serviceClient().rpc('redeem_code', {
     p_user: user, p_code: code, p_context: context, p_invitee_credits: null, p_invite_window_days: invite.windowDays, p_replace: replace,
   })

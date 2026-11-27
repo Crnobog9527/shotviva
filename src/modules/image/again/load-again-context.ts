@@ -1,8 +1,9 @@
+import { spendableBalance } from '@/core/org'
 import 'server-only'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-import { effectiveTier, limitsFor, readBalance } from '@/core/billing'
+import { effectiveLimits, readBalance } from '@/core/billing'
 import type { Locale } from '@/core/i18n'
 import { findOwnJob, listRunningJobIds } from '@/core/jobs'
 import type { ObjectStore } from '@/core/storage'
@@ -24,12 +25,12 @@ export async function loadAgainContext(deps: Deps, req: { userId: string; jobId:
   const [found] = await listTemplatesIn(deps.db, deps.locale, { id: job.templateId })
   if (!found) return null
   const template = toCatalogueTemplate(found)
-  const [balance, tier, runningIds, again] = await Promise.all([
-    readBalance(deps.db, req.userId),
-    // effective_tier() (an unbanned admin counts as Max) is service-role only; the user's own id comes from the session.
-    effectiveTier(deps.admin, req.userId),
+  const [balance, limits, runningIds, again] = await Promise.all([
+    readBalance(deps.db, req.userId).then((own) => spendableBalance(deps.admin, req.userId, own)),
+    // effective_limits() (tier, an unbanned admin as Max, plus the org lift) is service-role only; the user's own id comes from the session.
+    effectiveLimits(deps.admin, req.userId),
     listRunningJobIds(deps.admin, req.userId, new Date()),
     loadAgain({ db: deps.admin, store: deps.store }, { userId: req.userId, jobId: job.id, template }),
   ])
-  return again ? { template, again, balance, tier, concurrency: { limit: limitsFor(tier).concurrency, runningIds } } : null
+  return again ? { template, again, balance, tier: limits.tier, concurrency: { limit: limits.concurrency, runningIds } } : null
 }

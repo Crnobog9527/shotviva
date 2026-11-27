@@ -44,6 +44,8 @@ async function member(productId: ProductId | null) {
     templateId,
     inputKey,
     aspectRatio: '4:5',
+    // Paid credits pay 2K / 4K only, and a batch is paid only (1996).
+    resolution: '2k',
     ...overrides,
   })
   return { userId, deps, request }

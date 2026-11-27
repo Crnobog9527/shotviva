@@ -54,6 +54,9 @@ export const generateBodySchema = z.object({
   // Make again (T40): the work the workspace was opened from. Only a claim: the database keeps it
   // only when it is the caller's own succeeded work with the same template (1513).
   again_of: z.uuid().optional(),
+  // 出图时让员工自选 (ARCHITECTURE §6.5): which kind of org credits pays when the member holds both.
+  // Only honoured for a single web job by a member holding both; reserve_credits decides.
+  pool_choice: z.enum(['paid', 'promo']).optional(),
 })
 
 export type GenerationRequest = {
@@ -90,6 +93,8 @@ export type GenerationRequest = {
   poster?: { setId: string; part: number; redrawOf?: string }
   // Make again's source work, as the browser claimed it (checked in the database, 1513).
   againOf?: string
+  // The member's choice of org credits for this job (web only, single jobs; see pool_choice above).
+  poolChoice?: 'paid' | 'promo'
 }
 
 export function toGenerationRequest(userId: string, body: z.infer<typeof generateBodySchema>): GenerationRequest {
@@ -114,5 +119,6 @@ export function toGenerationRequest(userId: string, body: z.infer<typeof generat
     batchCell: body.batch_cell,
     ...(body.poster ? { poster: { setId: body.poster.set_id, part: body.poster.part, redrawOf: body.poster.redraw_of } } : {}),
     ...(body.again_of ? { againOf: body.again_of } : {}),
+    ...(body.pool_choice ? { poolChoice: body.pool_choice } : {}),
   }
 }

@@ -3,6 +3,7 @@ import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { applyPurchase } from '@/core/billing'
+import { adminCreateOrg, adminGrantOrg, adminUpdateOrg, allocateOrgCredits, joinOrg } from '@/core/org'
 import { batchArchive, preflightBatch, reserveJob, runGeneration, toGenerationRequest } from '@/core/jobs'
 import { newInputKey } from '@/core/storage'
 import { jpeg } from '../fakes/images'
@@ -32,7 +33,7 @@ async function setup(productId: 'max_monthly' | 'pro_monthly' | 'starter_monthly
   const r2 = createMemoryStore()
   const input_key = newInputKey(userId, 'image/jpeg')
   r2.upload(input_key, await jpeg(1024, 768), 'image/jpeg')
-  const cells = templates.map(template_id => ({ template_id, input_key, photo_name: '菜品.jpg', inputs: { aspect_ratio: '4:5' as const } }))
+  const cells = templates.map(template_id => ({ template_id, input_key, photo_name: '菜品.jpg', inputs: { aspect_ratio: '4:5' as const, resolution: '2k' as const } }))
   const deps = { db, store: r2.store, provider: fakeProvider().provider, track: vi.fn() }
   return { userId, cells, deps, db }
 }
@@ -70,9 +71,9 @@ describe('T107 preflight and independent jobs', () => {
   ] as const)('reserve_batch_cell for a multi-template cell: %s %s', async (product, role, refused) => {
     const { db, userId } = await setup(product, role)
     const before = await profileOf(sql, userId)
-    const cost = (await sql.query(`select (credits_cost->>'1k')::int as cost from public.templates where id=$1`, [templates[0]])).rows[0].cost
+    const cost = (await sql.query(`select (credits_cost->>'2k')::int as cost from public.templates where id=$1`, [templates[0]])).rows[0].cost
     const reserve = reserveJob(db, { jobId: randomUUID(), userId, module: 'image', templateId: templates[0], expectedCredits: cost, source: 'web',
-      inputs: { resolution: '1k', attempt_id: randomUUID(), batch_id: randomUUID(), batch_position: 1, batch_size: 2, batch_templates: 2 } })
+      inputs: { resolution: '2k', attempt_id: randomUUID(), batch_id: randomUUID(), batch_position: 1, batch_size: 2, batch_templates: 2 } })
     if (refused) {
       await expect(reserve).rejects.toMatchObject(refused)
       expect((await profileOf(sql, userId)).credits).toBe(before.credits)
@@ -80,6 +81,29 @@ describe('T107 preflight and independent jobs', () => {
       expect(await reserve).toMatchObject({ creditPool: 'paid', creditsCost: cost })
       expect((await profileOf(sql, userId)).credits).toBe(before.credits - cost)
     }
+  })
+
+  // ARCHITECTURE §6.5: an active org's usage lifts a Starter member to multi-template batches on
+  // both entry points and in reserve_batch_cell; a suspended org lifts nothing.
+  it('lets an org lift a Starter member to a multi-template batch until it is suspended', async () => {
+    const { db, deps, userId, cells } = await setup('starter_monthly')
+    const actor = await createUser(sql)
+    await sql.query(`update public.profiles set role='admin' where id=$1`, [actor])
+    const orgId = await adminCreateOrg(serviceClient(), actor, { owner_user_id: await createUser(sql), name: 'Batch org', batch_max: 10, multi_template_max: 2 })
+    const { rows } = await sql.query('select invite_token from public.orgs where id=$1', [orgId])
+    await joinOrg(serviceClient(), userId, rows[0].invite_token)
+    // An active member pays with org credits only (§6.5, 1897): their own plan credits do not pass the preflight.
+    await expect(preflightBatch(db, userId, cells, deps.provider)).rejects.toMatchObject({ code: 'CREDITS_INSUFFICIENT' })
+    const owner = (await sql.query('select owner_user_id from public.orgs where id=$1', [orgId])).rows[0].owner_user_id
+    await adminGrantOrg(serviceClient(), actor, { org_id: orgId, request_id: `grant:${randomUUID()}`, credits: 1000 })
+    await allocateOrgCredits(serviceClient(), owner, userId, 1000, randomUUID())
+    const quote = await preflightBatch(db, userId, cells, deps.provider)
+    const job = await runGeneration(deps, toGenerationRequest(userId, { ...cells[0], ...quote, ...quote.cells[0] }))
+    expect([job.status, job.credit_pool]).toEqual(['succeeded', 'paid'])
+    await adminUpdateOrg(serviceClient(), actor, orgId, { status: 'suspended' })
+    await expect(preflightBatch(db, userId, cells, deps.provider)).rejects.toMatchObject({ code: 'TIER_REQUIRED', requiredTier: 'max' })
+    await expect(runGeneration(deps, toGenerationRequest(userId, { ...cells[1], ...quote, ...quote.cells[1] })))
+      .rejects.toMatchObject({ code: 'TIER_REQUIRED', requiredTier: 'max' })
   })
 
   it('rejects an unsold resolution for any selected template during preflight', async () => {
@@ -132,15 +156,18 @@ describe('T107 preflight and independent jobs', () => {
     const { db, deps, userId, cells } = await setup('max_monthly')
     const batch = await preflightBatch(db, userId, cells, deps.provider)
     await expect(preflightBatch(db, userId, Array(31).fill(cells[0]), deps.provider)).rejects.toMatchObject({ code: 'TIER_REQUIRED' })
-    expect(batch).toMatchObject({ total_credits: 3, batch_templates: 2, batch_size: 2 })
-    await sql.query('update public.profiles set credits=2,free_credits=70 where id=$1', [userId])
+    // A batch is paid credits only and so 2K / 4K (1996): 2K prices 2 + 3.
+    expect(batch).toMatchObject({ total_credits: 5, batch_templates: 2, batch_size: 2 })
+    // 4 paid: short of the batch's 5, enough for the first cell (2) and for the repeat to reach
+    // the duplicate check (the reserve debits before it), never for the second cell (3).
+    await sql.query('update public.profiles set credits=4,free_credits=70 where id=$1', [userId])
     await expect(preflightBatch(db, userId, cells, deps.provider)).rejects.toMatchObject({ code: 'CREDITS_INSUFFICIENT' })
     const run = (i: number) => runGeneration(deps, toGenerationRequest(userId, { ...cells[i], ...batch, ...batch.cells[i] }))
     const first = await run(0)
     expect(first).toMatchObject({ batch_id: batch.batch_id, credit_pool: 'paid' })
     await expect(run(0)).rejects.toMatchObject({ code: 'CONFLICT' })
     await expect(run(1)).rejects.toMatchObject({ code: 'CREDITS_INSUFFICIENT' })
-    expect(await profileOf(sql, userId)).toMatchObject({ credits: 1, free_credits: 70 })
+    expect(await profileOf(sql, userId)).toMatchObject({ credits: 2, free_credits: 70 })
     const files = await batchArchive(db, userId, batch.batch_id)
     expect(files.files.map(f => f.jobId)).toEqual([first.id])
     await expect(batchArchive(db, randomUUID(), batch.batch_id)).rejects.toMatchObject({ code: 'NOT_FOUND' })

@@ -2,6 +2,7 @@ import { createHmac } from 'node:crypto'
 
 import { describe, expect, it, vi } from 'vitest'
 
+import { BATCH_SIZE_CEILING, limitsFor } from '../../billing/tier-limits'
 import type { GenerationRequest } from '../generation-request'
 import { archiveFilename } from './archive'
 import { assertBatchAllowed } from './limits'
@@ -10,15 +11,25 @@ import { signCell, assertBatchProof } from './proof'
 
 vi.mock('../../env', () => ({ serverEnv: () => ({ SUPABASE_SERVICE_ROLE_KEY: 'unit-test' }) }))
 
+// What effective_limits() gives an account outside any org.
+const tierLimits = (tier: 'starter' | 'pro' | 'max') => ({ batchMax: limitsFor(tier).batchMax, multiTemplateMax: tier === 'max' ? 5 : 1 })
+
 describe('batch admission', () => {
   it.each(['starter', 'pro'] as const)('opens Max for %s', tier => {
-    expect(() => assertBatchAllowed(tier, 2, 2)).toThrow(expect.objectContaining({ requiredTier: 'max' }))
+    expect(() => assertBatchAllowed(tierLimits(tier), 2, 2)).toThrow(expect.objectContaining({ requiredTier: 'max' }))
   })
   it('limits both dimensions', () => {
-    expect(() => assertBatchAllowed('max', 30, 5)).not.toThrow()
-    expect(() => assertBatchAllowed('max', 31, 1)).toThrow()
-    expect(() => assertBatchAllowed('max', 6, 6)).toThrow()
-    expect(preflightSchema.safeParse({ cells: Array(31).fill({ input_key: 'x', template_id: 't', photo_name: 'a' }) }).success).toBe(false)
+    expect(() => assertBatchAllowed(tierLimits('max'), 30, 5)).not.toThrow()
+    expect(() => assertBatchAllowed(tierLimits('max'), 31, 1)).toThrow()
+    expect(() => assertBatchAllowed(tierLimits('max'), 6, 6)).toThrow()
+    const cell = { input_key: 'x', template_id: 't', photo_name: 'a' }
+    expect(preflightSchema.safeParse({ cells: Array(BATCH_SIZE_CEILING + 1).fill(cell) }).success).toBe(false)
+  })
+  it('lets an org lift a Starter member past their tier without the paywall', () => {
+    const org = { batchMax: 30, multiTemplateMax: 5 }
+    expect(() => assertBatchAllowed(org, 30, 5)).not.toThrow()
+    expect(() => assertBatchAllowed(org, 31, 1)).toThrow(expect.objectContaining({ requiredTier: 'max' }))
+    expect(() => assertBatchAllowed({ batchMax: 12, multiTemplateMax: 1 }, 12, 2)).toThrow(expect.objectContaining({ requiredTier: 'max' }))
   })
   it('binds permissions, quote and options to the signed selection', () => {
     const req: GenerationRequest = { userId: 'u', source: 'web', templateId: 'a', inputKey: 'photo',

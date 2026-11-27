@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const tabs = ['overview', 'applications', 'affiliates', 'commissions', 'payouts', 'attribution', 'settings', 'errors'] as const
+export const tabs = ['overview', 'applications', 'affiliates', 'commissions', 'payouts', 'attribution', 'settings', 'fees', 'promo', 'errors'] as const
 export const dossierSections = ['commissions', 'bonuses', 'team', 'payouts', 'referrals', 'audit', 'adjustments'] as const
 export const categories = ['pack', 'monthly', 'yearly'] as const
 const blank = (value: unknown) => (value === '' ? undefined : value)
@@ -13,11 +13,12 @@ const filter = z
     id: optional(z.uuid()),
     affiliate: optional(z.uuid()),
     status: optional(z.enum(['confirmed', 'pending', 'on_hold', 'void', 'paid', 'due', 'held'])),
-    flag: optional(z.enum(['yes', 'no'])),
+    flag: optional(z.enum(['yes', 'no', 'paused'])),
     period: optional(z.iso.date()),
     from: optional(z.iso.date()),
     until: optional(z.iso.date()),
     section: optional(z.enum(dossierSections)),
+    payment: optional(z.string().regex(/^[1-9]\d{0,17}$/)),
     commission: optional(z.string().regex(/^[1-9]\d{0,18}$/).refine((s) => s.length < 19 || s <= '9223372036854775807')),
     historyCursor: optional(z.string().min(1).max(400)),
     cursor: optional(z.string().min(1).max(400)),

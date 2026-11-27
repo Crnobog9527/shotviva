@@ -10,14 +10,15 @@ import { logger, redactString } from '../logger'
 import { appOrigin } from '../site-url'
 import { r2MarkerStore } from '../storage/r2-store'
 import { alertPolicy, type AlertBudget, type OwnerAlert } from './alert-kinds'
-import { feishuConfig, type FeishuConfig } from './alerts-env'
+import type { FeishuConfig } from './alerts-env'
 import { createBackoff, type Backoff } from './backoff'
 import { createDedupe, type Dedupe } from './dedupe'
 import { enrich } from './enrich'
 import { FeishuError, sendFeishu, type FeishuDeps } from './feishu'
 import { isSpike, readFailureStats, spikeAlert } from './failure-spike'
+import { runtimeFeishuConfig } from './runtime-config'
 import { schedule } from './schedule'
-import { areaOf, createErrorWindow, sentryIssuesUrl, siteErrorsAlert, type ErrorBreach, type ErrorWindow } from './site-errors'
+import { recordServerError, sentryIssuesUrl, siteErrorsAlert, type ErrorBreach, type ErrorWindow } from './site-errors'
 import { readSaleFloorHidden, SALE_FLOOR_CHECK_EVERY_MS, saleFloorAlert } from './sale-floor'
 import { readSignupGiftToday, signupGiftAlert } from './signup-gift'
 import { renderAlert } from './templates'
@@ -152,20 +153,14 @@ export async function noteSignupGiftWith(deps: NotifyDeps): Promise<void> {
   }
 }
 
-// Every server error passes here synchronously (core/analytics signalServerError): counted in the
-// window; a breach is returned only when an alert could go out now.
-export function recordServerError(deps: NotifyDeps, window: ErrorWindow, signal: ServerErrorSignal): ErrorBreach | null {
-  if (!deps.config) return null
-  const area = areaOf(signal)
-  if (!area) return null
-  const breach = window.record(area, deps.now())
-  if (!breach || deps.dedupe.held('site_errors', SITE_ERRORS_COOLDOWN_MS) || deps.backoff.paused(deps.now())) return null
-  return breach
+function canSendSiteError(deps: NotifyDeps): boolean {
+  return !deps.dedupe.held('site_errors', SITE_ERRORS_COOLDOWN_MS) && !deps.backoff.paused(deps.now())
 }
 
 export async function noteServerErrorWith(deps: NotifyDeps, window: ErrorWindow, signal: ServerErrorSignal): Promise<void> {
-  const breach = recordServerError(deps, window, signal)
-  if (breach) await notifyOwnerWith(deps, siteErrorsAlert(breach, deps.sentryUrl))
+  if (!deps.config) return
+  const breach = recordServerError(window, signal, deps.now())
+  if (breach && canSendSiteError(deps)) await notifyOwnerWith(deps, siteErrorsAlert(breach, deps.sentryUrl))
 }
 
 let defaults: NotifyDeps | null | undefined
@@ -174,10 +169,8 @@ function defaultDeps(): NotifyDeps | null {
   if (defaults !== undefined) return defaults
   try {
     const env = serverEnv()
-    const { config, problem } = feishuConfig(env)
-    if (problem) logger.warn('owner alerts are off', { problem })
     defaults = {
-      config,
+      config: runtimeFeishuConfig(),
       db: createAdminSupabase,
       // The marker store has its own R2 client: one attempt, short timeouts. No R2: per instance.
       dedupe: createDedupe(() => r2MarkerStore()),
@@ -227,11 +220,16 @@ export async function checkSaleFloor(): Promise<number | null> {
   return deps?.config ? checkSaleFloorWith(deps, { force: true }) : null
 }
 
-const errorWindow = createErrorWindow()
-
-export function noteServerError(signal: ServerErrorSignal): void {
+// A cron's own alert (F4 fee reconciliation): awaited, so the function stays up until it is sent.
+export async function notifyOwnerNow(alert: OwnerAlert): Promise<void> {
   const deps = defaultDeps()
-  if (!deps) return
-  const breach = recordServerError(deps, errorWindow, signal)
-  if (breach) schedule(() => notifyOwnerWith(deps, siteErrorsAlert(breach, deps.sentryUrl)))
+  if (deps?.config) await notifyOwnerWith(deps, alert)
+}
+
+export function getSiteErrorDelivery() {
+  const deps = defaultDeps()
+  return deps?.config ? {
+    canSend: () => canSendSiteError(deps),
+    send: (breach: ErrorBreach) => notifyOwnerWith(deps, siteErrorsAlert(breach, deps.sentryUrl)),
+  } : null
 }

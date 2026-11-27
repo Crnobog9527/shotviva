@@ -35,10 +35,12 @@ describe('POST /api/generate body (T16)', () => {
     expect(generateBodySchema.safeParse(body({ note: 'x'.repeat(301) })).success).toBe(false)
   })
 
-  it('takes a batch size from 1 to the largest batchMax (30), absent for a single photo', () => {
-    expect(toGenerationRequest('user-1', generateBodySchema.parse({ template_id: 'pet-studio', batch_size: 30 })).batchSize).toBe(30)
+  // The schema only bounds the request (BATCH_SIZE_CEILING); the account's own batchMax, org lift
+  // included (ARCHITECTURE §6.5), is checked by assertBatchAllowed.
+  it('takes a batch size from 1 to the request ceiling (200), absent for a single photo', () => {
+    expect(toGenerationRequest('user-1', generateBodySchema.parse({ template_id: 'pet-studio', batch_size: 200 })).batchSize).toBe(200)
     expect(toGenerationRequest('user-1', generateBodySchema.parse({ template_id: 'pet-studio' })).batchSize).toBeUndefined()
-    expect(generateBodySchema.safeParse({ template_id: 'pet-studio', batch_size: 31 }).success).toBe(false)
+    expect(generateBodySchema.safeParse({ template_id: 'pet-studio', batch_size: 201 }).success).toBe(false)
     expect(generateBodySchema.safeParse({ template_id: 'pet-studio', batch_size: 0 }).success).toBe(false)
   })
 })

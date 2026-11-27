@@ -14,10 +14,16 @@ type Props = { items: BannerAnnouncement[]; initialId: string | null; dismissLab
 // The live banner (ARCHITECTURE §10): no popup, no countdown, no click tracking. The version key
 // is what the early script's hiding <style> matches; one that cannot be closed carries none and
 // has no ✕.
-export function BannerView({ items, initialId, dismissLabel }: Props) {
+// App routes still need the URL filter. Marketing has no excluded routes and can render
+// its banner in the initial HTML, even when the marketing layout contains dynamic routes.
+export function PathAwareBannerView(props: Props) {
   const pathname = usePathname()
+  return isBannerHiddenPath(pathname) ? null : <BannerView {...props} />
+}
+
+export function BannerView({ items, initialId, dismissLabel }: Props) {
   const { current, dismiss } = useBanner(items, initialId)
-  if (!current || isBannerHiddenPath(pathname)) return null
+  if (!current) return null
   const key = current.closeKey
   return (
     <BannerBar

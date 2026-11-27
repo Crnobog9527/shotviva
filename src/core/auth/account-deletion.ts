@@ -10,7 +10,11 @@ export type AuthAdmin = { deleteUser(userId: string): Promise<{ error: { message
 // wired in by app/: core/auth does not reach into billing). Throws when one cannot be cancelled.
 export type CancelSubscriptions = (userId: string) => Promise<unknown>
 
-export type AccountDeletionDeps = { storage: AccountStorage; authAdmin: AuthAdmin; cancelSubscriptions: CancelSubscriptions }
+// Moves the account's 企业作品 into its org (core/org/works archiveOrgWorksOf, wired in by the
+// route: the org's works belong to the org, control 2026-11-22). Throws when one cannot be kept.
+export type ArchiveOrgWorks = (userId: string) => Promise<unknown>
+
+export type AccountDeletionDeps = { storage: AccountStorage; authAdmin: AuthAdmin; cancelSubscriptions: CancelSubscriptions; archiveOrgWorks: ArchiveOrgWorks }
 
 // Key layout fixed by ARCHITECTURE §8.2 / T4: inputs/{user_id}/…, outputs/{user_id}/…, plus
 // the wishlist's reference images requests/{user_id}/… (§15.1, T12) and the support-ticket
@@ -19,14 +23,20 @@ export function accountPrefixes(userId: string): string[] {
   return [`inputs/${userId}/`, `outputs/${userId}/`, `requests/${userId}/`, `tickets/${userId}/`]
 }
 
-// Subscriptions go first (ARCHITECTURE §13): if Stripe will not cancel one, nothing is deleted
-// and the user can retry; deleting first would leave a card being charged for an account that
-// no longer exists. Files next: if R2 fails the account still exists and the user can retry,
+// The org's works go first (they belong to the org): archived and their files copied out of the
+// account's prefixes, which deletes nothing, and refused outright for an org's primary admin or
+// while an org work is still being made, before anything changes. Subscriptions next
+// (ARCHITECTURE §13): if Stripe will not cancel one, nothing is deleted and the user can retry;
+// deleting first would leave a card being charged for an account that no longer exists. Files next: if R2 fails the account still exists and the user can retry,
 // whereas the reverse order would leave orphaned photos nobody can delete. Deleting the auth
 // user then cascades to profiles and everything keyed on it (generation_jobs via T2's FK, the
-// subscriptions mirror).
+// subscriptions mirror); an org work's row is kept in org_work_archive by a trigger (1971).
 export async function deleteAccount(userId: string, deps: AccountDeletionDeps): Promise<void> {
+  await deps.archiveOrgWorks(userId)
   await deps.cancelSubscriptions(userId)
+  // Again right before the files go: the account was still signed in, so an org work may have
+  // been started (refused, still running) or finished (archived now) meanwhile.
+  await deps.archiveOrgWorks(userId)
   for (const prefix of accountPrefixes(userId)) {
     await deps.storage.deletePrefix(prefix)
   }

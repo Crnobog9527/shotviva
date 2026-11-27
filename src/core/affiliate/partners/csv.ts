@@ -6,7 +6,8 @@ import type { Locale } from '@/core/i18n'
 import { isAffiliateEnabled } from '../feature'
 import { productLabel } from './format'
 import type { Commission } from './models'
-import { readAccount, readCommissions } from './repository'
+import { readAccount, readCommissions, readSettings } from './repository'
+import { mustAcceptTerms } from './terms'
 
 function csvCell(value: string) {
   // Quoting handles delimiters; spreadsheets still treat a quoted leading '=' as a formula.
@@ -31,13 +32,17 @@ export async function exportCommissions(locale: Locale) {
   const user = await requireApiUser()
   const account = await readAccount(user.id)
   if (account?.status !== 'active') throw new AppError('NOT_FOUND', 'Not found')
+  // Same gate as the dashboard: no records leave before the current terms are accepted.
+  if (await mustAcceptTerms(account, (await readSettings()).terms_version)) throw new AppError('FORBIDDEN', 'Terms not accepted')
   const t = await getTranslations({ locale, namespace: 'affiliate' })
-  const header = line(['date', 'item', 'base', 'rate', 'commission', 'state', 'confirms'].map((key) => t(key)))
+  const header = line(['date', 'item', 'base', 'orderFees.fees', 'orderFees.netBase', 'rate', 'commission', 'state', 'confirms'].map((key) => t(key)))
   const row = (r: Commission) =>
     line([
       r.created_at,
       productLabel(r.product_id, t),
       (r.base_usd / 100).toFixed(2),
+      r.fee_cents === null ? '' : (r.fee_cents / 100).toFixed(2),
+      r.net_base_usd === null ? '' : (r.net_base_usd / 100).toFixed(2),
       r.rate_bp / 100 + '%',
       (r.amount / 100).toFixed(2),
       t('status.' + r.status),

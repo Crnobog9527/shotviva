@@ -1,4 +1,4 @@
-import type { HeroBlock, HeroStripBlock, ImageRef } from '@/core/content'
+import type { HeroBlock, HeroStripBlock, ImageRef, LiveHeroPair } from '@/core/content'
 import type { Locale } from '@/core/i18n/locales'
 
 import { withFirstFrame } from '../content/landing-shared'
@@ -9,11 +9,18 @@ export { HERO_DEFAULT_OPTION, HERO_OPTIONS } from './registry'
 // The home hero's options for A/B experiments (ARCHITECTURE §16.5, Owner 2026-11-14). Each is a
 // real before/after set made with a published template, plus one short line; the H1, subtitle and
 // direct answer never change (建站规格 §4, G1), so search engines and every group read the same
-// page copy. `tote` is today's hero (the e-commerce case) and needs nothing here.
-// Not here yet: food (the Owner picks the pictures first) and hotels (no template exists).
+// page copy. `tote` (the e-commerce case) is the page content's own hero and needs nothing here;
+// `food` is the default, shown at `/`.
+
+// A hero pair read live from a published template's covers (home-page.tsx, liveHero): the
+// template's current phone photo and result, so a cover changed in admin shows here once the
+// templates cache refreshes. The words are ours, per dish; the pictures are the template's.
+export type LiveHeroScene = LiveHeroPair
 
 export type HeroOptionContent = {
-  hero: Pick<HeroBlock, 'before' | 'after' | 'caption' | 'scenes'>
+  // Static pictures; with `live`, the fallback for when none of those templates is live.
+  hero?: Pick<HeroBlock, 'before' | 'after' | 'caption' | 'scenes'>
+  live?: { label: string; scenes: readonly LiveHeroScene[] }
   // One line under the direct answer that says who this demo is for.
   tagline: string
   // The template the first-screen generator opens on, when it is on sale.
@@ -29,7 +36,7 @@ const art = (file: string, alt: string): ImageRef => ({ src: `/home/${file}.webp
 const artStyle: Record<Locale, HeroOptionContent> = {
   en: {
     hero: {
-      before: withFirstFrame(art('hero-art-photo', 'Phone photo: a tabby cat with white paws lying on a grey sofa arm, a lamp and bookshelf behind')),
+      before: withFirstFrame(art('hero-art-photo', 'Real phone photo: a tabby cat with white paws lying on a grey sofa arm, a lamp and bookshelf behind')),
       after: art('hero-art-anime', 'Real example: the same tabby cat on the sofa arm, redrawn in a flat anime style'),
       caption: 'Same cat, flat anime style',
       scenes: {
@@ -46,7 +53,7 @@ const artStyle: Record<Locale, HeroOptionContent> = {
   },
   zh: {
     hero: {
-      before: withFirstFrame(art('hero-art-photo', '手机照片：一只白爪子的虎斑猫趴在灰色沙发扶手上，身后是台灯和书架')),
+      before: withFirstFrame(art('hero-art-photo', '真实手机照：一只白爪子的虎斑猫趴在灰色沙发扶手上，身后是台灯和书架')),
       after: art('hero-art-anime', '真实案例：同一只虎斑猫趴在沙发扶手上，变成平涂动漫风'),
       caption: '同一只猫，变成动漫风',
       scenes: {
@@ -58,7 +65,7 @@ const artStyle: Record<Locale, HeroOptionContent> = {
         ],
       },
     },
-    tagline: '把宠物、孩子或朋友的照片变成动漫、3D 或水彩画，长相和姿势还是原来的样子。',
+    tagline: '把宠物、孩子或朋友的照片变成动漫、3D 或水彩画，长相和姿势保持不变。',
     generatorTemplate: 'flat-anime-style',
   },
 }

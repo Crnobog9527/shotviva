@@ -27,10 +27,43 @@ describe('proxy matcher', () => {
     expect(runsOn('/manifest.webmanifest')).toBe(false)
   })
 
+  // The pre-sized copies of public pictures (core/presized), fetched by the image CDN with its header:
+  // the proxy would answer those 404 (image-cdn-guard.ts), and an AVIF is not in the extension list.
+  it('skips the pre-sized pictures in both formats', () => {
+    expect(runsOn('/presized/v1/w640/home/hero-set-phone.avif')).toBe(false)
+    expect(runsOn('/presized/v1/w640/home/hero-set-phone.webp')).toBe(false)
+    expect(runsOn('/assets/presized/v1/w384/covers/x/after-0123456789abcdef.avif')).toBe(false)
+  })
+
+  // The Graylum intro animations in public/: a video request must not land on the not-found page.
+  it('skips the intro animation videos but not a page that merely mentions them', () => {
+    expect(runsOn('/partners/graylum/graylum-hero-6steps.mp4')).toBe(false)
+    expect(runsOn('/partners/graylum/graylum-hero-6steps-en.webm')).toBe(false)
+    expect(runsOn('/partners/graylum/graylum-hero-6steps-poster.webp')).toBe(false)
+    expect(runsOn('/pricing/mp4')).toBe(true)
+  })
+
   // T90: the version check never touches the session.
   it('skips /api/version but not the other API routes', () => {
     expect(runsOn('/api/version')).toBe(false)
     expect(runsOn('/api/versions')).toBe(true)
+  })
+
+  // The app's anonymous speed numbers: no session refresh, so no cookie is read or set for them.
+  it('skips /api/vitals but not lookalikes', () => {
+    expect(runsOn('/api/vitals')).toBe(false)
+    expect(runsOn('/api/vitals/x')).toBe(true)
+    expect(runsOn('/api/vitalsx')).toBe(true)
+  })
+
+  it('skips the service worker script (public, no cookies) but not lookalikes', () => {
+    expect(runsOn('/sw.js')).toBe(false)
+    expect(runsOn('/sw.json')).toBe(true)
+  })
+
+  it('skips the public catalogue file (edge-cached: no session work, no cookies) but not its siblings', () => {
+    expect(runsOn('/api/catalogue/public/zh/latest')).toBe(false)
+    expect(runsOn('/api/catalogue/forms')).toBe(true)
     expect(runsOn('/api/generate')).toBe(true)
   })
 

@@ -177,7 +177,7 @@ export async function listWorkOptions(client: SupabaseClient, userId: string, in
       .select('id, template_id, created_at, templates(name)')
       .eq('user_id', userId)
       .eq('status', 'succeeded')
-      .is('deleted_at', null)
+      .is('deleted_at', null).is('org_access_ended_at', null)
   const [latest, extra] = await Promise.all([
     works().order('created_at', { ascending: false }).limit(PICKER_LIMIT),
     include ? works().eq('id', include).maybeSingle() : null,

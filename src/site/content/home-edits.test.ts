@@ -12,9 +12,9 @@ describe('home text-edit cases', () => {
   it.each([
     ['en', homePage],
     ['zh', zhHomePage],
-  ])('%s: four pairs of the home page’s own pictures', (_locale, page) => {
+  ])('%s: two pairs of the home page’s own pictures', (_locale, page) => {
     const items = page.edits?.items ?? []
-    expect(items).toHaveLength(4)
+    expect(items).toHaveLength(2)
     for (const item of items) {
       for (const image of [item.before, item.after]) {
         expect(image.src).toMatch(/^\/cases\/text-[a-z0-9-]+\.webp$/)

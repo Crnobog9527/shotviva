@@ -3,6 +3,8 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type { Locale } from '../i18n/locales'
+import { orderTree } from './locale-display'
+import { readLocaleDisplay } from './locale-display-read'
 import type { CategoryNode } from './taxonomy'
 import { readCategoryTree } from './taxonomy-reads'
 
@@ -23,11 +25,11 @@ export type IndexSeries = {
 }
 export type CatalogueIndex = { tree: CategoryNode[]; entries: IndexEntry[]; series: IndexSeries[] }
 
-type SeriesRow = {
+export type SeriesRow = {
   id: string; slug: string; name_en: string; name_zh: string
   description_en: string | null; description_zh: string | null; cover_url: string | null
 }
-type EntryRow = {
+export type EntryRow = {
   type: 'template' | 'series'; entry_key: string; sort_order: number; category_key: string
   template_id: string | null; series_id: string | null; entry_series: SeriesRow | null
 }
@@ -59,7 +61,15 @@ export function toCatalogueIndex(tree: CategoryNode[], entryRows: EntryRow[], me
     entries.push({ type: row.type, id, categoryKey: row.category_key })
     if (row.type === 'series' && row.entry_series) series.push(toSeries(row.entry_series, members.get(id) ?? [], locale))
   }
-  return { tree, entries, series }
+  return onePlace({ tree, entries, series })
+}
+
+// A template shows in one place only (Owner 2026-11-25): a member of a series on the page lives in
+// that series (Create's shelf), never also as a loose card, whatever the series' old show_members
+// says. Also applied to an index read from the cache, which may predate this rule.
+export function onePlace(index: CatalogueIndex): CatalogueIndex {
+  const inSeries = new Set(index.series.flatMap((item) => item.memberIds))
+  return { ...index, entries: index.entries.filter((entry) => entry.type === 'series' || !inSeries.has(entry.id)) }
 }
 
 function toSeries(row: SeriesRow, members: MemberRow[], locale: Locale): IndexSeries {
@@ -72,12 +82,14 @@ function toSeries(row: SeriesRow, members: MemberRow[], locale: Locale): IndexSe
 }
 
 export async function readCatalogueIndex(db: SupabaseClient, locale: Locale): Promise<CatalogueIndex> {
-  const [tree, entryRows, memberRows] = await Promise.all([
+  const [tree, display, entryRows, memberRows] = await Promise.all([
     readCategoryTree(db),
+    readLocaleDisplay(db),
     readAll<EntryRow>((from, to) => db.from('web_catalogue_entries').select(ENTRY_COLUMNS)
       .order('sort_order').order('entry_key').range(from, to).returns<EntryRow[]>()),
     readAll<MemberRow>((from, to) => db.from('web_template_members').select('id,series_id,series_sort_order')
       .not('series_id', 'is', null).order('series_id').order('series_sort_order').order('id').range(from, to).returns<MemberRow[]>()),
   ])
-  return toCatalogueIndex(tree, entryRows, memberRows, locale)
+  // The category tree in this language's own order (migration 1575); shared until one is saved.
+  return toCatalogueIndex(orderTree(tree, display.categoryOrder[locale]), entryRows, memberRows, locale)
 }

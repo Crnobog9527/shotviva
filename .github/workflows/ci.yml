@@ -16,15 +16,15 @@ concurrency:
 permissions:
   contents: read
 
-# "lint · typecheck · test · build" and "supabase db tests" are required checks on main, and
-# "CI gate" sums up every job here (meant to become the one required check). A docs/spec-only PR
+# "lint · typecheck · test · build" and "supabase db tests" each sum up parallel jobs, and "CI gate"
+# sums up every job here (the required check on main, with "Codex findings"). A docs/spec-only PR
 # or push to main (规范/, seo资料/, docs/, design/, *.md) still runs the required jobs, but each
 # stops after the change detection step and reports success in seconds (.github/actions/changes).
 #
 # Lighthouse (mobile, marketing pages) runs on a PR only when it can measure something new: the
 # pages' fingerprint (HTML, headers, static files they load, public/; scripts/ci/page-fingerprint.mjs)
 # differs from the base commit's, or the change touches what the fingerprint cannot see
-# (scripts/ci/lighthouse-force.sh). It measures the build the checks job made, in four parallel
+# (scripts/ci/lighthouse-force.sh). It measures the build the build job made, in four parallel
 # jobs, and an LCP just over its limit is measured once more (scripts/ci/lighthouse-run.sh).
 #
 # Server action ids are derived from this key; fixed in CI so two builds of the same code send the
@@ -33,8 +33,82 @@ env:
   NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: c2hvdHZpdmEtY2ktZmluZ2VycHJpbnQta2V5LTAwMDE=
 
 jobs:
-  checks:
-    name: lint · typecheck · test · build
+  # "lint · typecheck · test · build" (required through the CI gate) is the sum of four jobs that
+  # run in parallel: lint, typecheck, unit tests and the build with its checks. Each decides on its
+  # own, from the same commit, whether there is code to check (.github/actions/changes); the sum
+  # passes only when all four succeeded and agree (scripts/ci/checks-verify.mjs). Lighthouse needs
+  # only the build, so it starts as soon as the build is done.
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.changes.outputs.code }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 2
+      - id: changes
+        uses: ./.github/actions/changes
+      - if: steps.changes.outputs.code == 'true'
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - if: steps.changes.outputs.code == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm lint
+
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.changes.outputs.code }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 2
+      - id: changes
+        uses: ./.github/actions/changes
+      - if: steps.changes.outputs.code == 'true'
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - if: steps.changes.outputs.code == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm typecheck
+
+  unit:
+    name: unit tests
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.changes.outputs.code }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 2
+      - id: changes
+        uses: ./.github/actions/changes
+      - if: steps.changes.outputs.code == 'true'
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - if: steps.changes.outputs.code == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.changes.outputs.code == 'true'
+        run: pnpm test
+
+  build:
+    name: build
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.changes.outputs.code }}
@@ -64,12 +138,6 @@ jobs:
           key: next-cache-v1-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: next-cache-v1-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
       - if: steps.changes.outputs.code == 'true'
-        run: pnpm lint
-      - if: steps.changes.outputs.code == 'true'
-        run: pnpm typecheck
-      - if: steps.changes.outputs.code == 'true'
-        run: pnpm test
-      - if: steps.changes.outputs.code == 'true'
         run: pnpm build
       # The app top bar must be in every app page's prerendered shell (scripts/app-shell-check-lib.ts).
       - if: steps.changes.outputs.code == 'true'
@@ -89,6 +157,12 @@ jobs:
           pnpm start > /tmp/next-start.log 2>&1 &
           for i in $(seq 1 60); do curl -sf -o /dev/null http://localhost:3000/robots.txt && break; sleep 1; done
           pnpm seo:ssr http://localhost:3000
+      # Home and landing pages' HTML, raw and gzip, against scripts/html-budget.json. This build has
+      # no database, so profile "build" guards what does not come from the catalogue (styles,
+      # messages, layout, copy); production's catalogue is checked daily (seo-check.yml).
+      - name: HTML budget
+        if: steps.changes.outputs.code == 'true'
+        run: pnpm html:budget http://localhost:3000
       # What the Lighthouse pages send, compared with the base build's by the lighthouse jobs.
       # On any failure the output stays empty and Lighthouse runs.
       - name: Lighthouse pages fingerprint
@@ -114,16 +188,43 @@ jobs:
           retention-days: 1
           compression-level: 0
 
-  # One local Supabase per run serves both the DB tests and the schema.sql snapshot check
-  # (AGENTS §5), which used to start its own database in a separate workflow. T88: it runs only
-  # when the change can affect the database or the DB tests (scripts/ci/db-test-inputs.ts);
-  # otherwise it stops after change detection and reports success under the same required name.
-  db:
-    name: supabase db tests
+  # The required "lint · typecheck · test · build". Runs even when a part failed or the run was
+  # cancelled, so it is never skipped (a skipped required check would count as passed). Its
+  # outputs are the build's, for Lighthouse's decision in the gate.
+  checks:
+    name: lint · typecheck · test · build
+    needs: [lint, typecheck, unit, build]
+    if: always()
     runs-on: ubuntu-latest
     outputs:
-      schema-fix: ${{ steps.schema.outputs.fix }}
-      schema-tree: ${{ steps.schema.outputs.tree }}
+      code: ${{ needs.build.outputs.code }}
+      fingerprint: ${{ needs.build.outputs.fingerprint }}
+      pages: ${{ needs.build.outputs.pages }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          sparse-checkout: scripts/ci
+          persist-credentials: false
+      - env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: node scripts/ci/checks-verify.mjs
+
+  # The database stage (T88) is three jobs. "supabase schema" and the four "supabase db tests (k/4)"
+  # shards each start their own local Supabase and run in parallel; "supabase db tests", the
+  # required check, sums them up (scripts/ci/db-shards-verify.mjs). Each one decides on its own,
+  # from the same commit, whether the change can affect the database or the DB tests
+  # (scripts/ci/db-test-inputs.ts); when it cannot, they stop after change detection and the sum
+  # reports success under the same required name, as before sharding.
+  #
+  # Schema check, kept apart from the tests so the snapshot comes from migrations only, never from
+  # test data, and so the release dry run gets a database no test is writing to.
+  db-schema:
+    name: supabase schema
+    runs-on: ubuntu-latest
+    outputs:
+      db: ${{ steps.changes.outputs.db }}
+      fix: ${{ steps.schema.outputs.fix }}
+      tree: ${{ steps.schema.outputs.tree }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -147,17 +248,19 @@ jobs:
         run: pnpm install --frozen-lockfile
       # Pinned CLI and the stack's images from the Actions cache; downloads, pulls and the start
       # itself are retried with backoff (.github/actions/supabase-start). Only the services DB
-      # tests need; later cards drop names from this list as they need them.
+      # tests need; later cards drop names from this list as they need them. The shards below
+      # pass the same list, so all five jobs share one cache entry.
       - if: steps.changes.outputs.db == 'true'
         uses: ./.github/actions/supabase-start
         with:
           exclude: studio,imgproxy,edge-runtime,analytics,vector,inbucket,functions,realtime,storage
-      # Before the tests, so the snapshot comes from migrations only, not from test data.
       - name: schema.sql matches migrations (export)
         if: steps.changes.outputs.db == 'true'
         run: pnpm db:schema
-      # A stale file on a same-repo PR is not a failure: the tests run with the regenerated file
-      # and the schema-sql job below commits it to the branch (scripts/ci/schema-check.sh).
+      # A stale file on a same-repo PR is not a failure: the schema-sql job below commits the
+      # regenerated file to the branch (scripts/ci/schema-check.sh). The shards test the migrations,
+      # never schema.sql (config.toml schema_paths = [], no DB test reads it), so their results
+      # hold for that commit too; a test that reads supabase/schema.sql would break that carry.
       - name: schema.sql matches migrations
         id: schema
         if: steps.changes.outputs.db == 'true'
@@ -176,8 +279,98 @@ jobs:
           retention-days: 3
       - if: steps.changes.outputs.db == 'true'
         run: pnpm exec vitest run --project pricing-release
+
+  # The DB tests in four shards (vitest --shard splits the files), each on its own database and
+  # serial within it, as `pnpm test:db` runs them. Every shard uploads a record of what it decided
+  # and the JSON report of what it ran, even when it fails, for the sum below to check.
+  db-shard:
+    name: supabase db tests (${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    strategy:
+      # Every shard finishes, so one run shows every failing file.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+      - id: changes
+        uses: ./.github/actions/changes
+        with:
+          db: 'true'
       - if: steps.changes.outputs.db == 'true'
-        run: pnpm test:db
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - if: steps.changes.outputs.db == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - if: steps.changes.outputs.db == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.changes.outputs.db == 'true'
+        uses: ./.github/actions/supabase-start
+        with:
+          exclude: studio,imgproxy,edge-runtime,analytics,vector,inbucket,functions,realtime,storage
+      - if: steps.changes.outputs.db == 'true'
+        env:
+          SHARD: ${{ matrix.shard }}
+          REPORT: ${{ runner.temp }}/db-shard/report.json
+        run: pnpm test:db --shard="$SHARD/4" --reporter=default --reporter=json --outputFile.json="$REPORT"
+      - name: Record the shard
+        if: always()
+        env:
+          SHARD: ${{ matrix.shard }}
+          DB: ${{ steps.changes.outputs.db }}
+          DIR: ${{ runner.temp }}/db-shard
+        run: |
+          mkdir -p "$DIR"
+          printf '{"shard":%s,"of":4,"db":"%s","sha":"%s"}\n' "$SHARD" "$DB" "$GITHUB_SHA" > "$DIR/marker.json"
+          cat "$DIR/marker.json"
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: db-shard-${{ matrix.shard }}
+          path: ${{ runner.temp }}/db-shard/
+          retention-days: 30
+          # A re-run of a failed shard replaces its record from the earlier attempt. Kept as long as
+          # failed jobs can be re-run, since the sum reads the passed shards' records again.
+          overwrite: true
+
+  # The required check. Passes only when the schema job and every shard succeeded, all five made
+  # the same run/skip decision, and, when the tests ran, the shards' reports together cover every
+  # test file under tests/db exactly once with nothing failed (scripts/ci/db-shards-verify.mjs).
+  # Runs even when a shard failed or the run was cancelled, so it is never skipped: a skipped
+  # required check would count as passed.
+  db:
+    name: supabase db tests
+    needs: [db-schema, db-shard]
+    if: always()
+    runs-on: ubuntu-latest
+    outputs:
+      schema-fix: ${{ needs.db-schema.outputs.fix }}
+      schema-tree: ${{ needs.db-schema.outputs.tree }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          sparse-checkout: |
+            scripts/ci
+            tests/db
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: db-shard-*
+          path: ${{ runner.temp }}/db-shards
+      - env:
+          SCHEMA_RESULT: ${{ needs.db-schema.result }}
+          SHARDS_RESULT: ${{ needs.db-shard.result }}
+          SCHEMA_DB: ${{ needs.db-schema.outputs.db }}
+          SHARD_COUNT: '4'
+          REPORT_DIR: ${{ runner.temp }}/db-shards
+        run: node scripts/ci/db-shards-verify.mjs
 
   # The base commit's fingerprint, built here in parallel with the checks. Skipped when the change
   # forces Lighthouse anyway (scripts/ci/lighthouse-force.sh) or has no code.
@@ -252,7 +445,7 @@ jobs:
           echo "hash=$(jq -r .hash "$RUNNER_TEMP/fingerprint.json")" >> "$GITHUB_OUTPUT"
           echo "pages=$(jq -c .pages "$RUNNER_TEMP/fingerprint.json")" >> "$GITHUB_OUTPUT"
 
-  # Mobile Lighthouse on the marketing pages of the checks job's build (performance pass, B8):
+  # Mobile Lighthouse on the marketing pages of the build job's build (performance pass, B8):
   # simulated throttling (lighthouserc.json: score ≥ 0.85, CLS ≤ 0.1; warns on LCP > 2.5 s and
   # TBT > 200 ms) and throttling in the browser for the Owner's mobile LCP standard
   # (lighthouserc.devtools.json: LCP ≤ 1.2 s on the median of 5 runs). The build has no
@@ -260,13 +453,13 @@ jobs:
   # production. Pages are served through scripts/ci/lighthouse-server.mjs (HTTP/2 + brotli).
   lighthouse:
     name: lighthouse (${{ matrix.name }})
-    needs: [checks, lighthouse-base]
+    needs: [build, lighthouse-base]
     if: >-
       !cancelled() && github.event_name != 'push' &&
-      needs.checks.result == 'success' && needs.checks.outputs.code == 'true' &&
+      needs.build.result == 'success' && needs.build.outputs.code == 'true' &&
       (needs.lighthouse-base.result != 'success' || needs.lighthouse-base.outputs.force != 'false' ||
-       needs.checks.outputs.fingerprint == '' || needs.lighthouse-base.outputs.fingerprint == '' ||
-       needs.checks.outputs.fingerprint != needs.lighthouse-base.outputs.fingerprint)
+       needs.build.outputs.fingerprint == '' || needs.lighthouse-base.outputs.fingerprint == '' ||
+       needs.build.outputs.fingerprint != needs.lighthouse-base.outputs.fingerprint)
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -312,7 +505,7 @@ jobs:
   # fails, Lighthouse runs and decides.
   gate:
     name: CI gate
-    needs: [checks, db, lighthouse-base, lighthouse]
+    needs: [checks, build, db, lighthouse-base, lighthouse]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -322,6 +515,7 @@ jobs:
           persist-credentials: false
       - env:
           CHECKS: ${{ needs.checks.result }}
+          BUILD: ${{ needs.build.result }}
           DB: ${{ needs.db.result }}
           LIGHTHOUSE: ${{ needs.lighthouse.result }}
           BASE: ${{ needs.lighthouse-base.result }}
@@ -346,6 +540,8 @@ jobs:
     permissions:
       contents: write
       checks: write
+    outputs:
+      new-head: ${{ steps.commit.outputs.new-head }}
     steps:
       # All executable files in the write job come from main. The full fetch includes the
       # same-repo PR branch. Build its schema-only child using Git objects.
@@ -362,6 +558,7 @@ jobs:
           name: schema-sql
           path: ${{ runner.temp }}/schema-fix
       - name: Commit schema.sql and carry the results over
+        id: commit
         env:
           FIX_FILE: ${{ runner.temp }}/schema-fix/schema.sql
           TREE: ${{ needs.db.outputs.schema-tree }}
@@ -376,3 +573,39 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           GH_TOKEN: ${{ github.token }}
         run: scripts/ci/schema-commit.sh
+
+  # The schema.sql commit above starts no workflow run, so nothing would post the required "Codex
+  # findings" check on it. This job runs the same evaluation as codex-review.yml against the new
+  # commit and posts its real result (scripts/ci/codex-findings-post.mjs): a review of the tested
+  # commit holds there only through the schema-only carry rule, and open threads still fail it.
+  # Scripts come from main; the token can read the PR and write check runs, nothing else.
+  codex-findings:
+    name: post Codex findings on the schema.sql commit
+    needs: schema-sql
+    # Drafts are skipped, as in codex-review.yml.
+    if: ${{ !cancelled() && !github.event.pull_request.draft && needs.schema-sql.result == 'success' && needs.schema-sql.outputs.new-head != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: refs/heads/main
+          sparse-checkout: scripts/ci
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ needs.schema-sql.outputs.new-head }}
+          # schema-sql runs only for PRs that change the database, which review-risk.mjs rates high.
+          RISK: high
+          WAIT_MINUTES: '20'
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/ci/codex-findings-post.mjs

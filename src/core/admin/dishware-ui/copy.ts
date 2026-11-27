@@ -4,7 +4,6 @@ import type { DishCategory } from '@/core/templates/food-flow'
 export const dishwareCopy = {
   title: '器皿图库',
   intro: '餐饮模板开「优化器皿」时，按认菜得出的菜形类别随机挑一只。形状描述会原样写进提示词：只写器型、釉色、质感，不写菜名或具体食物。',
-  back: '← 模板与提示词',
   empty: '这一类还没有器皿',
   label: '名称（只在后台显示）',
   category: '菜形类别',

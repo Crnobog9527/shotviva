@@ -12,7 +12,10 @@
 // ~45 KB, the kind of file the static-file CDN serves), fetched from base + /fonts/misans/….
 // `hero`: the home page's first-screen pictures (public/home, the mobile LCP image) at w=640 from
 // base + /_next/image, the size a phone's srcset picks.
-export type LabOrigin = { id: string; label: string; base: string; small?: boolean; font?: boolean; hero?: boolean }
+// `presized` with `small` or `hero`: the same picture as the fixed-width WebP file the pages load
+// when NEXT_PUBLIC_PRESIZED_IMAGES_URL is on (core/presized): base + /assets/presized/… for a cover,
+// base + /presized/… for a home picture. On img-eo it answers only once EdgeOne forwards both paths.
+export type LabOrigin = { id: string; label: string; base: string; small?: boolean; font?: boolean; hero?: boolean; presized?: boolean }
 
 export const LAB_HERO_FILES = ['hero-set-phone.webp', 'hero-ai-street.webp', 'hero-ai-terrace.webp', 'hero-ai-villa.webp', 'hero-set-listing.webp', 'hero-set-promo.webp']
 export const HERO_WIDTH = 640
@@ -81,10 +84,12 @@ function cdnRows(hasCovers: boolean, cdn: string): LabOrigin[] {
   const small: LabOrigin[] = [
     { id: 'site-s', label: '小图：本站 /_next/image（Vercel，现在）', base: '', small: true },
     { id: 'eo-s', label: '小图：img-eo /_next/image（EdgeOne 转 Vercel）', base: cdn, small: true },
+    { id: 'eo-ps', label: '小图：img-eo 预生成 WebP（EdgeOne 放行后）', base: cdn, small: true, presized: true },
   ]
   const heroes: LabOrigin[] = [
     { id: 'site-h', label: '首屏大图：本站 /_next/image（Vercel，现在）', base: '', hero: true },
     { id: 'eo-h', label: '首屏大图：img-eo /_next/image（EdgeOne 转 Vercel）', base: cdn, hero: true },
+    { id: 'eo-ph', label: '首屏大图：img-eo 预生成 WebP（EdgeOne 放行后）', base: cdn, hero: true, presized: true },
   ]
   const fonts: LabOrigin[] = [
     { id: 'site-f', label: '静态文件：本站（Vercel）', base: '', font: true },

@@ -1,11 +1,14 @@
 import { getTranslations } from 'next-intl/server'
 import { currentLocale } from '@/core/i18n/server'
+import { ENTERPRISE_LINK_LOCALE } from '@/core/i18n/locales'
 import { consumerReferralUrl } from '../consumer-link'
 import { Link } from '@/core/i18n/ui'
-import { date, money } from './format'
+import { date, money, viewHref } from './format'
 import { CopyLink } from '../copy-link'
-import type { Account, Settings } from './models'
-import { readSummary } from './repository'
+import { payoutThreshold, type Account, type Settings } from './models'
+import { FeePanel } from './fee-panel'
+import { PromoMonthCard } from './promo-month'
+import { readFees, readSummary } from './repository'
 
 export async function Overview({
   user,
@@ -16,10 +19,11 @@ export async function Overview({
   account: Account
   settings: Settings
 }) {
-  const [s, t, locale] = await Promise.all([readSummary(user), getTranslations('affiliate'), currentLocale()])
-  const gap = Math.max(0, settings.payout_min_usd - s.available)
+  const [s, fees, t, locale] = await Promise.all([readSummary(user), readFees(user), getTranslations('affiliate'), currentLocale()])
+  const threshold = payoutThreshold(account, settings)
+  const gap = Math.max(0, threshold - s.available)
   const eligible = gap === 0 && !!account.payout_method && account.status === 'active'
-  const progress = Math.min(100, Math.round((s.available / settings.payout_min_usd) * 100))
+  const progress = Math.min(100, Math.round((s.available / threshold) * 100))
   const usd = (cents: number) => money(locale, cents)
   const activity = [
     ['clicks', String(s.clicks)],
@@ -36,11 +40,11 @@ export async function Overview({
         <h2 id="af-balance" className="af-label">{t('metrics.available')}</h2>
         <p className="af-balance-figure">{usd(s.available)}</p>
         <div className="af-meter" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}
-          aria-label={t('gap', { threshold: usd(settings.payout_min_usd), gap: usd(gap) })}>
+          aria-label={t('gap', { threshold: usd(threshold), gap: usd(gap) })}>
           <span style={{ inlineSize: progress + '%' }} />
         </div>
         <p className="af-balance-line">
-          {gap > 0 ? t('gap', { threshold: usd(settings.payout_min_usd), gap: usd(gap) }) : t('thresholdMet', { threshold: usd(settings.payout_min_usd) })}
+          {gap > 0 ? t('gap', { threshold: usd(threshold), gap: usd(gap) }) : t('thresholdMet', { threshold: usd(threshold) })}
         </p>
         <dl className="af-balance-facts">
           <div>
@@ -53,16 +57,22 @@ export async function Overview({
           </div>
         </dl>
         <p className={eligible ? 'af-success' : 'af-note'}>{eligible ? t('eligible') : account.payout_method ? t('notEligible') : t('needMethod')}</p>
-        <Link href="/partners?view=settings" className="af-link">
+        <Link href={settingsHref(account)} className="af-link">
           {account.payout_method ? t('hasMethod') : t('addMethod')}
         </Link>
       </section>
 
       <section className="af-panel af-linkbox" aria-labelledby="af-mylink">
         <h2 id="af-mylink">{t('myLink')}</h2>
-        <CopyLink url={consumerReferralUrl(account.slug, locale)} copy={t('copy')} copied={t('copied')} />
+        <CopyLink url={consumerReferralUrl(account.slug, account.org_id ? ENTERPRISE_LINK_LOCALE : locale)} copy={t('copy')} copied={t('copied')} />
         <p className="af-hint">{t('anyPage', { suffix: '?ref=' + account.slug })}</p>
+        {/* The org dashboard has no header line for the code, so it sits with the link (Owner 2026-11-23). */}
+        <CodeLine account={account} label={t('codeLabel')} />
       </section>
+
+      {account.org_id ? <PromoMonthCard orgId={account.org_id} locale={locale} /> : null}
+
+      <FeePanel fees={fees} threshold={threshold} locale={locale} t={t} />
 
       <section className="af-stats" aria-label={t('statsLabel')}>
         {[...activity, ...earnings].map(([key, value]) => (
@@ -73,5 +83,17 @@ export async function Overview({
         ))}
       </section>
     </div>
+  )
+}
+
+// The payout settings of this account's own dashboard: an org's stays on /partners/enterprise.
+const settingsHref = (account: Account) => viewHref({ view: 'settings', base: account.org_id ? '/partners/enterprise' : '/partners' })
+
+function CodeLine({ account, label }: { account: Account; label: string }) {
+  if (!account.org_id) return null
+  return (
+    <p className="af-hint af-code-line">
+      {label} <code className="af-code">{account.slug}</code>
+    </p>
   )
 }

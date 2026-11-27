@@ -18,7 +18,10 @@ const slimFilters = (nodes: readonly FilterNode[]): FilterNode[] =>
 // null (the index read failed): the picker falls back to its flat list by category.
 export function pickerBrowse(index: CatalogueIndex | null, templates: readonly CatalogueTemplate[], zh: boolean): PickerBrowse | null {
   if (!index) return null
-  const view = buildCatalogueView(index, templates, zh)
+  return slimBrowse(buildCatalogueView(index, templates, zh))
+}
+
+export function slimBrowse(view: CatalogueView): PickerBrowse {
   const entries = view.entries.map((entry): SlimEntry => {
     if (entry.type === 'template') return { type: 'template', id: entry.template.id, path: entry.path }
     const { members, ...series } = entry.series
@@ -46,7 +49,10 @@ export function browseView(browse: PickerBrowse | null, templates: readonly Cata
     return members.length ? [{ type: 'series', series: { ...series, members }, path: entry.path }] : []
   })
   const rest = templates.filter((template) => !placed.has(template.id)).map((template): GridEntry => ({ type: 'template', template, path: [] }))
-  return { filters: browse.filters, entries: [...entries, ...rest] }
+  // One place per template (Owner 2026-11-25), again here: a catalogue copy kept on the device or
+  // in a cache from before that rule may still list a series member loose.
+  const members = new Set(entries.flatMap((entry) => (entry.type === 'series' ? entry.series.members.map((member) => member.id) : [])))
+  return { filters: browse.filters, entries: [...entries, ...rest].filter((entry) => entry.type === 'series' || !members.has(entry.template.id)) }
 }
 
 export type EntryGroup = { key: string; name: string | null; entries: GridEntry[] }
