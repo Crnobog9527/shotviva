@@ -145,11 +145,12 @@ self.addEventListener('fetch', (event) => {
   const request = event.request
   if (shellFetch(event)) return
   if (request.mode === 'navigate') {
-    // Always the network: the preloaded response when there is one, else a plain fetch.
+    // Always the network: the preloaded response when there is one, else a plain fetch. An empty
+    // 204 preload is the proxy's answer to a shell-era preload of Create (shell-proxy.ts), never a page.
     event.respondWith((async () => {
       try {
         const preloaded = await event.preloadResponse
-        if (preloaded) return preloaded
+        if (preloaded && preloaded.status !== 204) return preloaded
       } catch {}
       return fetch(request)
     })())

@@ -6,6 +6,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { CreateContext } from '@/modules/image/create-page'
 import { DeviceCatalogue, FavoritesProvider } from '@/modules/image/create-page'
 
+import { leaveShell, SHELL_FALLBACK_MS, sessionStore, shellSettled } from '@/core/offline/shell-fallback'
+
 import { replayTap, shellTapKey } from './shell-taps'
 
 // Never settles: the shell has no account, so the dialogs and saved marks stay at their placeholders.
@@ -21,7 +23,7 @@ export function ShellCatalogue() {
 }
 
 declare global {
-  interface Window { __svShell?: { href: string; refreshed?: boolean; tap?: { key: string; at: number } } }
+  interface Window { __svShell?: { href: string; refreshed?: boolean; leaving?: boolean; tap?: { key: string; at: number } } }
 }
 
 // The worker answered the visitor's address (/generate, /zh/generate) with this shell when the
@@ -39,6 +41,8 @@ function answeredByWorker(): boolean {
 // (shell-taps.ts). No panel opens on the shell. When the real page takes over, Next keeps this route hidden (Activity) and runs this
 // effect's cleanup: the shell then renders nothing, so no second catalogue, duplicate id or hidden
 // copy stays on the page. Opened at /app-shell/generate itself, it stays put and inert.
+// The shell never holds the visitor (shell-fallback.ts): not replaced within SHELL_FALLBACK_MS of
+// the refresh, the tab loads the network page past the shell.
 export function ShellFrame({ children }: { children: ReactNode }) {
   const router = useRouter()
   const frame = useRef<HTMLDivElement>(null)
@@ -52,12 +56,16 @@ export function ShellFrame({ children }: { children: ReactNode }) {
       if (key && window.__svShell) window.__svShell.tap = { key, at: Date.now() }
     }
     element?.addEventListener('click', hold, true)
-    if (answeredByWorker() && window.__svShell && !window.__svShell.refreshed) {
+    let fallback: ReturnType<typeof setTimeout> | undefined
+    if (answeredByWorker() && window.__svShell && !window.__svShell.refreshed && !window.__svShell.leaving) {
       window.__svShell.refreshed = true
       router.refresh()
+      fallback = setTimeout(() => leaveShell(window), SHELL_FALLBACK_MS)
     }
     return () => {
+      clearTimeout(fallback)
       element?.removeEventListener('click', hold, true)
+      if (!window.__svShell?.leaving) shellSettled(sessionStore(window))
       if (!window.__svShell?.refreshed) return
       setRetired(true)
       const tap = window.__svShell.tap

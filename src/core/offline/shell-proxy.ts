@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
 import { IDENTITY_HEADER } from '../auth/forwarded-identity'
+import { SHELL_BYPASS_PARAM } from './shell-fallback'
 import { SHELL_PRELOAD_PREFIX } from './shell-worker'
 
 // The proxy's part in Create's app shell (ARCHITECTURE §18.3), ahead of every session step.
@@ -13,7 +14,8 @@ import { SHELL_PRELOAD_PREFIX } from './shell-worker'
 //   private, no-store (never on a CDN), noindex, and which build it belongs to (X-SV-Shell), the only
 //   answer the service worker keeps for a page.
 // - A navigation preload of /generate whose header says the worker answers with its shell gets an
-//   empty 204 at once, instead of the page rendered for nothing (shell-worker.ts).
+//   empty 204 at once, instead of the page rendered for nothing (shell-worker.ts); never on the way
+//   out of the shell (SHELL_BYPASS_PARAM, shell-fallback.ts), where that preload is the page.
 export const SHELL_PATHS = { en: '/app-shell/generate', zh: '/zh/app-shell/generate' } as const
 
 // Any other spelling of an app-shell address (a trailing slash, which next.config's
@@ -34,7 +36,7 @@ const CREATE_PATHS = new Set(['/generate', '/generate/', '/zh/generate', '/zh/ge
 export function shellProxyAnswer(request: NextRequest, version: string): NextResponse | null {
   const { pathname, search } = request.nextUrl
   const preload = request.headers.get('service-worker-navigation-preload')
-  if (version && preload === `${SHELL_PRELOAD_PREFIX}${version}` && CREATE_PATHS.has(pathname)) {
+  if (version && preload === `${SHELL_PRELOAD_PREFIX}${version}` && CREATE_PATHS.has(pathname) && !request.nextUrl.searchParams.has(SHELL_BYPASS_PARAM)) {
     return new NextResponse(null, { status: 204, headers: { 'Cache-Control': 'private, no-store' } })
   }
   const locale = pathname === SHELL_PATHS.en ? 'en' : pathname === SHELL_PATHS.zh ? 'zh' : null
