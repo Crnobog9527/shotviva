@@ -15721,8 +15721,8 @@ CREATE OR REPLACE FUNCTION "public"."code_preview_credits"("offer" "public"."cod
     SET "search_path" TO ''
     AS $$
   select case
-    when offer.kind = 'invite' and public._invite_code_org(offer.owner_user_id) is not null then
-      (select o.signup_bonus_credits from public.orgs o where o.id = public._invite_code_org(offer.owner_user_id))
+    when offer.kind = 'invite' and public._in_active_org(offer.owner_user_id) then
+      coalesce((select o.signup_bonus_credits from public.orgs o where o.id = public._invite_code_org(offer.owner_user_id)), 0)
     when offer.kind = 'invite' then
       (select (value->>'inviteeCredits')::integer from public.system_settings where key = 'code_invite_rewards')
     else coalesce(offer.invitee_credits, 0) end;
@@ -15732,11 +15732,40 @@ $$;
 ALTER FUNCTION "public"."code_preview_credits"("offer" "public"."codes") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."code_preview_invite_credits"("p_code" "text", "p_ref_slug" "text") RETURNS integer
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare v_offer public.codes; v_org uuid; v_account uuid; v_ref uuid;
+begin
+  if p_code is null or p_code collate "C" !~ '^[A-Za-z0-9]{4,20}$' then return null; end if;
+  select * into v_offer from public.codes where code = upper(p_code);
+  if not found then return null; end if;
+  if v_offer.kind <> 'invite' or not public._in_active_org(v_offer.owner_user_id) then
+    return public.code_preview_credits(v_offer);
+  end if;
+  v_org := public._invite_code_org(v_offer.owner_user_id);
+  if v_org is null then return 0; end if;
+  select a.user_id into v_account from public.affiliates a where a.org_id = v_org;
+  if p_ref_slug is not null and p_ref_slug ~ '^[a-z0-9-]{3,24}$' then
+    select a.user_id into v_ref from public.affiliates a
+      join public.affiliate_settings st on st.singleton and st.enabled
+     where a.slug = p_ref_slug and a.status = 'active';
+    if v_ref is not null and v_ref <> v_account then return 0; end if;
+  end if;
+  return coalesce((select o.signup_bonus_credits from public.orgs o where o.id = v_org), 0);
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."code_preview_invite_credits"("p_code" "text", "p_ref_slug" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."code_preview_org"("offer" "public"."codes") RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-  select offer.kind = 'invite' and public._invite_code_org(offer.owner_user_id) is not null
+  select offer.kind = 'invite' and public._in_active_org(offer.owner_user_id)
 $$;
 
 
@@ -19284,7 +19313,8 @@ begin
   -- 2030: reported as new_users_only, so code from before this deploy shows its usual refusal; the
   -- reason tells the current code to say that invite codes are for sign-up only. Nothing is written.
   if outcome = 'org_member' then
-    return jsonb_build_object('kind', offer.kind, 'status', 'new_users_only');
+    -- Reported as new_users_only for code from before this deploy; org_member says why.
+    return jsonb_build_object('kind', offer.kind, 'status', 'new_users_only', 'org_member', true);
   end if;
   if outcome = 'signup_only' then
     return jsonb_build_object('kind', offer.kind, 'status', 'new_users_only', 'reason', 'signup_only');
@@ -30579,6 +30609,11 @@ GRANT SELECT ON TABLE "public"."codes" TO "service_role";
 
 REVOKE ALL ON FUNCTION "public"."code_preview_credits"("offer" "public"."codes") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."code_preview_credits"("offer" "public"."codes") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."code_preview_invite_credits"("p_code" "text", "p_ref_slug" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."code_preview_invite_credits"("p_code" "text", "p_ref_slug" "text") TO "service_role";
 
 
 
