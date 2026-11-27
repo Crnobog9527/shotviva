@@ -5464,8 +5464,8 @@ begin
        where v_account is not null and c.affiliate_user_id = v_account and c.level = 1 and c.status = 'confirmed'
          and c.confirmed_at >= v_start and c.confirmed_at < v_end
          and cu.referred_by = v_account
-         and (cu.referred_source in ('org_l1', 'signup', 'first_checkout')
-              or (cu.referred_source = 'admin' and p.created_at >= cu.referred_at))
+         and cu.referred_source in ('org_l1', 'signup', 'first_checkout', 'admin')
+         and p.created_at >= cu.referred_at
          and not exists(select from public.partner_promo_grant_lines l join public.partner_promo_grants g on g.id = l.grant_id
                          where l.payment_id = c.payment_id and g.status = 'granted' and g.period <> p_period)
     ) x
@@ -6673,6 +6673,11 @@ begin
     v_bound_at := now();
   else
     -- Already this partner's customer: keep how and when (the commission term runs from referred_at).
+    -- Back-dating only extends an admin binding; a customer this partner got through a link or an
+    -- invite code is not back-dated (its pre-binding payments were never this partner's sale).
+    if v_days > 0 and v_profile.referred_source is distinct from 'admin' then
+      raise exception 'AFFILIATE_BACKDATE_NOT_ADMIN';
+    end if;
     v_bound_at := coalesce(v_profile.referred_at, now());
   end if;
 
