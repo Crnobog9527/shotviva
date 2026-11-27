@@ -1,3 +1,4 @@
+import { CACHE_PREFIX } from './client-names'
 import { routeFor } from './routes'
 import { CREATE_PATHS } from './shell-fallback'
 import { NO_SHELL, SHELL_HANDLERS } from './shell-worker'
@@ -14,7 +15,7 @@ import { NO_SHELL, SHELL_HANDLERS } from './shell-worker'
 
 // Cache names: one per build for the static files (a deploy's files live under its own name, and
 // activation deletes every other build's), one for catalogue files across builds (a few kept).
-export const CACHE_PREFIX = 'sv-'
+export { CACHE_PREFIX }
 const CATALOGUE_KEEP = 4
 // First-screen template covers (LCP plan 1): the first screens of the last few Create screens used
 // (All, a category), at most COVERS_KEEP covers, some 0.3 MB of 384 w AVIF. Kept across builds:
