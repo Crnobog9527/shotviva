@@ -8,8 +8,11 @@ export const CLAWBACK_COPY = {
   button: '扣回剩余积分',
   loading: '读取中…',
   title: '扣回这笔付款的剩余积分',
-  facts: (p: { granted: number; clawedBack: number; shortfall: number; balance: number }) =>
-    `这笔付款发放了 ${p.granted} 积分，已扣回 ${p.clawedBack}${p.shortfall > 0 ? `，欠扣 ${p.shortfall}` : ''}。用户现在有 ${p.balance} 付费积分。`,
+  facts: (p: { granted: number; clawedBack: number; shortfall: number; balance: number; orgName?: string | null }) =>
+    `这笔付款发放了 ${p.granted} 积分，已扣回 ${p.clawedBack}${p.shortfall > 0 ? `，欠扣 ${p.shortfall}` : ''}。` +
+    (p.orgName
+      ? `积分当时直接存入了企业「${p.orgName}」的积分池，扣回从这个池里扣；池里现在有 ${p.balance} 积分（已划给成员的不会扣）。`
+      : `用户现在有 ${p.balance} 付费积分。`),
   will: (n: number) => `将扣回 ${n} 积分，记到这笔付款名下。之后按比例退款时，退款回调不会再扣这一部分。`,
   nothing: '现在没有可以扣回的积分（这笔已经扣完，或者用户的付费积分是 0）。',
   confirm: (n: number) => `确认扣回 ${n} 积分`,

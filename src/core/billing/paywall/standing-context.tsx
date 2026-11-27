@@ -25,8 +25,11 @@ export function useStanding(): MemberStanding {
 
 export function StandingFeed({ standing }: { standing: MemberStanding }) {
   const { setStanding } = useContext(StandingContext)
-  const { subscription, subscriptionRank, tier, orgMember } = standing
-  useEffect(() => setStanding({ subscription, subscriptionRank, tier, orgMember }), [setStanding, subscription, subscriptionRank, tier, orgMember])
+  const { subscription, subscriptionRank, tier, orgMember, orgPool } = standing
+  useEffect(
+    () => setStanding({ subscription, subscriptionRank, tier, orgMember, orgPool }),
+    [setStanding, subscription, subscriptionRank, tier, orgMember, orgPool],
+  )
   return null
 }
 

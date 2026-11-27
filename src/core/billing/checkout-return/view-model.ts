@@ -25,6 +25,8 @@ export type SuccessView = Order & {
   // What was bought and which payment, for the celebration (T55).
   productId: ProductId
   paymentKey: string | null
+  // The credits are in the org's credit pool, not the buyer's balance (migration 2033).
+  orgPool: boolean
 }
 
 export type PendingView = Order & { state: 'pending'; amount: Money | null; method: RecordedMethod | null }
@@ -61,6 +63,7 @@ export function returnView(facts: CheckoutFacts, product: SiteProduct, balance: 
     receiptUrl: facts.receiptUrl,
     productId: product.id,
     paymentKey: facts.paymentKey,
+    orgPool: facts.orgPool === true,
     fine: fineKey(order, facts.recurring),
   }
 }

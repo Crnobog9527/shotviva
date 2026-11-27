@@ -24,14 +24,15 @@ export function SuccessReturn({ view, back }: Props) {
       <CelebrationLoader level={level} paymentKey={view.paymentKey} />
       <Glyph pending={false} />
       <h1 data-title="" className={titleClass}>{view.tier ? t('titlePlan', { tier: tiers(view.tier) }) : view.credits === null ? t('packPaid') : t('titlePack', { count: view.credits })}</h1>
-      <p className={subClass}>{view.kind === 'plan' && view.credits !== null ? t('subPlan', { count: view.credits }) : t('subPack')}</p>
+      <p className={subClass}>{subLine(t, view)}</p>
       <Rows>
-        {view.credits !== null ? <Row label={t('added')}>
+        {view.credits !== null ? <Row label={t(view.orgPool ? 'addedOrg' : 'added')}>
           <Credits count={`+${count}`} unit={t('unit')} added={view.credits} />
         </Row> : null}
-        <Row label={t('balance')}>
+        {/* An org main admin's credits went to the org pool (2033): their own balance did not change. */}
+        {view.orgPool ? null : <Row label={t('balance')}>
           <Credits count={view.balance.toLocaleString()} unit={t('unit')} />
-        </Row>
+        </Row>}
         {view.renews ? (
           <Row label={t('renews')}>
             {t('renewsDate', { date: new Date(view.renews.at) })}
@@ -46,6 +47,11 @@ export function SuccessReturn({ view, back }: Props) {
       <p className={fineClass}>{t(view.fine, { period: view.interval ?? 'month' })}</p>
     </ReturnPlate>
   )
+}
+
+function subLine(t: ReturnType<typeof useTranslations<'app.checkout'>>, view: SuccessView): string {
+  if (view.orgPool) return t('subOrgPool')
+  return view.kind === 'plan' && view.credits !== null ? t('subPlan', { count: view.credits }) : t('subPack')
 }
 
 function paidLine(t: ReturnType<typeof useTranslations<'app.checkout'>>, amount: string, paid: NonNullable<SuccessView['paid']>): string {

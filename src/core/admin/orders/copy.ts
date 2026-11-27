@@ -1,7 +1,7 @@
 // /admin/orders copy (DESIGN §7: Chinese only, kept out of site/messages).
 export const ORDERS_COPY = {
   title: '订单与收入',
-  priceNote: '收入为净额：实付减去税（Managed Payments 代扣）再减去已退款。付款记录显示实付金额（含税）。退款和争议在 Stripe 后台处理；退款、拒付回调会自动扣回这笔发放的积分，「积分扣回」列显示已扣回和欠扣。用过积分要按比例退款的，先点「扣回剩余积分」再去退款。「标记已知晓」只把退款或争议从概览的待处理计数里去掉，不动钱；未结的争议仍会计入，直到结案。T10 上线前的付款不在其中。',
+  priceNote: '收入为净额：实付减去税（Managed Payments 代扣）再减去已退款。付款记录显示实付金额（含税）。退款和争议在 Stripe 后台处理；退款、拒付回调会自动扣回这笔发放的积分，「积分扣回」列显示已扣回和欠扣。用过积分要按比例退款的，先点「扣回剩余积分」再去退款。企业主管理员的购买，积分直接存入企业积分池（「积分扣回」列标出企业），退款和拒付也从那个企业积分池扣回。「标记已知晓」只把退款或争议从概览的待处理计数里去掉，不动钱；未结的争议仍会计入，直到结案。T10 上线前的付款不在其中。',
   windows: { today: '今日', '7d': '近 7 天', period: (days: number) => `近 ${days} 天` },
   revenue: '收入（净额）',
   purchases: (n: number) => `${n} 笔付款`,
@@ -28,6 +28,8 @@ export const ORDERS_COPY = {
   // MP 卡 = Managed Payments（Link 当卖家、另加税）；普通卡 = 中国银行卡，Shotviva 当卖家（T64）。
   methods: { card: 'MP 卡', cn_card: '普通卡（中国银行卡）', alipay: '支付宝', wechat_pay: '微信支付' },
   statuses: { paid: '已付款', refunded: '已退款', partially_refunded: '部分退款', disputed: '争议中' },
+  // 2033: an active org's main admin buys into the org's paid pool; refunds take back from there.
+  creditsToOrg: (name: string) => `积分已存入企业积分池 · ${name}`,
   openInStripe: '在 Stripe 查看',
   noLink: '—',
   purchasesTitle: '付款记录',

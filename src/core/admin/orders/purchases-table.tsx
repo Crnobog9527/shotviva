@@ -43,6 +43,7 @@ function PurchaseRow({ row, stripeLive, actions: { clawback, acknowledge } }: Ro
       <TableCell className="font-mono text-xs">{row.amountRefunded > 0 ? money(row.amountRefunded) : COPY.noLink}</TableCell>
       <TableCell>
         <span className="grid gap-1">
+          {row.creditsOrg ? <span className="text-xs text-muted-foreground" title={row.creditsOrg.id}>{COPY.creditsToOrg(row.creditsOrg.name)}</span> : null}
           <ClawbackStatus clawedBack={row.creditsClawedBack} shortfall={row.clawbackShortfall} />
           {clawback ? <ClawbackButton paymentId={row.id} actions={clawback} /> : null}
         </span>
