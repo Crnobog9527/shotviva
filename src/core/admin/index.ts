@@ -188,7 +188,8 @@ export {
 export {
   FEATURES_COPY,
   FeaturesEditor,
-  FoodTogglesCard,
+  FoodPlatingCard,
+  FoodTablewareCard,
   AppShellCard,
   ServiceWorkerCard,
   PosterPhotoCard,

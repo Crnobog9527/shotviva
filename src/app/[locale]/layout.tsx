@@ -12,7 +12,7 @@ import { registersServiceWorker } from '@/core/offline/server'
 import { htmlLang, isLocale, publicClientMessages } from '@/core/i18n'
 import { TranslatedPathsProvider } from '@/core/i18n/ui'
 import { rootMetadata, ShortcutTitleSync } from '@/core/seo'
-import { foodTogglesEnabled, serviceWorkerEnabled } from '@/core/system-settings'
+import { foodSwitches, serviceWorkerEnabled } from '@/core/system-settings'
 import { FoodTogglesProvider } from '@/core/templates/offered-toggles'
 import { GeistFonts } from '@/core/ui/geist-fonts'
 import { MiSansStylesheet } from '@/core/ui/misans-stylesheet'
@@ -48,8 +48,8 @@ export default async function RootLayout({ children }: LayoutProps<'/[locale]'>)
   // label, spec #186), nor what only the logged-in app reads, which the (app) layout adds.
   const messages = publicClientMessages(await getMessages())
   const lang = isLocale(locale) ? locale : site.locales.default
-  // 优化摆盘 / 优化器皿 are offered only while this site-wide switch is on (cached, own tag).
-  const [foodToggles, serviceWorker] = await Promise.all([foodTogglesEnabled(), serviceWorkerEnabled()])
+  // 优化摆盘 and 优化器皿 are each offered only while its site-wide switch is on (cached, own tag).
+  const [food, serviceWorker] = await Promise.all([foodSwitches(), serviceWorkerEnabled()])
   return (
     <html lang={htmlLang(lang)} className="h-full antialiased">
       <body className="flex min-h-full flex-col">
@@ -60,7 +60,7 @@ export default async function RootLayout({ children }: LayoutProps<'/[locale]'>)
         {lang === 'zh' ? <MiSansStylesheet /> : null}
         <NextIntlClientProvider messages={messages}>
           <TranslatedPathsProvider paths={site.locales.zhPaths}>
-            <FoodTogglesProvider enabled={foodToggles}>{children}</FoodTogglesProvider>
+            <FoodTogglesProvider switches={food}>{children}</FoodTogglesProvider>
             {/* The analytics cookie bar, for EU/EEA/UK/CH visitors who have not answered (T70). */}
             <ConsentSlot />
             {/* "Shotviva has been updated" with Refresh, on every page (T90). */}

@@ -4,7 +4,7 @@ import { errorResponse, jsonResponse } from '@/core/api-response'
 import { assertSameOrigin, createAdminSupabase, requireApiAdmin } from '@/core/auth'
 import { AppError } from '@/core/errors'
 import { r2Store } from '@/core/storage'
-import { foodTogglesEnabled } from '@/core/system-settings'
+import { foodSwitches } from '@/core/system-settings'
 import { foodDeps, identityJudge, imageProvider, loadPanelSummary, loadPanelRecords, loadTestPanel, runTestGenerate, signRun, testGenerateBodySchema } from '@/modules/image'
 
 // Admin template test runs (ARCHITECTURE §10.b, T85). Admin only: anyone else gets a 404, as the
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     const body = testGenerateBodySchema.safeParse(await request.json().catch(() => null))
     if (!body.success) throw new AppError('INVALID_INPUT', 'run_id, batch_id and template_id are required')
     const judge = await identityJudge()
-    const deps = { db: createAdminSupabase(), store: r2Store(), provider: imageProvider, identityJudge: judge, food: foodDeps(), foodTogglesEnabled }
+    const deps = { db: createAdminSupabase(), store: r2Store(), provider: imageProvider, identityJudge: judge, food: foodDeps(), foodSwitches }
     return jsonResponse(await signRun(deps.store, await runTestGenerate(deps, { actorId: admin.id, body: body.data })))
   } catch (error) {
     return errorResponse(error, 'admin-test-runs')

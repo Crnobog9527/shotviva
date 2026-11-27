@@ -6,7 +6,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import type { TemplatePreviewProps } from '@/core/admin'
 import type { Locale } from '@/core/i18n/locales'
 import { localizeTemplate } from '@/core/templates/localize'
-import { offeredTemplate, useFoodTogglesEnabled } from '@/core/templates/offered-toggles'
+import { offeredTemplate, useFoodSwitches } from '@/core/templates/offered-toggles'
 import type { Template } from '@/core/templates/types'
 import { cn } from '@/core/ui/cn'
 
@@ -57,9 +57,9 @@ type BodyProps = { draftId: string; members: CatalogueTemplate[]; seriesName: st
 
 function PreviewBody({ draftId, members: given, seriesName, width }: BodyProps) {
   const t = useTranslations('app')
-  // As users see it: no dish name while the food switch is off (offered-toggles.tsx).
-  const foodEnabled = useFoodTogglesEnabled()
-  const members = useMemo(() => given.map((member) => offeredTemplate(member, foodEnabled)), [given, foodEnabled])
+  // As users see it: no dish name while both food switches are off (offered-toggles.tsx).
+  const foodSwitches = useFoodSwitches()
+  const members = useMemo(() => given.map((member) => offeredTemplate(member, foodSwitches)), [given, foodSwitches])
   // The series strip switches members as in the user's dialog; it opens on the template being edited.
   const [memberId, setMemberId] = useState(draftId)
   const template = members.find(member => member.id === memberId) ?? members[0]!

@@ -3,7 +3,7 @@
 import { useLocale } from 'next-intl'
 import { useEffect, useState } from 'react'
 
-import { offeredTemplate, useFoodTogglesEnabled } from '@/core/templates/offered-toggles'
+import { offeredTemplate, useFoodSwitches } from '@/core/templates/offered-toggles'
 
 import type { CatalogueForms } from './catalogue-payload'
 import type { CatalogueTemplate } from './catalogue-template'
@@ -27,7 +27,7 @@ async function fetchForms(locale: string, ids: string[], signal: AbortSignal): P
 
 export function useCatalogueForms(templates: readonly CatalogueTemplate[]) {
   const locale = useLocale()
-  const foodEnabled = useFoodTogglesEnabled()
+  const foodSwitches = useFoodSwitches()
   const [loaded, setLoaded] = useState<{ locale: string; forms: CatalogueForms }>()
   const [failure, setFailure] = useState('')
   const [attempt, setAttempt] = useState(0)
@@ -53,10 +53,10 @@ export function useCatalogueForms(templates: readonly CatalogueTemplate[]) {
     ready: missing.length === 0,
     failed,
     retry: () => setAttempt((current) => current + 1),
-    // The template with its form, as offered now: no dish name while the food switch is off.
+    // The template with its form, as offered now: no dish name while both food switches are off.
     fill: (template: CatalogueTemplate): CatalogueTemplate =>
       offeredTemplate(forms && Object.hasOwn(forms, template.id)
         ? { ...template, ...forms[template.id], formDeferred: undefined, hasDeferredSlots: undefined, hasDeferredGroups: undefined }
-        : template, foodEnabled),
+        : template, foodSwitches),
   }
 }

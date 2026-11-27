@@ -10,8 +10,8 @@ import { screenIdentityText, type IdentityJudge } from '../identity-guard'
 import { isOwnInputKey, loadInputImage, outputKeyFor, writeInputPreview } from '../storage'
 import {
   DEFAULT_RESOLUTION,
-  FOOD_COPY_KEYS,
-  FOOD_TOGGLE_KEYS,
+  FOOD_SWITCHES_OFF,
+  foodSwitchedOff,
   loadGenerationTemplate,
   allowedWebAspects,
   assertPricedTier,
@@ -20,6 +20,7 @@ import {
   publicCopyKeys,
   toStoredSlots,
   validateGenerationInputs,
+  type FoodSwitches,
   type GenerationInputs,
   type Resolution,
   type TemplateSurface,
@@ -61,9 +62,10 @@ export type GenerationDeps = Omit<SettleDeps, 'provider'> & {
   afterPoster?: (job: Job) => void
   // A food template's toggle flows (§5.1c): the dish reader and the vessel library.
   food?: FoodDeps | null
-  // The site-wide switch for 优化摆盘 / 优化器皿 (system_settings food_toggles_enabled). Absent or
-  // false: both are rendered off whatever the request says, so no dish reading and no vessel.
-  foodTogglesEnabled?: () => Promise<boolean>
+  // The site-wide switches for 优化摆盘 and 优化器皿 (system_settings food_plating_enabled,
+  // food_tableware_enabled). Absent: both are rendered off whatever the request says, so no dish
+  // reading and no vessel; one off: that toggle alone is rendered off.
+  foodSwitches?: () => Promise<FoodSwitches>
 }
 
 const SURFACE: Record<JobSource, TemplateSurface> = { web: 'web', graylum: 'partner' }
@@ -116,12 +118,13 @@ async function finishPoster(deps: GenerationDeps, poster: Prepared['poster'], jo
   deps.afterPoster?.(job)
 }
 
-// Everything that can be rejected without touching credits: template, fields, key
-// 优化摆盘 / 优化器皿, and the dish name only their flow reads, while the site-wide switch is off
-// (food_toggles_enabled, 1848): toggles rendered off, the dish name left out of the inputs.
+// 优化摆盘 or 优化器皿 while its own site-wide switch is off (2009) is rendered off; the dish name
+// only their flows read is left out of the inputs once both are off. No switches read: both off.
 async function switchedOff(deps: GenerationDeps): Promise<{ forceOff: readonly string[]; dropCopy: readonly string[] }> {
-  return (await deps.foodTogglesEnabled?.()) ? { forceOff: [], dropCopy: [] } : { forceOff: FOOD_TOGGLE_KEYS, dropCopy: FOOD_COPY_KEYS }
+  return foodSwitchedOff((await deps.foodSwitches?.()) ?? FOOD_SWITCHES_OFF)
 }
+
+// Everything that can be rejected without touching credits: template, fields, key
 
 // ownership, tier limits (batch size, rate limit), then the user's words (ARCHITECTURE §5.1a:
 // no face swap) alongside the stored upload itself (HEAD + bytes; bad ones are deleted).
