@@ -13,6 +13,7 @@ import { createMemoryStore } from '../fakes/memory-store'
 import { fakeProvider, seedTemplate } from './generation-fixtures'
 import { connectAdmin, createPricedTemplate, createUser, ledgerOf, profileOf, serviceClient } from './helpers'
 import { serviceSupabase } from './supabase-env'
+import { framedNote } from '@/core/templates/generation-inputs'
 
 // T16 (ARCHITECTURE §4–§6.1, AGENTS §7 item 3): the charge is templates.credits_cost at the
 // chosen resolution, looked up in the database; an unknown resolution is refused before any
@@ -121,7 +122,7 @@ describe('runGeneration by resolution', () => {
     const view = await runGeneration(deps, request({ resolution: '2k', aspectRatio: '16:9', note: 'add a sprig of mint' }))
     const { rows } = await db.query<{ inputs: Record<string, unknown> }>('select inputs from public.generation_jobs where id = $1', [view.id])
     expect(rows[0]?.inputs).toMatchObject({ resolution: '2k', aspect_ratio: '16:9', note: 'add a sprig of mint' })
-    expect(fake.calls[0]?.prompt).toBe('WRAPPED studio shot of ramen, keep the plate unchanged\n\nadd a sprig of mint')
+    expect(fake.calls[0]?.prompt).toBe(`WRAPPED studio shot of ramen, keep the plate unchanged\n\n${framedNote('add a sprig of mint')}`)
   })
 
   it('refuses a size outside the eight before charging', async () => {
