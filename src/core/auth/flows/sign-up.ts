@@ -1,7 +1,8 @@
 import 'server-only'
 
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 
+import { storeSignupReferral } from '../../affiliate/referral'
 import { currentLocale, localized } from '../../i18n/server'
 import { logger } from '../../logger'
 import { currentOrigin } from '../../request-origin'
@@ -21,6 +22,15 @@ import { formFields, newPasswordSchema, resendSchema, resetRequestSchema, signUp
 // no identities and sends nothing; with them off it says `user_already_exists`, treated the same.
 const REGISTERED = new Set(['user_already_exists', 'email_exists'])
 
+// A partner's link (sv_ref) onto the new account, so verifying on another device still binds it
+// (2021, ARCHITECTURE §6.5). Read from our httpOnly cookie, never from the form. A staff link's
+// sign-up never binds, so it stores nothing. A registered address gets no real account back
+// (or one the SQL refuses as not just created).
+async function rememberReferral(userId: string | undefined, staff: Record<string, string>) {
+  if (Object.keys(staff).length) return
+  await storeSignupReferral(userId, (await cookies()).get('sv_ref')?.value)
+}
+
 // The verification link lands on `next` (the home draft, the Graylum connect page) when it is a
 // same-site path that passes sanitizeNext, else the account page of the form's language.
 export async function signUpWithPassword(form: FormData): Promise<FormState> {
@@ -38,8 +48,9 @@ export async function signUpWithPassword(form: FormData): Promise<FormState> {
   // A sign-up through an org's staff link remembers it (token and org), so a confirmation resent
   // from the ordinary login page, or one after the org reset its link, is still a staff sign-up
   // (no signup gift, 1940/1950).
-  const data = { locale, ...(await staffSignupData(createAdminSupabase(), next)) }
-  const { error } = await supabase.auth.signUp({
+  const staff = await staffSignupData(createAdminSupabase(), next)
+  const data = { locale, ...staff }
+  const { data: created, error } = await supabase.auth.signUp({
     email,
     password,
     options: { captchaToken, data, emailRedirectTo: confirmUrl(nextIn(next, locale), await currentOrigin()) },
@@ -49,6 +60,7 @@ export async function signUpWithPassword(form: FormData): Promise<FormState> {
     if (code === 'INTERNAL') logger.warn('sign-up failed', { code: error.code })
     return failed(code)
   }
+  await rememberReferral(created?.user?.id, staff)
   return { status: 'sent' }
 }
 
