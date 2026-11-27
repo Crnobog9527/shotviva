@@ -23,6 +23,7 @@ import {
 
 import type { PublishCandidate } from './publish-rules'
 import { toUpsertArgs } from './rpc-payload'
+import { retryStatementTimeout } from './timeout-retry'
 import type { AdminTemplate, SaveTemplatePayload, TemplateOrderGroup } from './types'
 
 // Every function expects a service-role client; callers must have passed requireAdmin().
@@ -34,7 +35,7 @@ type AdminRow = SaleRow & { subcategory_key: string | null; series_id: string | 
 const CATALOGUE_PAGE_SIZE = 250
 
 async function readAdminPage(client: SupabaseClient, after: string | null) {
-  const { data, error } = await selectTemplates((columns) => {
+  const { data, error } = await retryStatementTimeout(() => selectTemplates((columns) => {
     // The stable primary-key cursor keeps an in-flight reorder from skipping a template.
     const taxonomy = columns.startsWith(PRE_T75_TEMPLATE_COLUMNS + ',') ? '' : ', subcategory_key, series_id, series_sort_order'
     // Deleted templates (1401) come too, marked: the list hides them unless 已删除 is chosen.
@@ -42,7 +43,7 @@ async function readAdminPage(client: SupabaseClient, after: string | null) {
       .order('id').limit(CATALOGUE_PAGE_SIZE)
     if (after) page.gt('id', after)
     return page.returns<AdminRow[]>()
-  }, ', template_sale_approvals(enabled,unpriced_resolutions), template_prompts(body, version, model_params, provider_id, style_refs)')
+  }, ', template_sale_approvals(enabled,unpriced_resolutions), template_prompts(body, version, model_params, provider_id, style_refs)'))
   if (error || !data) throw new AppError('INTERNAL', `listAdminTemplates failed: ${error?.message ?? 'no data'}`)
   return data
 }
