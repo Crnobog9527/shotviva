@@ -3,6 +3,7 @@ import { z } from 'zod'
 
 import { LOCALES } from '@/core/i18n'
 import { logger } from '@/core/logger'
+import { CATALOGUE_CDN_TAG_HEADER } from '@/core/templates/cdn-cache-tag'
 import { HOME_CATALOGUE_CACHE_CONTROL, loadHomeCatalogue } from '@/modules/image'
 
 const localeSchema = z.enum(LOCALES)
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
   try {
     const catalogue = await loadHomeCatalogue(locale.data)
     // Without the category index (taxonomy read failed) it is a stand-in: never shared.
-    return Response.json(catalogue, { headers: catalogue.browse ? { 'Cache-Control': HOME_CATALOGUE_CACHE_CONTROL } : NO_STORE })
+    return Response.json(catalogue, { headers: catalogue.browse ? { 'Cache-Control': HOME_CATALOGUE_CACHE_CONTROL, ...CATALOGUE_CDN_TAG_HEADER } : NO_STORE })
   } catch (error) {
     unstable_rethrow(error)
     logger.error('home.catalogue_read_failed', { error })

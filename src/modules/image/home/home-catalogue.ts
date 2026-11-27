@@ -11,9 +11,9 @@ export type HomeCatalogueSource = { locale: Locale }
 export const HOME_RAIL_SIZE = 4
 
 // /api/home/templates: public catalogue data, the same for every visitor (no cookies are read).
-// The CDN may keep it a minute and serve it a minute longer while it refetches; the result itself
-// is cached under the templates tag (loadHomeCatalogue), so an admin save reaches the picker within
-// about two minutes. Browsers always ask again.
+// The CDN may keep it a minute and serve it a minute longer while it refetches; the routes tag it
+// like the cache behind it (core/templates/cdn-cache-tag), so an admin save's updateTag deletes the
+// edge copy and the next request reads the new catalogue. Browsers always ask again.
 export const HOME_CATALOGUE_CACHE_CONTROL = 'public, max-age=0, s-maxage=60, stale-while-revalidate=60'
 
 const isHomeTemplate = (template: LocalizedTemplate) => !template.fields.images.slots?.length

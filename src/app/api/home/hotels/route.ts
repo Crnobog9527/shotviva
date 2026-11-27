@@ -3,6 +3,7 @@ import { z } from 'zod'
 
 import { LOCALES } from '@/core/i18n'
 import { logger } from '@/core/logger'
+import { CATALOGUE_CDN_TAG_HEADER } from '@/core/templates/cdn-cache-tag'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 import { HOME_CATALOGUE_CACHE_CONTROL } from '@/modules/image'
 import { hotelViewerPairs } from '@/site/content'
@@ -21,7 +22,7 @@ export async function GET(request: Request) {
 
   try {
     const live = await cachedWebCatalogue(locale.data)
-    return Response.json(hotelViewerPairs(locale.data, live), { headers: live.length > 0 ? { 'Cache-Control': HOME_CATALOGUE_CACHE_CONTROL } : NO_STORE })
+    return Response.json(hotelViewerPairs(locale.data, live), { headers: live.length > 0 ? { 'Cache-Control': HOME_CATALOGUE_CACHE_CONTROL, ...CATALOGUE_CDN_TAG_HEADER } : NO_STORE })
   } catch (error) {
     unstable_rethrow(error)
     logger.error('home.hotel_pairs_read_failed', { error })

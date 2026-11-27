@@ -3,6 +3,7 @@ import { z } from 'zod'
 
 import { LOCALES } from '@/core/i18n'
 import { logger } from '@/core/logger'
+import { CATALOGUE_CDN_TAG_HEADER } from '@/core/templates/cdn-cache-tag'
 import { cachedFeaturedBundles } from '@/core/templates/cached-bundles'
 import { cachedWebCatalogue } from '@/core/templates/cached-catalogue'
 import { HOME_CATALOGUE_CACHE_CONTROL, openingCandidates } from '@/modules/image'
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
   if (!locale.success) return Response.json({ code: 'INVALID_INPUT' }, { status: 400, headers: NO_STORE })
   try {
     const [live, bundles] = await Promise.all([cachedWebCatalogue(locale.data), cachedFeaturedBundles(locale.data)])
-    return Response.json({ templates: openingCandidates(live, bundleOpeningIds(live, bundles)) }, { headers: { 'Cache-Control': HOME_CATALOGUE_CACHE_CONTROL } })
+    return Response.json({ templates: openingCandidates(live, bundleOpeningIds(live, bundles)) }, { headers: { 'Cache-Control': HOME_CATALOGUE_CACHE_CONTROL, ...CATALOGUE_CDN_TAG_HEADER } })
   } catch (error) {
     unstable_rethrow(error)
     logger.error('home.opening_read_failed', { error })
