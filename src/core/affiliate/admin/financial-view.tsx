@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { PAUSED_HOLD, commissionMarks } from './commission-marks'
 import { COPY, DOSSIER, STATUS, money, commissionStatus } from './copy'
 import { MutationForm, type SaveAction } from './form'
 import { payoutAmountHeaders, payoutAmounts } from './payout-amounts'
@@ -35,8 +36,8 @@ function FilterBar({ f }: { f: Filters }) {
             label={COPY.flag}
             initial={f.flag}
             all
-            values={['yes', 'no']}
-            labels={{ yes: COPY.flaggedOnly, no: COPY.unflagged }}
+            values={['yes', 'no', 'paused']}
+            labels={{ yes: COPY.flaggedOnly, no: COPY.unflagged, paused: PAUSED_HOLD }}
           />
         )}
       </FiltersForm>
@@ -102,7 +103,7 @@ export async function CommissionsView({ db, filters, action }: ViewProps) {
             r.rate_bp / 100 + '%',
             money(r.amount),
             commissionStatus(r.status),
-            r.flags.map((s) => STATUS[s] ?? s).join('、') || COPY.none,
+            commissionMarks(r).join('、') || COPY.none,
             <Link key="history" prefetch={false} className="text-primary hover:underline"
               href={href({ tab: 'affiliates', id: r.affiliate_user_id, section: r.level === 2 ? 'bonuses' : 'commissions', commission: r.id }) + '#commission-history'}>
               {DOSSIER.history}
