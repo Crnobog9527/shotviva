@@ -26,7 +26,7 @@ describe('toCompanyItems', () => {
   it('builds the reader\'s own works from their full rows, and marks the personal ones', () => {
     const items = toCompanyItems([row('a', ME), row('b', ME, { orgWork: false })], deps([job('a'), job('b')]))
     expect(items.map((i) => [i.id, i.personal, i.maker, i.fileUrl])).toEqual([['a', false, undefined, '/api/files/a'], ['b', true, undefined, '/api/files/b']])
-    expect(items[0]).toMatchObject({ aspect: '1:1', resolution: '2k', thumbUrl: '/api/files/a/thumb' })
+    expect(items[0]).toMatchObject({ aspect: '1:1', resolution: '2k', thumbUrl: '/api/files/a/thumb?size=tile' })
   })
 
   it('makes a colleague\'s work a reduced item served by the org route, never the reader\'s own', () => {
