@@ -1,0 +1,62 @@
+'use client'
+
+/* eslint-disable @next/next/no-img-element -- local photo previews and template covers */
+import { ChevronRightIcon } from 'lucide-react'
+import { useTranslations } from 'next-intl'
+
+import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
+import { cn } from '@/core/ui/cn'
+
+import { coverOf, type ReviewActions } from './review-actions'
+import { groupSummary, type ReviewGroup } from './review-groups'
+import { ReviewRowView } from './review-row'
+
+type Props = { group: ReviewGroup; open: boolean; onToggle(): void; actions: ReviewActions }
+
+// One template's results (or one photo's), folding under its head (Owner 2026-11-28). Folded,
+// the head still says what the group makes: count, tiers, notes, credits.
+export function ReviewGroupView({ group, open, onToggle, actions }: Props) {
+  const panel = `group-${group.by}-${group.id}`
+  return (
+    <section className="hairline-lit rounded-[20px] bg-card">
+      <h3>
+        <button type="button" aria-expanded={open} aria-controls={panel} onClick={onToggle} className="press flex min-h-16 w-full items-center gap-2.5 px-3 py-2 text-left">
+          <ChevronRightIcon aria-hidden="true" className={cn('size-[18px] flex-none text-muted-foreground transition-transform duration-200', open && 'rotate-90')} />
+          <GroupImage group={group} />
+          <GroupTitle group={group} />
+        </button>
+      </h3>
+      {open ? (
+        <ul id={panel} className="divide-y divide-hairline border-t border-hairline">
+          {group.rows.map((row) => <ReviewRowView key={row.cell.key} row={row} by={group.by} actions={actions} />)}
+        </ul>
+      ) : null}
+    </section>
+  )
+}
+
+function GroupImage({ group }: { group: ReviewGroup }) {
+  const first = group.rows[0]!
+  const src = group.by === 'template' ? coverOf(first.cell) : first.photo.url
+  return (
+    <span className="hairline block size-10 flex-none overflow-hidden rounded-[10px] bg-muted">
+      {src ? <img src={src} alt="" loading="lazy" decoding="async" className={cn('size-full object-cover', group.by === 'photo' && REPLAY_BLOCK_CLASS)} /> : null}
+    </span>
+  )
+}
+
+function GroupTitle({ group }: { group: ReviewGroup }) {
+  const t = useTranslations('app.matrix.review')
+  const first = group.rows[0]!
+  const summary = groupSummary(group)
+  const title = group.by === 'template' ? first.cell.template.name : `${t('photoGroup', { index: first.index + 1 })}${first.photo.name ? ` · ${first.photo.name}` : ''}`
+  const tiers = summary.tiers.map(([tier, count]) => `${tier.toUpperCase()}×${count}`).join(' ')
+  return (
+    <span className="min-w-0 flex-1">
+      <b className="block truncate text-body leading-[1.25] font-semibold">{title}</b>
+      <span className="line-clamp-2 text-caption text-muted-foreground md:line-clamp-1">
+        {t('groupSummary', { kept: summary.kept, tiers, notes: summary.notes, credits: summary.credits })}
+      </span>
+    </span>
+  )
+}

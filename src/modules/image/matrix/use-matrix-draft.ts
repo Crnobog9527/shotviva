@@ -20,9 +20,11 @@ import { EMPTY_MATRIX, matrixBlock, matrixCells, matrixTotal, sharedOptions, typ
 export const MATRIX_VIEW = 'matrix'
 
 // `caps` is what one batch may hold on this plan (Pro 1 template × 10, Max 5 templates, 30 in all).
-type Input = { templates: readonly CatalogueTemplate[]; initial: string[]; balance: Balance; limit: number; caps: BatchCaps }
+// `promo`: an active member of an affiliate org, whose batch may use 1K from the promotion share
+// (2034); everyone else's batch is paid only.
+type Input = { templates: readonly CatalogueTemplate[]; initial: string[]; balance: Balance; limit: number; caps: BatchCaps; promo?: boolean }
 
-export function useMatrixDraft({ templates, initial, balance, limit, caps }: Input) {
+export function useMatrixDraft({ templates, initial, balance, limit, caps, promo = false }: Input) {
   const photos = usePhotoBatch(caps.cells)
   const [requested, setValues] = useState<MatrixValues>(() => ({ ...EMPTY_MATRIX, templateIds: initial.slice(0, caps.templates) }))
   const [checking, setChecking] = useState(false)
@@ -35,14 +37,14 @@ export function useMatrixDraft({ templates, initial, balance, limit, caps }: Inp
   const selected = requested.templateIds.flatMap((id) => byId.get(id) ?? [])
   const forms = useCatalogueForms(selected)
   const chosen = selected.map(forms.fill)
-  const options = sharedOptions(chosen)
+  const options = sharedOptions(chosen, promo)
   // A choice the current templates cannot make moves to the nearest one they share.
   const values = { ...requested, resolution: closestResolution(requested.resolution, options) ?? requested.resolution, aspect: selectedAspect(requested.aspect, options) }
-  const cells = matrixCells(chosen, photos.photos.filter((photo) => photo.upload.phase !== 'error'), values)
+  const cells = matrixCells(chosen, photos.photos.filter((photo) => photo.upload.phase !== 'error'), values, promo)
   const block = matrixBlock(cells, chosen.length, { picked: photos.summary.planned, uploading: photos.summary.photo === 'uploading' }, options, caps.cells)
   const total = matrixTotal(cells)
   const count = cells.filter((cell) => !cell.removed).length
-  const cta = matrixCta(block, total, count, balance, checking || !forms.ready)
+  const cta = matrixCta(block, cells, count, balance, checking || !forms.ready)
 
   const change = (next: (current: MatrixValues) => MatrixValues) => {
     setError(null)
@@ -65,7 +67,7 @@ export function useMatrixDraft({ templates, initial, balance, limit, caps }: Inp
     return { started: true }
   }
 
-  return { caps, photos, values, change, setValues, chosen, options, cells, total, count, cta, start, error, forms }
+  return { caps, promo, balance, photos, values, change, setValues, chosen, options, cells, total, count, cta, start, error, forms }
 }
 
 export type MatrixDraft = ReturnType<typeof useMatrixDraft>

@@ -3,14 +3,16 @@ import { toggleRequest } from '../toggles'
 import { chosenAspect } from '../workspace/output-choice'
 import { photoNameFor } from '../batch/preflight'
 import type { ReadyPhoto } from '../workspace/photo-batch'
+import { sentNote } from './cell-edits'
 import { keptCells, sharedOptions, type MatrixCell, type MatrixValues } from './matrix-state'
 
 export type MatrixStart = { inputs: StartInput[]; names: string[] }
 
-// One job per kept cell, in grid order (the batch position). Every cell has the batch's one
-// resolution and one size: when the templates cannot follow each photo's own shape, the first
-// photo's nearest shared size is used for all. Text is the template's shared text with the
-// photo's override on top; toggles are the template's.
+// One job per kept cell, in grid order (the batch position). Every cell has the batch's one size:
+// when the templates cannot follow each photo's own shape, the first photo's nearest shared size
+// is used for all. Each cell sends its own tier and its own note (Owner 2026-11-28); the server
+// appends the note to the template's prompt and prices the cell by its template alone. Text is
+// the template's shared text with the photo's override on top; toggles are the template's.
 export function matrixStartInputs(cells: readonly MatrixCell[], values: MatrixValues, ready: readonly ReadyPhoto[]): MatrixStart | null {
   const kept = keptCells(cells)
   const byId = new Map(ready.map((entry, index) => [entry.photo.id, { entry, index }]))
@@ -18,20 +20,22 @@ export function matrixStartInputs(cells: readonly MatrixCell[], values: MatrixVa
   const options = sharedOptions([...new Set(kept.map((cell) => cell.template))])
   const first = byId.get(kept[0]!.photo.id)!.entry.photo
   const aspect = chosenAspect(values.aspect, options, first.originalRatio)
-  if (!aspect || !options.resolutions.includes(values.resolution)) return null
+  if (!aspect || kept.some((cell) => cell.tier === null)) return null
   const inputs = kept.map((cell): StartInput => {
     const { entry } = byId.get(cell.photo.id)!
     const { template } = cell
+    const resolution = cell.tier!
     const toggles = toggleRequest(template.toggles, values.toggles[template.id] ?? {})
+    const note = sentNote(cell.note)
     return {
       templateId: template.id,
       templateName: template.name,
-      resolution: values.resolution,
+      resolution,
       aspect,
       credits: cell.credits,
       inputKey: entry.inputKey,
       previewUrl: entry.photo.url,
-      body: { expected_credits: cell.credits, template_id: template.id, input_key: entry.inputKey, inputs: { copy: cell.copy, resolution: values.resolution, aspect_ratio: aspect, ...toggles } },
+      body: { expected_credits: cell.credits, template_id: template.id, input_key: entry.inputKey, inputs: { copy: cell.copy, resolution, aspect_ratio: aspect, ...(note ? { note } : {}), ...toggles } },
     }
   })
   const names = kept.map((cell) => {
