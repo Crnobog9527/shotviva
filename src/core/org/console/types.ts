@@ -83,6 +83,9 @@ export type StaffCard = {
   // The same for promotion credits (free pool, watermarked, expire at month end); null when unread.
   promo: { allowance: number; held: number; allocated: number; used: number } | null
   customers: number
+  // Whether the org runs the enterprise affiliate program: without it (a workspace bought only as a
+  // production tool) the member gets no promotion link, customers or promotion credits.
+  withAffiliate: boolean
   // Whether the org has level 2 on (the card shows the level-2 line only then).
   withLevel2: boolean
   // 'YYYY-MM' (UTC) the figures below are for; performance is null when they could not be read.
