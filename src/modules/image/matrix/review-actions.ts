@@ -3,6 +3,8 @@ import type { CellKey, MatrixCell } from './matrix-state'
 // What a row can do, handed down from the review list so each row stays a plain view.
 export type ReviewActions = {
   promo: boolean
+  selected: ReadonlySet<CellKey>
+  toggleSelect(key: CellKey): void
   editing: CellKey | null
   setEditing(key: CellKey | null): void
   setNote(key: CellKey, note: string): void

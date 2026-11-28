@@ -2,6 +2,8 @@
 
 import { useTranslations } from 'next-intl'
 
+import { BulkNoteSheet } from './bulk-note-sheet'
+import { cellTier } from './cell-choices'
 import { CoverZoom } from './cover-zoom'
 import { totalsByResolution } from './matrix-state'
 import { TierSheet } from './tier-sheet'
@@ -14,7 +16,9 @@ export function ReviewSheets({ draft, list }: { draft: MatrixDraft; list: Review
   return (
     <>
       {list.tierFor === 'batch' ? <BatchTierSheet draft={draft} list={list} /> : null}
-      {list.tierFor && list.tierFor !== 'batch' ? <CellTierSheet key={list.tierFor} draft={draft} list={list} /> : null}
+      {list.tierFor === 'selection' ? <SelectionTierSheet draft={draft} list={list} /> : null}
+      {list.tierFor && list.tierFor !== 'batch' && list.tierFor !== 'selection' ? <CellTierSheet key={list.tierFor} draft={draft} list={list} /> : null}
+      {list.noteOpen ? <BulkNoteSheet cells={draft.cells.filter((cell) => list.bulk.selected.has(cell.key))} onClose={() => list.setNoteOpen(false)} onApply={list.noteSelected} /> : null}
       <CoverZoom rows={list.rows} at={list.zoomAt} onAt={list.setZoomAt} />
     </>
   )
@@ -66,6 +70,32 @@ function BatchTierSheet({ draft, list }: { draft: MatrixDraft; list: ReviewList 
       promo={draft.promo}
       onPick={(tier) => {
         list.pickTier('batch', tier, false)
+        close()
+      }}
+    />
+  )
+}
+
+// The picked results' tier: every tier any of them offers, each priced as the picked results
+// would cost at it (each takes the nearest tier its template sells).
+function SelectionTierSheet({ draft, list }: { draft: MatrixDraft; list: ReviewList }) {
+  const t = useTranslations('app.matrix.review')
+  const picked = draft.cells.filter((cell) => list.bulk.selected.has(cell.key))
+  const tiers = draft.options.resolutions.filter((tier) => picked.some((cell) => cell.tiers.includes(tier)))
+  const cost = (tier: (typeof tiers)[number]) => picked.reduce((sum, cell) => sum + cell.template.creditsCost[cellTier(tier, cell.tiers) ?? tier], 0)
+  const close = () => list.setTierFor(null)
+  const single = new Set(picked.map((cell) => cell.tier))
+  return (
+    <TierSheet
+      open
+      onOpenChange={(open) => !open && close()}
+      title={t('bulkTierTitle', { count: picked.length })}
+      description={t('bulkTierLine')}
+      choices={tiers.map((tier) => ({ tier, credits: cost(tier) }))}
+      current={single.size === 1 ? [...single][0]! : null}
+      promo={draft.promo}
+      onPick={(tier) => {
+        list.pickTier('selection', tier, false)
         close()
       }}
     />

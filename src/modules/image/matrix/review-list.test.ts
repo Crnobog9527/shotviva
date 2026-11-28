@@ -35,7 +35,7 @@ describe('the review list (Owner 2026-11-28)', () => {
 
   it('lists each result with its tier and price, its note or the note prompt, and the skipped ones', () => {
     const html = render(values, false)
-    for (const text of ['付费积分', '批量只用付费积分', '整批档位', '按模板', '按照片', '全部收起', '模板a', '第 1 张', '去掉盘边的葱花', '补充说明（选填）', '例如：去掉盘边的葱花', '已跳过，不扣积分', '>2K<', '>90<']) {
+    for (const text of ['付费积分', '批量只用付费积分', '整批档位', '按模板', '按照片', '全部收起', '全选', '选这组', '选择这张', '模板a', '第 1 张', '去掉盘边的葱花', '补充说明（选填）', '例如：去掉盘边的葱花', '已跳过，不扣积分', '>2K<', '>90<']) {
       expect(html).toContain(text)
     }
     expect(html).not.toContain('推广积分')
