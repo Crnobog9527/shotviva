@@ -10,7 +10,7 @@ import { currentLocale } from '@/core/i18n/server'
 import { r2Origin, r2Store } from '@/core/storage'
 import { cachedPosterTemplates, cachedWebTemplates, EDIT_TEMPLATE_ID } from '@/core/templates'
 import { readCompanySeat } from '@/core/org/works'
-import { DoneGrid, PhotosCount, RunningList, toPhotoItem, type TemplateLookup } from '@/modules/image'
+import { DoneGrid, PhotosCount, toPhotoItem, type TemplateLookup } from '@/modules/image'
 
 import { CompanyPhotos } from './company-screen'
 import { createWorkShareAction } from './share-actions'
@@ -60,12 +60,11 @@ async function Photos({ back, until, member }: Asked) {
   return (
     <>
       <Header aside={<PhotosCount runningIds={running.map((item) => item.id)} done={own.total} />} />
-      <RunningList server={running} covers={covers} />
       <DoneGrid
         items={done}
         now={now}
         timeZone={timeZone}
-        anyRunning={running.length > 0}
+        running={{ server: running, covers }}
         liveTemplates={liveTemplates}
         share={createWorkShareAction}
         total={own.total}
