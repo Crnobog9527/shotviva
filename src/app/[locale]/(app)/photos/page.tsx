@@ -24,6 +24,7 @@ export default function PhotosPage({ searchParams }: PageProps<'/[locale]/photos
       member={asked('member')}
       category={asked('category')}
       mark={asked('mark')}
+      cc={asked('cc')}
       extra={
         <Suspense>
           <Deleted searchParams={searchParams} />

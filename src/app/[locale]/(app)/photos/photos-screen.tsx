@@ -5,7 +5,7 @@ import { preconnect } from 'react-dom'
 
 import { AppPage, TabRootHeader } from '@/core/app-shell'
 import { createAdminSupabase, requireUser } from '@/core/auth'
-import { decodeOwnJobsCursor, encodeOwnJobsCursor, fileUrlFor, FIRST_SCREEN_THUMBS, firstThumbUrls, listOwnJobs, listOwnPhotoCategories, ownJobsFilterFrom, type OwnPhotoCategory } from '@/core/jobs'
+import { decodeOwnJobsCursor, encodeOwnJobsCursor, fileUrlFor, FIRST_SCREEN_THUMBS, firstThumbUrls, listOwnJobs, listOwnPhotoCategories, ownJobsFilterFrom, type OwnJobsFilter, type OwnPhotoCategory } from '@/core/jobs'
 import { currentLocale } from '@/core/i18n/server'
 import { logger } from '@/core/logger'
 import { r2Origin, r2Store } from '@/core/storage'
@@ -32,9 +32,13 @@ function Header({ aside }: { aside?: ReactNode }) {
 // category, mark: the personal page's filter (?category=<root category>, ?mark=watermark), one at
 // a time; the company view has its own rail and ignores them.
 type Query = Promise<string | undefined>
-type Asked = { back: string | Promise<string>; until?: Query; member?: Query; category?: Query; mark?: Query }
+// cc: the company view's category chips, carried on Load more's pages.
+type Asked = { back: string | Promise<string>; until?: Query; member?: Query; category?: Query; mark?: Query; cc?: Query }
 
-async function Photos({ back, until, member, category, mark }: Asked) {
+// The company view takes the category alone (it has no watermark filter).
+const categoryOf = (filter: OwnJobsFilter | null) => (filter && 'category' in filter ? filter.category : null)
+
+async function Photos({ back, until, member, category, mark, cc }: Asked) {
   const user = await requireUser(await back)
   const now = new Date()
   const cursor = decodeOwnJobsCursor(await until)
@@ -68,7 +72,7 @@ async function Photos({ back, until, member, category, mark }: Asked) {
   const timeZone = PHOTOS_ZONE[locale] ?? 'UTC'
   const liveTemplates = templates.map((template) => template.id)
   if (seat) {
-    return <CompanyPhotos db={db} userId={user.id} seat={seat} now={now} timeZone={timeZone} filter={(await member) ?? null} until={cursor} lookup={lookup} liveTemplates={liveTemplates} covers={covers} />
+    return <CompanyPhotos db={db} userId={user.id} seat={seat} now={now} timeZone={timeZone} filter={(await member) ?? null} category={categoryOf(filter)} carried={await cc} until={cursor} lookup={lookup} liveTemplates={liveTemplates} covers={covers} />
   }
   const [personal, categories] = await Promise.all([works, offered])
   // Not a company member here, so the list was read.
