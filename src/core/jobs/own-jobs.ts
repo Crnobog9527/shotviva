@@ -33,14 +33,30 @@ const before = (c: OwnJobsCursor) => `created_at.lt."${c.createdAt}",and(created
 
 type Row = Record<string, unknown> & { id: string; created_at: string }
 
-export async function listOwnJobs(client: SupabaseClient, userId: string, now: Date, until: OwnJobsCursor | null = null, window = MAX_WINDOW): Promise<OwnJobs> {
+// Photos' filter (作品页改版 PR③): one root template category, or the works that carry a
+// watermark. One at a time. Under a filter the list is finished works only (none developing).
+export type OwnJobsFilter = { category: string } | { watermarked: true }
+
+const FILTER_KEY = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/
+
+// From the address (?category=, ?mark=watermark); anything else is no filter.
+export function ownJobsFilterFrom(category: unknown, mark: unknown): OwnJobsFilter | null {
+  if (typeof category === 'string' && category.length <= 64 && FILTER_KEY.test(category)) return { category }
+  return mark === 'watermark' ? { watermarked: true } : null
+}
+
+// Where the user's listed works are read: the table, or under a filter own_photos_filtered
+// (migration 2039), which returns the same rows narrowed, so every query below reads either.
+function ownWorks(client: SupabaseClient, userId: string, filter: OwnJobsFilter | null, columns: string, count?: { count: 'exact' }) {
+  if (!filter) return client.from('generation_jobs').select(columns, count).eq('user_id', userId).is('deleted_at', null).is('org_access_ended_at', null)
+  const args = 'category' in filter ? { p_user: userId, p_category: filter.category } : { p_user: userId, p_watermarked: true }
+  return client.rpc('own_photos_filtered', args, count).select(columns)
+}
+
+export async function listOwnJobs(client: SupabaseClient, userId: string, now: Date, until: OwnJobsCursor | null = null, window = MAX_WINDOW, filter: OwnJobsFilter | null = null): Promise<OwnJobs> {
   const base = (ascending = false) =>
-    client
-      .from('generation_jobs')
-      .select(JOB_COLUMNS)
-      .eq('user_id', userId)
+    ownWorks(client, userId, filter, JOB_COLUMNS)
       .in('status', LISTED)
-      .is('deleted_at', null).is('org_access_ended_at', null)
       .order('created_at', { ascending })
       .order('id', { ascending })
   const read = async (query: PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<Row[]> => {
@@ -51,7 +67,7 @@ export async function listOwnJobs(client: SupabaseClient, userId: string, now: D
   const [above, page, total] = await Promise.all([
     until ? read(base(true).or(atOrAfter(until)).limit(window)) : Promise.resolve([] as Row[]),
     read((until ? base().or(before(until)) : base()).limit(PHOTOS_PAGE + 1)),
-    countDone(client, userId),
+    countDone(client, userId, filter),
   ])
   // next always comes from the page below the cursor, so each Load more moves one page on.
   const below = page.slice(0, PHOTOS_PAGE)
@@ -61,18 +77,14 @@ export async function listOwnJobs(client: SupabaseClient, userId: string, now: D
   const listed = rows.map((row) => jobRowSchema.parse(row))
   // Cut at either end (more below, or the window full above): a batch may straddle the cut.
   const cut = next !== null || above.length >= window
-  const jobs = cut ? await withWholeBatches(client, userId, listed) : listed
+  const jobs = cut ? await withWholeBatches(client, userId, listed, filter) : listed
   const live = (job: Job) => isLiveRunning({ status: job.status, created_at: job.createdAt.toISOString() }, now)
   return { running: jobs.filter(live), done: jobs.filter((job) => job.status === 'succeeded'), total, next }
 }
 
-async function countDone(client: SupabaseClient, userId: string): Promise<number> {
-  const { count, error } = await client
-    .from('generation_jobs')
-    .select('id', { count: 'exact' })
-    .eq('user_id', userId)
+async function countDone(client: SupabaseClient, userId: string, filter: OwnJobsFilter | null): Promise<number> {
+  const { count, error } = await ownWorks(client, userId, filter, 'id', { count: 'exact' })
     .eq('status', 'succeeded')
-    .is('deleted_at', null).is('org_access_ended_at', null)
     .limit(1)
   if (error) throw new AppError('INTERNAL', `listOwnJobs count failed: ${error.message}`)
   return count ?? 0
@@ -97,20 +109,33 @@ export function decodeOwnJobsCursor(value: unknown): OwnJobsCursor | null {
 // A batch cut by the page window (its older photos past the cut) would show fewer photos and
 // a smaller ZIP count than it has (T107): its missing finished photos are read in too, one
 // query over generation_jobs_batch_slot. A batch is at most 30 photos. The next page then
-// leaves them out (Photos drops a work it already shows).
-async function withWholeBatches(client: SupabaseClient, userId: string, jobs: Job[]): Promise<Job[]> {
+// leaves them out (Photos drops a work it already shows). Under a filter, only the batch's
+// photos the filter keeps.
+async function withWholeBatches(client: SupabaseClient, userId: string, jobs: Job[], filter: OwnJobsFilter | null = null): Promise<Job[]> {
   const batchIds = [...new Set(jobs.flatMap((job) => (job.batchId ? [job.batchId] : [])))]
   if (batchIds.length === 0) return jobs
-  const { data, error } = await client
-    .from('generation_jobs')
-    .select(JOB_COLUMNS)
-    .eq('user_id', userId)
+  const { data, error } = await ownWorks(client, userId, filter, JOB_COLUMNS)
     .in('batch_id', batchIds)
     .eq('status', 'succeeded')
-    .is('deleted_at', null).is('org_access_ended_at', null)
   if (error) throw new AppError('INTERNAL', `listOwnJobs batches failed: ${error.message}`)
   const seen = new Set(jobs.map((job) => job.id))
-  return [...jobs, ...data.map((row) => jobRowSchema.parse(row)).filter((job) => !seen.has(job.id))]
+  return [...jobs, ...(data as unknown as Row[]).map((row) => jobRowSchema.parse(row)).filter((job) => !seen.has(job.id))]
+}
+
+// What the filter offers: each category the user has finished works in (an edit counts with the
+// work it was made from), how many, and how many of them carry a watermark. Built-in categories
+// (system: an edit whose original is gone) come too, so `works` adds up to every finished work.
+export type OwnPhotoCategory = { key: string; nameEn: string; nameZh: string; system: boolean; works: number; watermarked: number }
+
+const categoryRows = z.array(z.object({
+  category_key: z.string(), name_en: z.string(), name_zh: z.string(), is_system: z.boolean(),
+  works: z.number().int(), watermarked: z.number().int(),
+}))
+
+export async function listOwnPhotoCategories(client: SupabaseClient, userId: string): Promise<OwnPhotoCategory[]> {
+  const { data, error } = await client.rpc('own_photo_categories', { p_user: userId })
+  if (error) throw new AppError('INTERNAL', `listOwnPhotoCategories failed: ${error.message}`)
+  return categoryRows.parse(data).map((row) => ({ key: row.category_key, nameEn: row.name_en, nameZh: row.name_zh, system: row.is_system, works: row.works, watermarked: row.watermarked }))
 }
 
 // The company view of Photos (core/org/works/photos.ts) lists other people's works too; the

@@ -5,12 +5,13 @@ import { preconnect } from 'react-dom'
 
 import { AppPage, TabRootHeader } from '@/core/app-shell'
 import { createAdminSupabase, requireUser } from '@/core/auth'
-import { decodeOwnJobsCursor, encodeOwnJobsCursor, fileUrlFor, FIRST_SCREEN_THUMBS, firstThumbUrls, listOwnJobs } from '@/core/jobs'
+import { decodeOwnJobsCursor, encodeOwnJobsCursor, fileUrlFor, FIRST_SCREEN_THUMBS, firstThumbUrls, listOwnJobs, listOwnPhotoCategories, ownJobsFilterFrom, type OwnPhotoCategory } from '@/core/jobs'
 import { currentLocale } from '@/core/i18n/server'
+import { logger } from '@/core/logger'
 import { r2Origin, r2Store } from '@/core/storage'
 import { cachedPosterTemplates, cachedWebTemplates, EDIT_TEMPLATE_ID } from '@/core/templates'
 import { readCompanySeat } from '@/core/org/works'
-import { DoneGrid, PhotosCount, toPhotoItem, type TemplateLookup } from '@/modules/image'
+import { DoneGrid, offersFilter, PhotoFilterRail, PhotosCount, photosHref, toPhotoItem, type TemplateLookup } from '@/modules/image'
 
 import { CompanyPhotos } from './company-screen'
 import { createWorkShareAction } from './share-actions'
@@ -27,18 +28,27 @@ function Header({ aside }: { aside?: ReactNode }) {
 // sign-in returns to (a work's own address on /photos/[jobId]). until: ?until= from Load more,
 // the last work already shown (own-jobs.ts); the page then lists down to it and one page more.
 // member: ?member= on the company view (whose works; §6.5「作品页就是企业作品」), ignored elsewhere.
-type Asked = { back: string | Promise<string>; until?: Promise<string | undefined>; member?: Promise<string | undefined> }
+// category, mark: the personal page's filter (?category=<root category>, ?mark=watermark), one at
+// a time; the company view has its own rail and ignores them.
+type Query = Promise<string | undefined>
+type Asked = { back: string | Promise<string>; until?: Query; member?: Query; category?: Query; mark?: Query }
 
-async function Photos({ back, until, member }: Asked) {
+async function Photos({ back, until, member, category, mark }: Asked) {
   const user = await requireUser(await back)
   const now = new Date()
   const cursor = decodeOwnJobsCursor(await until)
+  const filter = ownJobsFilterFrom(await category, await mark)
   const db = createAdminSupabase()
   // An active member of an org whose workspace is on sees the company's works here instead. The
   // personal list is read alongside, not after, so nobody else waits for the seat check; a
   // company member's copy of it is dropped.
   // The first screen's small copies are signed while the templates are still being read.
-  const works = listOwnJobs(db, user.id, now, cursor).then(async (own) => ({ own, signed: await firstThumbUrls(r2Store, own.done, FIRST_SCREEN_THUMBS, 'tile') }))
+  // What the filter offers is read alongside. Without it the page still lists (no rail).
+  const offered = listOwnPhotoCategories(db, user.id).catch((error: unknown) => {
+    logger.error('photos.categories_failed', { error })
+    return [] as OwnPhotoCategory[]
+  })
+  const works = listOwnJobs(db, user.id, now, cursor, undefined, filter).then(async (own) => ({ own, signed: await firstThumbUrls(r2Store, own.done, FIRST_SCREEN_THUMBS, 'tile') }))
   works.catch(() => undefined)
   const locale = await currentLocale()
   const [seat, templates, posters] = await Promise.all([readCompanySeat(db, user.id), cachedWebTemplates(locale, true), cachedPosterTemplates(locale)])
@@ -54,21 +64,25 @@ async function Photos({ back, until, member }: Asked) {
   if (seat) {
     return <CompanyPhotos db={db} userId={user.id} seat={seat} now={now} timeZone={timeZone} filter={(await member) ?? null} until={cursor} lookup={lookup} liveTemplates={liveTemplates} covers={covers} />
   }
-  const { own, signed } = await works
+  const [{ own, signed }, categories] = await Promise.all([works, offered])
+  // Every finished work, whatever the filter: the header's count.
+  const all = categories.reduce((sum, c) => sum + c.works, 0) || own.total
   const running = own.running.map((job) => toPhotoItem(job, lookup, null, fallback))
   const done = own.done.map((job) => toPhotoItem(job, lookup, fileUrlFor(job.id), fallback, signed.get(job.id)))
   return (
     <>
-      <Header aside={<PhotosCount runningIds={running.map((item) => item.id)} done={own.total} />} />
+      <Header aside={<PhotosCount runningIds={running.map((item) => item.id)} done={all} />} />
       <DoneGrid
         items={done}
         now={now}
         timeZone={timeZone}
-        running={{ server: running, covers }}
+        // Under a filter the grid is finished works only: none developing, this tab's included.
+        running={filter ? null : { server: running, covers }}
         liveTemplates={liveTemplates}
         share={createWorkShareAction}
         total={own.total}
-        more={own.next ? `/photos?until=${encodeOwnJobsCursor(own.next)}` : null}
+        more={own.next ? photosHref(filter, encodeOwnJobsCursor(own.next)) : null}
+        rail={offersFilter(categories, filter) ? { filter: <PhotoFilterRail categories={categories} current={filter} />, emptyNote: tp('filter.empty') } : undefined}
       />
     </>
   )
@@ -76,7 +90,7 @@ async function Photos({ back, until, member }: Asked) {
 
 // The grid, on /photos and under the viewer on /photos/[jobId] (a link to a work, a refresh).
 // The Photos layout's viewer opens the work from the address.
-export function PhotosScreen({ back, until, member, extra }: Asked & { extra?: ReactNode }) {
+export function PhotosScreen({ extra, ...asked }: Asked & { extra?: ReactNode }) {
   // The first screen's pictures come straight from R2: the connection opens with the page's shell,
   // while the list is still being read, instead of when the first <img> arrives.
   const origin = r2Origin()
@@ -84,7 +98,7 @@ export function PhotosScreen({ back, until, member, extra }: Asked & { extra?: R
   return (
     <AppPage wide>
       <Suspense fallback={<Header />}>
-        <Photos back={back} until={until} member={member} />
+        <Photos {...asked} />
       </Suspense>
       {extra}
     </AppPage>
