@@ -26,20 +26,21 @@ import type { CreateShareAction } from '../work-share/share-types'
 // shows the work's small copy, never the full file (ARCHITECTURE §8.3「作品小图」). share: with it,
 // a Share button next to "Done" turns on picking works for one share link (§6.2「作品集分享」).
 // more: the next page's address while older works remain (LoadMore); total: every finished work.
-// company: Photos' company view (§6.5「作品页就是企业作品」): the filter rail under the heading, what
-// an empty filter says, and the org owner's delete for colleagues' works (null for staff).
-export type CompanyGrid = { filter: ReactNode; emptyNote: string; remove: DeleteCompanyWork | null }
+// rail: the filter under the heading and what an empty filter says: the personal page's
+// categories, or on the company view (§6.5「作品页就是企业作品」) whose works, with the org owner's
+// delete for colleagues' works (remove; null for staff and on the personal page).
+export type GridRail = { filter: ReactNode; emptyNote: string; remove?: DeleteCompanyWork | null }
 // running: the photos still developing (the server's, the tab adds its own) and the covers that
 // stand in for them; they are the first tiles of Today. null: none are shown at all, this tab's
 // own included (the company view under a filter that leaves the reader out).
 export type Running = { server: PhotoItem[]; covers: Record<string, string | null> }
-type Props = { items: PhotoItem[]; now: Date; timeZone: string; running: Running | null; liveTemplates: string[]; share?: CreateShareAction; more?: string | null; total?: number; company?: CompanyGrid }
+type Props = { items: PhotoItem[]; now: Date; timeZone: string; running: Running | null; liveTemplates: string[]; share?: CreateShareAction; more?: string | null; total?: number; rail?: GridRail }
 
-export function DoneGrid({ items, now, timeZone, running, liveTemplates, share, more = null, total = items.length, company }: Props) {
+export function DoneGrid({ items, now, timeZone, running, liveTemplates, share, more = null, total = items.length, rail }: Props) {
   const t = useTranslations('app')
   const format = useFormatter()
   const today = t('photos.today')
-  if (items.length === 0) return <Nothing company={company} running={running} today={today} />
+  if (items.length === 0) return <Nothing rail={rail} running={running} today={today} />
   const entries = groupByBatch(items)
   // Display order: what the viewer steps through.
   const ordered = entries.flatMap((entry) => (entry.kind === 'photo' ? [entry.item] : entry.items))
@@ -52,7 +53,7 @@ export function DoneGrid({ items, now, timeZone, running, liveTemplates, share, 
   // A colleague's work is not the reader's: its own tile and viewer, and never the reader's viewer.
   const card = (item: PhotoItem) =>
     item.maker ? (
-      <ColleagueCard item={item} place={at(item)} remove={company?.remove ?? null} />
+      <ColleagueCard item={item} place={at(item)} remove={rail?.remove ?? null} />
     ) : (
       <DoneCard item={item} meta={tileMeta(item, t)} live={liveTemplates.includes(item.templateId)} place={at(item)} />
     )
@@ -63,7 +64,7 @@ export function DoneGrid({ items, now, timeZone, running, liveTemplates, share, 
         <h2 id="done-h" className="text-headline leading-[1.2] font-semibold tracking-[-0.01em]">{t('photos.done')}</h2>
         {share ? <ShareToggle /> : null}
       </div>
-      {company?.filter}
+      {rail?.filter}
       <Days entries={entries} zone={{ now, timeZone }} running={running} today={today} whole={more === null} draw={{ card, when, slot: (id) => place.get(id) ?? EAGER_TILES }} />
       {more ? <LoadMore href={more} shown={items.length} total={total} /> : null}
       <p className="mx-(--gutter) mt-6 max-w-[72ch] text-caption leading-[1.4] text-muted-foreground">{t('photos.footnote')}</p>
@@ -96,20 +97,20 @@ function Days({ entries, zone, running, today, whole, draw }: DaysProps) {
 
 // No finished work: the developing ones alone under Today, or the empty state (which hides itself
 // while this tab has a photo developing the server did not list).
-function Nothing({ company, running, today }: { company?: CompanyGrid; running: Running | null; today: string }) {
+function Nothing({ rail, running, today }: { rail?: GridRail; running: Running | null; today: string }) {
   const developing = running ? <RunningList server={running.server} covers={running.covers} today={today} /> : null
-  if (company) return <>{developing}<CompanyEmpty company={company} /></>
+  if (rail) return <>{developing}<FilteredEmpty rail={rail} /></>
   return <>{developing}{running && running.server.length > 0 ? null : <PhotosEmpty />}</>
 }
 
-// The company view with nothing under the chosen filter: the rail stays, so the way back is there.
-function CompanyEmpty({ company }: { company: CompanyGrid }) {
+// Nothing under the chosen filter: the rail stays, so the way back is there.
+function FilteredEmpty({ rail }: { rail: GridRail }) {
   const t = useTranslations('app.photos')
   return (
     <section aria-labelledby="done-h">
       <h2 id="done-h" className="mx-(--gutter) mt-6 text-headline leading-[1.2] font-semibold tracking-[-0.01em] md:mt-8">{t('done')}</h2>
-      {company.filter}
-      <p className="hairline-lit mx-(--gutter) mt-4 rounded-panel bg-card p-4 text-label text-muted-foreground">{company.emptyNote}</p>
+      {rail.filter}
+      <p className="hairline-lit mx-(--gutter) mt-4 rounded-panel bg-card p-4 text-label text-muted-foreground">{rail.emptyNote}</p>
     </section>
   )
 }

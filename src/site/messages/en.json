@@ -1215,6 +1215,7 @@
       "tileMeta": "{size} · {tier}",
       "developing": "{count, plural, one {# photo} other {# photos}} developing",
       "company": {"close": "Close", "all": "Everyone", "mine": "Mine", "personal": "Personal", "owner": "Main admin", "deleted": "Deleted member", "unknown": "Account", "left": "{who} (left)", "leftMark": "left", "filterLabel": "Whose photos", "madeBy": "{who} · {date}", "download": "Download original", "viewOnly": "A colleague's photo: you can view and download it.", "empty": "Nobody in the company has made a photo yet.", "emptyFilter": "No photos here yet."},
+      "filter": {"label": "Filter by category", "all": "All", "watermark": "Watermarked", "empty": "No photos here yet."},
       "dayCount": "{count, plural, one {# photo} other {# photos}}",
       "waiting": "Waiting for a free slot",
       "loadMore": "Load more",

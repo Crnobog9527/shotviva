@@ -33,7 +33,41 @@ const before = (c: OwnJobsCursor) => `created_at.lt."${c.createdAt}",and(created
 
 type Row = Record<string, unknown> & { id: string; created_at: string }
 
-export async function listOwnJobs(client: SupabaseClient, userId: string, now: Date, until: OwnJobsCursor | null = null, window = MAX_WINDOW): Promise<OwnJobs> {
+// Photos' filter (作品页改版 PR③): one root template category, or the works that carry a
+// watermark. One at a time. Under a filter the list is finished works only (none developing).
+export type OwnJobsFilter = { category: string } | { watermarked: true }
+
+const FILTER_KEY = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/
+
+// From the address (?category=, ?mark=watermark); anything else is no filter.
+export function ownJobsFilterFrom(category: unknown, mark: unknown): OwnJobsFilter | null {
+  if (typeof category === 'string' && category.length <= 64 && FILTER_KEY.test(category)) return { category }
+  return mark === 'watermark' ? { watermarked: true } : null
+}
+
+// Under a filter the rows come from own_photos_filtered (migration 2039), which takes the cursor
+// and the limit itself and reads one page through the same index; it returns generation_jobs rows.
+const filterArgs = (userId: string, filter: OwnJobsFilter) =>
+  'category' in filter ? { p_user: userId, p_category: filter.category } : { p_user: userId, p_watermarked: true }
+
+type Read = PromiseLike<{ data: unknown; error: { message: string } | null }>
+const rowsOf = async (query: Read, what: string): Promise<Row[]> => {
+  const { data, error } = await query
+  if (error) throw new AppError('INTERNAL', `${what} failed: ${error.message}`)
+  return data as Row[]
+}
+
+// The two reads of a list: the window from the cursor up to the newest (oldest first), and the
+// page below the cursor (newest first), one row more than a page to know whether more remain.
+function pageReads(client: SupabaseClient, userId: string, until: OwnJobsCursor | null, window: number, filter: OwnJobsFilter | null): [Read | null, Read] {
+  if (filter) {
+    const args = filterArgs(userId, filter)
+    const rpc = (more: Record<string, unknown>) => client.rpc('own_photos_filtered', { ...args, ...more }).select(JOB_COLUMNS)
+    return [
+      until ? rpc({ p_limit: window, p_from_at: until.createdAt, p_from_id: until.id }) : null,
+      rpc({ p_limit: PHOTOS_PAGE + 1, ...(until ? { p_before_at: until.createdAt, p_before_id: until.id } : {}) }),
+    ]
+  }
   const base = (ascending = false) =>
     client
       .from('generation_jobs')
@@ -43,16 +77,24 @@ export async function listOwnJobs(client: SupabaseClient, userId: string, now: D
       .is('deleted_at', null).is('org_access_ended_at', null)
       .order('created_at', { ascending })
       .order('id', { ascending })
-  const read = async (query: PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<Row[]> => {
-    const { data, error } = await query
-    if (error) throw new AppError('INTERNAL', `listOwnJobs failed: ${error.message}`)
-    return data as Row[]
-  }
+  return [until ? base(true).or(atOrAfter(until)).limit(window) : null, (until ? base().or(before(until)) : base()).limit(PHOTOS_PAGE + 1)]
+}
+
+// filter: the list narrowed (finished works only). total stays every finished work, whatever the
+// filter; how many the filter holds is listOwnPhotoCategories' count.
+export async function listOwnJobs(client: SupabaseClient, userId: string, now: Date, until: OwnJobsCursor | null = null, window = MAX_WINDOW, filter: OwnJobsFilter | null = null): Promise<OwnJobs> {
+  const [up, down] = pageReads(client, userId, until, window, filter)
   const [above, page, total] = await Promise.all([
-    until ? read(base(true).or(atOrAfter(until)).limit(window)) : Promise.resolve([] as Row[]),
-    read((until ? base().or(before(until)) : base()).limit(PHOTOS_PAGE + 1)),
+    up ? rowsOf(up, 'listOwnJobs') : Promise.resolve([] as Row[]),
+    rowsOf(down, 'listOwnJobs'),
     countDone(client, userId),
   ])
+  // The function answers a union: put each read in its own order whatever came back.
+  const newestFirst = (x: Row, y: Row) => (x.created_at === y.created_at ? (x.id < y.id ? 1 : -1) : x.created_at < y.created_at ? 1 : -1)
+  if (filter) {
+    above.sort((x, y) => -newestFirst(x, y))
+    page.sort(newestFirst)
+  }
   // next always comes from the page below the cursor, so each Load more moves one page on.
   const below = page.slice(0, PHOTOS_PAGE)
   const rows = [...above.reverse(), ...below]
@@ -61,7 +103,7 @@ export async function listOwnJobs(client: SupabaseClient, userId: string, now: D
   const listed = rows.map((row) => jobRowSchema.parse(row))
   // Cut at either end (more below, or the window full above): a batch may straddle the cut.
   const cut = next !== null || above.length >= window
-  const jobs = cut ? await withWholeBatches(client, userId, listed) : listed
+  const jobs = cut ? await withWholeBatches(client, userId, listed, filter) : listed
   const live = (job: Job) => isLiveRunning({ status: job.status, created_at: job.createdAt.toISOString() }, now)
   return { running: jobs.filter(live), done: jobs.filter((job) => job.status === 'succeeded'), total, next }
 }
@@ -97,20 +139,39 @@ export function decodeOwnJobsCursor(value: unknown): OwnJobsCursor | null {
 // A batch cut by the page window (its older photos past the cut) would show fewer photos and
 // a smaller ZIP count than it has (T107): its missing finished photos are read in too, one
 // query over generation_jobs_batch_slot. A batch is at most 30 photos. The next page then
-// leaves them out (Photos drops a work it already shows).
-async function withWholeBatches(client: SupabaseClient, userId: string, jobs: Job[]): Promise<Job[]> {
+// leaves them out (Photos drops a work it already shows). Under a filter, only the batch's
+// photos the filter keeps.
+async function withWholeBatches(client: SupabaseClient, userId: string, jobs: Job[], filter: OwnJobsFilter | null = null): Promise<Job[]> {
   const batchIds = [...new Set(jobs.flatMap((job) => (job.batchId ? [job.batchId] : [])))]
   if (batchIds.length === 0) return jobs
-  const { data, error } = await client
-    .from('generation_jobs')
-    .select(JOB_COLUMNS)
-    .eq('user_id', userId)
-    .in('batch_id', batchIds)
-    .eq('status', 'succeeded')
-    .is('deleted_at', null).is('org_access_ended_at', null)
-  if (error) throw new AppError('INTERNAL', `listOwnJobs batches failed: ${error.message}`)
+  const query: Read = filter
+    ? client.rpc('own_photos_filtered', { ...filterArgs(userId, filter), p_batches: batchIds, p_limit: MAX_WINDOW }).select(JOB_COLUMNS)
+    : client
+        .from('generation_jobs')
+        .select(JOB_COLUMNS)
+        .eq('user_id', userId)
+        .in('batch_id', batchIds)
+        .eq('status', 'succeeded')
+        .is('deleted_at', null).is('org_access_ended_at', null)
+  const data = await rowsOf(query, 'listOwnJobs batches')
   const seen = new Set(jobs.map((job) => job.id))
   return [...jobs, ...data.map((row) => jobRowSchema.parse(row)).filter((job) => !seen.has(job.id))]
+}
+
+// What the filter offers: each category the user has finished works in (an edit counts with the
+// work it was made from), how many, and how many of them carry a watermark. Built-in categories
+// (system: an edit whose original is gone) come too, so `works` adds up to every finished work.
+export type OwnPhotoCategory = { key: string; nameEn: string; nameZh: string; system: boolean; works: number; watermarked: number }
+
+const categoryRows = z.array(z.object({
+  category_key: z.string(), name_en: z.string(), name_zh: z.string(), is_system: z.boolean(),
+  works: z.number().int(), watermarked: z.number().int(),
+}))
+
+export async function listOwnPhotoCategories(client: SupabaseClient, userId: string): Promise<OwnPhotoCategory[]> {
+  const { data, error } = await client.rpc('own_photo_categories', { p_user: userId })
+  if (error) throw new AppError('INTERNAL', `listOwnPhotoCategories failed: ${error.message}`)
+  return categoryRows.parse(data).map((row) => ({ key: row.category_key, nameEn: row.name_en, nameZh: row.name_zh, system: row.is_system, works: row.works, watermarked: row.watermarked }))
 }
 
 // The company view of Photos (core/org/works/photos.ts) lists other people's works too; the
