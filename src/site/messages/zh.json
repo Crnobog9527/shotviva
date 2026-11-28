@@ -547,7 +547,7 @@
         "next": "下一张",
         "selectAll": "全选",
         "selectGroup": "选这组",
-        "selectRow": "选择这张",
+        "selectRow": "选择第 {index, number} 张 · {template}",
         "selected": "已选 <mono>{count, number}</mono> 张",
         "bulkTier": "档位",
         "bulkNote": "补充说明",
@@ -569,7 +569,8 @@
         "doneSkip": "已跳过 {count, number} 张",
         "doneRestore": "已恢复 {count, number} 张",
         "doneCopy": "已用到 {count, number} 张",
-        "undo": "撤销"
+        "undo": "撤销",
+        "selectGroupNamed": "选这组：{name}"
       }
     },
     "batchZip": {

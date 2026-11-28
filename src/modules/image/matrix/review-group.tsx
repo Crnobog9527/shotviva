@@ -7,7 +7,7 @@ import { useTranslations } from 'next-intl'
 import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
 import { cn } from '@/core/ui/cn'
 
-import { CheckBox } from './check-box'
+import { CheckBox, pressedOf } from './check-box'
 import { coverOf, type ReviewActions } from './review-actions'
 import { groupSummary, type ReviewGroup } from './review-groups'
 import { ReviewRowView } from './review-row'
@@ -31,7 +31,7 @@ export function ReviewGroupView({ group, open, onToggle, onSelect, actions }: Pr
             <GroupTitle group={group} />
           </button>
         </h3>
-        <button type="button" aria-pressed={state === 'on'} aria-label={t('selectGroup')} onClick={() => onSelect(state !== 'on')} className="inline-flex min-h-11 flex-none items-center gap-2 px-2 text-caption font-medium text-bone-dim hover:text-foreground">
+        <button type="button" aria-pressed={pressedOf(state)} aria-label={t('selectGroupNamed', { name: groupName(group, t) })} onClick={() => onSelect(state !== 'on')} className="inline-flex min-h-11 flex-none items-center gap-2 px-2 text-caption font-medium text-bone-dim hover:text-foreground">
           <CheckBox state={state} />
           <span className="max-md:hidden">{t('selectGroup')}</span>
         </button>
@@ -57,9 +57,8 @@ function GroupImage({ group }: { group: ReviewGroup }) {
 
 function GroupTitle({ group }: { group: ReviewGroup }) {
   const t = useTranslations('app.matrix.review')
-  const first = group.rows[0]!
   const summary = groupSummary(group)
-  const title = group.by === 'template' ? first.cell.template.name : `${t('photoGroup', { index: first.index + 1 })}${first.photo.name ? ` · ${first.photo.name}` : ''}`
+  const title = groupName(group, t)
   const tiers = summary.tiers.map(([tier, count]) => `${tier.toUpperCase()}×${count}`).join(' ')
   return (
     <span className="min-w-0 flex-1">
@@ -69,4 +68,11 @@ function GroupTitle({ group }: { group: ReviewGroup }) {
       </span>
     </span>
   )
+}
+
+// A template group by its template; a photo group by its place in the batch and its file name.
+function groupName(group: ReviewGroup, t: ReturnType<typeof useTranslations<'app.matrix.review'>>): string {
+  const first = group.rows[0]!
+  if (group.by === 'template') return first.cell.template.name
+  return `${t('photoGroup', { index: first.index + 1 })}${first.photo.name ? ` · ${first.photo.name}` : ''}`
 }

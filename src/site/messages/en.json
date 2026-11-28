@@ -547,7 +547,7 @@
         "next": "Next",
         "selectAll": "Select all",
         "selectGroup": "Select group",
-        "selectRow": "Select this image",
+        "selectRow": "Select photo {index, number} · {template}",
         "selected": "<mono>{count, number}</mono> selected",
         "bulkTier": "Resolution",
         "bulkNote": "Note",
@@ -569,7 +569,8 @@
         "doneSkip": "{count, plural, one {# image} other {# images}} skipped",
         "doneRestore": "{count, plural, one {# image} other {# images}} brought back",
         "doneCopy": "Note used for {count, plural, one {# image} other {# images}}",
-        "undo": "Undo"
+        "undo": "Undo",
+        "selectGroupNamed": "Select group: {name}"
       }
     },
     "batchZip": {
