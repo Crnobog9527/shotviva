@@ -1,81 +1,20 @@
-import { readPoolChoiceOffer, spendableBalance } from '@/core/org'
-import { unstable_rethrow } from 'next/navigation'
-import { Suspense } from 'react'
+import { EARLY_TOUCH_SCRIPT, type HomeGeneratorProps } from '@/modules/image/marketing'
 
-import { createAdminSupabase, createServerSupabase, getSessionUser } from '@/core/auth'
-import { batchLimitsOf, effectiveLimits, readBalance } from '@/core/billing'
-import { PaywallProvider } from '@/core/billing/paywall/provider'
-import { walletOffersWechat } from '@/core/billing/wallet'
-import { StandingSlot } from '@/core/billing/standing'
-import { paymentChannel } from '@/core/billing/waffo'
-import { listFavoriteIdsOrEmpty } from '@/core/favorites'
-import { listRunningJobIds } from '@/core/jobs'
-import { logger } from '@/core/logger'
-import { EARLY_TOUCH_SCRIPT, HomeGenerator, type HomeGeneratorProps, type HomeViewer } from '@/modules/image/marketing'
-import { displayProducts } from '@/site/billing/display-products'
+import { HomeViewerGate } from './home-viewer-gate'
 
-import { paywallPerkFacts } from '../paywall-perk-facts'
+type Base = Omit<HomeGeneratorProps, 'viewer' | 'settled'>
 
-type Base = Omit<HomeGeneratorProps, 'viewer'>
-
-// The visitor half of the home generator: the only request-time read on the page. Everything
-// else (copy, templates, samples) is in the prerendered shell (建站规格 R5).
-async function viewerOf(): Promise<HomeViewer | null> {
-  const user = await getSessionUser()
-  if (!user?.verified) return null
-  const supabase = await createServerSupabase()
-  const admin = createAdminSupabase()
-  const [balance, limits, runningIds, favoriteIds, poolChoice] = await Promise.all([
-    readBalance(supabase, user.id).then((own) => spendableBalance(admin, user.id, own)),
-    // effective_limits() (tier, an unbanned admin as Max, plus the org lift) is service-role only; the user's own id comes from the session.
-    effectiveLimits(admin, user.id),
-    listRunningJobIds(admin, user.id, new Date()),
-    // A failed read degrades to no favorites (logged), never to an error page or signed-out home.
-    listFavoriteIdsOrEmpty(supabase, user.id),
-    // 出图时让员工自选 (§6.5), as Create reads it: the template panel's form takes it.
-    readPoolChoiceOffer(admin, user.id),
-  ])
-  return { balance, concurrency: { limit: limits.concurrency, runningIds }, favoriteIds, tier: limits.tier, batch: batchLimitsOf(limits), poolChoice }
-}
-
-// The home page is everyone's first page: an auth or database hiccup shows the signed-out
-// generator instead of an error page.
-async function safeViewer(): Promise<HomeViewer | null> {
-  try {
-    return await viewerOf()
-  } catch (error) {
-    // Next's own control flow (prerender bail-outs, redirects) must pass through.
-    unstable_rethrow(error)
-    logger.error('home.viewer_read_failed', { error })
-    return null
-  }
-}
-
-async function WithViewer(props: Base) {
-  const viewer = await safeViewer()
-  if (!viewer) return <HomeGenerator {...props} viewer={null} />
-  const [perkFacts, products] = await Promise.all([paywallPerkFacts(), displayProducts()])
-  // "Get credits · N needed" opens the same paywall as the workspace (DESIGN §6.9 item 9).
-  return (
-    <PaywallProvider products={products} perkFacts={perkFacts} channel={paymentChannel()} wechatPay={walletOffersWechat()}>
-      <HomeGenerator {...props} viewer={viewer} />
-      {/* What the member holds, so the paywall locks lower plans (T66). */}
-      <StandingSlot />
-    </PaywallProvider>
-  )
-}
-
-// While the session streams in, the generator shows as for a signed-out visitor; it is not
-// settled, so a ?panel= in the address waits for the generator that replaces it.
+// The home generator, signed out in the static HTML (建站规格 R5: copy, templates and samples are
+// all in it). The visitor half is asked for by the browser, and only when a session cookie is
+// there (home-viewer-gate.tsx): the page itself reads nothing at request time, so it prerenders
+// fully static and hydrates without waiting for a function.
 export function HomeGeneratorSlot(props: Base) {
   return (
     <>
       {/* A card that will swap to a random 精选组合 template notes a touch before hydration, so it
           then stays as the visitor saw it (modules/image/home/early-touch.ts). */}
       {props.shuffle ? <script dangerouslySetInnerHTML={{ __html: EARLY_TOUCH_SCRIPT }} /> : null}
-      <Suspense fallback={<HomeGenerator {...props} viewer={null} settled={false} />}>
-        <WithViewer {...props} />
-      </Suspense>
+      <HomeViewerGate {...props} />
     </>
   )
 }
