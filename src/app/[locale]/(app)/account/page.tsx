@@ -71,7 +71,7 @@ async function Account() {
   const more = payments.length >= PICKER_LIMIT
   // Each line with its receipt / invoice links (T80); the support picker keeps the plain labels.
   const lines = purchaseLines(payments, purchases, locale)
-  const data = { email: user.email, phone: maskPhone(user.phone) || null, balance, giftRefused: signupGift.reason, subscription, since, lastMembership: last, works, purchases: lines, morePurchases: more, helpUnread, graylum, graylumLinks: graylumIntroLinks(serverEnv().VERCEL_ENV), affiliate, admin: user.role === 'admin', orgStaff: org.kind === 'member' && org.status === 'active' }
+  const data = { email: user.email, phone: maskPhone(user.phone) || null, balance, giftRefused: signupGift.reason, subscription, since, lastMembership: last, works, purchases: lines, morePurchases: more, helpUnread, graylum, graylumLinks: graylumIntroLinks(serverEnv().VERCEL_ENV), affiliate, admin: user.role === 'admin', orgStaff: buysThroughOrg(org) }
   // Help & feedback opens over the page (?help=…, T68); its payments picker is the Purchases list.
   return (
     <>
@@ -92,6 +92,12 @@ async function Account() {
 // while the org is active (2032) or runs the affiliate program (2035, A2: then the code is the
 // org's), so the personal invite card would promise rewards that do not come. They promote with
 // the org's links instead.
+// Staff of an org whose workspace is on buy nothing for themselves (ORG_MEMBER_CHECKOUT); with the
+// workspace off they buy and spend their own credits (2034).
+function buysThroughOrg(view: Awaited<ReturnType<typeof readOrgView>>) {
+  return view.kind === 'member' && view.status === 'active'
+}
+
 // Codes (Owner 2026-11-28): the redeem route refuses every code for an active member of an active
 // org, the main admin included (2032), so the code box is hidden for them. With the workspace off
 // the route accepts codes and the member can spend what they get (2034), so it shows again.
