@@ -36,7 +36,7 @@ async function deleteOne(deps: { db: SupabaseClient; store: ObjectStore }, userI
     if (appError.code === 'NOT_FOUND') return 'deleted'
     if (appError.code === 'CONFLICT') return 'running'
     if (appError.code === 'FORBIDDEN') return 'org'
-    logger.error('photos.bulk_delete.failed', { jobId, error: appError.cause ?? appError })
+    logger.error('bulk_delete.failed', { jobId, error: appError.cause ?? appError })
     return 'failed'
   }
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { namedFor } from '../batch/photo-save'
-import { DOWNLOAD_GAP_MS, downloadEach, downloadHref, pickedLinks, pickedSource } from './bulk-save'
+import { downloadEach, downloadHref, fetchWork, nameFrom, pickedLinks, pickedSource } from './bulk-save'
 
 const A = '11111111-1111-4111-8111-111111111111'
 const B = '22222222-2222-4222-8222-222222222222'
@@ -17,21 +17,56 @@ describe('saving the works picked on Photos', () => {
     expect(await pickedSource([])()).toEqual({ kind: 'error', code: 'NOT_FOUND' })
   })
 
-  it('starts the downloads one after another, apart', async () => {
+  it('fetches and saves one work at a time, and counts only what arrived', async () => {
     const log: string[] = []
-    const steps: number[] = []
-    const started = await downloadEach([A, B], (n) => steps.push(n), () => true, (href) => log.push(href), async (ms) => void log.push(`wait ${ms}`))
-    expect(started).toBe(2)
-    expect(log).toEqual([downloadHref(A), `wait ${DOWNLOAD_GAP_MS}`, downloadHref(B)])
-    expect(steps).toEqual([1, 2])
+    const steps: string[] = []
+    const get = async (id: string) => {
+      log.push(`get ${id}`)
+      return id === B ? null : { name: `${id}.png`, blob: new Blob(['x']) }
+    }
+    const progress = await downloadEach([A, B, A], (p) => steps.push(`${p.saved}/${p.failed}`), () => true, get, (file) => void log.push(`save ${file.name}`))
+    expect(progress).toEqual({ saved: 2, failed: 1 })
+    expect(log).toEqual([`get ${A}`, `save ${A}.png`, `get ${B}`, `get ${A}`, `save ${A}.png`])
+    expect(steps).toEqual(['1/0', '1/1', '2/1'])
   })
 
-  it('stops when the bar is gone', async () => {
-    const log: string[] = []
+  it('stops when the bar is gone, without saving the file in flight', async () => {
+    const saved: string[] = []
     let alive = true
-    const started = await downloadEach([A, B], () => { alive = false }, () => alive, (href) => log.push(href), async () => undefined)
-    expect(started).toBe(1)
-    expect(log).toEqual([downloadHref(A)])
+    const get = async (id: string) => {
+      alive = false
+      return { name: id, blob: new Blob(['x']) }
+    }
+    expect(await downloadEach([A, B], () => undefined, () => alive, get, (file) => void saved.push(file.name))).toEqual({ saved: 0, failed: 0 })
+    expect(saved).toEqual([])
+  })
+
+})
+
+describe('one picked work\'s file', () => {
+  it('fetches a work from its own route with the session, named as the route named it', async () => {
+    const calls: [string, RequestInit | undefined][] = []
+    const answer = (init: ResponseInit, body = 'x') => async (url: RequestInfo | URL, options?: RequestInit) => {
+      calls.push([String(url), options])
+      return new Response(body, init)
+    }
+    const named = await fetchWork(A, answer({ headers: { 'Content-Type': 'image/jpeg', 'Content-Disposition': `attachment; filename="shotviva-${A}.jpg"` } }))
+    expect(named?.name).toBe(`shotviva-${A}.jpg`)
+    expect(calls[0]).toEqual([downloadHref(A), { credentials: 'same-origin', cache: 'no-store' }])
+    // Redirected to storage: the header is not readable there, so the name follows the bytes.
+    expect((await fetchWork(A, answer({ headers: { 'Content-Type': 'image/png' } })))?.name).toBe(`shotviva-${A}.png`)
+    expect((await fetchWork(A, answer({ headers: { 'Content-Type': 'image/jpeg' } })))?.name).toBe(`shotviva-${A}.jpg`)
+    // Refused, missing or offline: not a download.
+    expect(await fetchWork(A, answer({ status: 404 }))).toBeNull()
+    expect(await fetchWork(A, async () => { throw new Error('offline') })).toBeNull()
+  })
+
+  it('reads the file name from Content-Disposition', () => {
+    expect(nameFrom('attachment; filename="a b.png"')).toBe('a b.png')
+    expect(nameFrom("attachment; filename*=UTF-8''%E8%8F%9C.png")).toBe('菜.png')
+    expect(nameFrom("attachment; filename*=UTF-8''%E0%A4%A")).toBeNull()
+    expect(nameFrom('attachment')).toBeNull()
+    expect(nameFrom(null)).toBeNull()
   })
 
   it('names a saved file by what its bytes are', () => {

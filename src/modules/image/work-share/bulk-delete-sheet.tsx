@@ -1,10 +1,11 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 
 import { buttonVariants } from '@/core/ui/button'
 import { cn } from '@/core/ui/cn'
+import { useRouter } from '@/core/i18n/navigation'
 import { ResponsiveSheet } from '@/core/ui/responsive-sheet'
 
 import type { BulkDeleteAction, BulkDeleteResult } from './share-types'
@@ -17,15 +18,30 @@ type Props = { open: boolean; onOpenChange(open: boolean): void; jobIds: readonl
 export function BulkDeleteSheet({ open, onOpenChange, jobIds, remove, onDone }: Props) {
   const t = useTranslations('app.workShare.bulk')
   const [result, setResult] = useState<BulkDeleteResult | null>(null)
-  const [pending, start] = useTransition()
+  // The action itself failed (signed out, offline, a server error): said here, never the page's
+  // error screen. Some works may already be gone, so the list is read again; trying again is
+  // safe, since a work that is already deleted counts as deleted.
+  const [broken, setBroken] = useState(false)
+  // Its own flag, not a transition: the list's refresh after a failure must not keep the sheet
+  // locked while it loads (or never arrives, offline).
+  const [pending, setPending] = useState(false)
+  const router = useRouter()
   const count = jobIds.length
-  const confirm = () =>
-    start(async () => {
+  const confirm = async () => {
+    setPending(true)
+    setBroken(false)
+    try {
       const outcome = await remove([...jobIds])
       const kept = outcome.running + outcome.org + outcome.failed
       if (kept === 0) return onDone()
       setResult(outcome)
-    })
+    } catch {
+      setBroken(true)
+      router.refresh()
+    } finally {
+      setPending(false)
+    }
+  }
   const close = (next: boolean) => {
     if (pending) return
     if (!next && result) return onDone()
@@ -39,8 +55,13 @@ export function BulkDeleteSheet({ open, onOpenChange, jobIds, remove, onDone }: 
         </button>
       ) : (
         <>
-          <button type="button" disabled={pending} onClick={confirm} className={cn(buttonVariants({ variant: 'cta', size: 'cta' }), 'mt-6 bg-destructive text-background')}>
-            {t(pending ? 'deleting' : 'deleteConfirm', { count })}
+          {broken ? (
+            <p role="alert" className="mt-4 text-caption text-destructive">
+              {t('deleteError')}
+            </p>
+          ) : null}
+          <button type="button" disabled={pending} onClick={() => void confirm()} className={cn(buttonVariants({ variant: 'cta', size: 'cta' }), 'mt-6 bg-destructive text-background')}>
+            {t(pending ? 'deleting' : broken ? 'deleteRetry' : 'deleteConfirm', { count })}
           </button>
           <button type="button" disabled={pending} onClick={() => close(false)} className="mt-2 min-h-11 w-full text-label font-medium text-bone-dim">
             {t('cancel')}
