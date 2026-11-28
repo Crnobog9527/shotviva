@@ -60,7 +60,7 @@ async function Workspace({ searchParams }: { searchParams: Promise<{ month?: str
 async function MemberArea({ data }: { data: StaffCard }) {
   const t = await getTranslations('app.org.staff')
   return (
-    <EnterpriseFrame orgName={data.orgName} current="workspace" affiliate={false} role="member" intro={t('pageIntro')}>
+    <EnterpriseFrame orgName={data.orgName} current="workspace" affiliate={false} role="member" intro={t(data.withAffiliate ? 'pageIntro' : 'pageIntroNoAffiliate')}>
       <MemberOrgView data={data} />
     </EnterpriseFrame>
   )

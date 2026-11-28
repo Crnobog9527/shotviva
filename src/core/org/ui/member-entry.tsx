@@ -9,6 +9,12 @@ import { InviteLinkBox } from './invite-link-box'
 import { LinkCallout } from './link-callout'
 import { Stat } from './parts'
 
+// Promotion credits come only with the enterprise affiliate program (1842). An org that has just
+// left it still shows what its member holds until the month-end expiry clears it.
+export function showsPromo(data: StaffCard) {
+  return data.withAffiliate || (data.promo?.held ?? 0) > 0
+}
+
 // Where a member's org row goes: their own view inside the org (customers, month in detail).
 export const MEMBER_ORG_HREF = '/account/enterprise'
 
@@ -24,17 +30,19 @@ export function MemberEntry({ data }: { data: StaffCard }) {
       <Link href={MEMBER_ORG_HREF} className={rowClass}>
         <span className="min-w-0">
           <span className="block truncate font-medium">{data.orgName}</span>
-          <span className="block text-caption text-muted-foreground">{data.status === 'suspended' ? t('suspended') : t('entryHint')}</span>
+          <span className="block text-caption text-muted-foreground">{data.status === 'suspended' ? t('suspended') : t(data.withAffiliate ? 'entryHint' : 'entryHintNoAffiliate')}</span>
         </span>
         <RowValue>{t('open')}</RowValue>
       </Link>
       <div className="grid grid-cols-2 gap-3 py-3">
         <Stat label={t('paidLeft')} value={format.number(data.heldCredits)} note={t('monthly', { count: format.number(data.monthlyAllowance) })} />
-        <Stat
-          label={t('promoLeftLabel')}
-          value={data.promo ? format.number(data.promo.held) : '—'}
-          note={data.promo ? t('monthly', { count: format.number(data.promo.allowance) }) : undefined}
-        />
+        {showsPromo(data) ? (
+          <Stat
+            label={t('promoLeftLabel')}
+            value={data.promo ? format.number(data.promo.held) : '—'}
+            note={data.promo ? t('monthly', { count: format.number(data.promo.allowance) }) : undefined}
+          />
+        ) : null}
       </div>
     </RowsPanel>
   )

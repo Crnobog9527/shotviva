@@ -29,7 +29,7 @@ export function PerformancePanel({ report }: { report: OwnerReport | null }) {
   const levels = [{ n: 1 as const, show: report.withAffiliate }, { n: 2 as const, show: report.withLevel2 }].filter((l) => l.show)
   const label = (row: ReportRow) => row.account ?? t('unknown')
   return (
-    <Panel title={t('title')} hint={t('hint')}>
+    <Panel title={t('title')} hint={t(report.withAffiliate ? 'hint' : 'hintNoAffiliate')}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <nav aria-label={t('month')} className="flex items-center gap-1">
           {report.previous ? <Link href={`/account/enterprise?month=${report.previous}`} aria-label={t('previous')} className={nav}>‹</Link> : <span aria-hidden className={`${nav} opacity-30`}>‹</span>}
@@ -77,7 +77,7 @@ export function PerformancePanel({ report }: { report: OwnerReport | null }) {
           </tfoot>
         </table>
       </div>
-      <p className="text-caption text-muted-foreground">{t('definition')}</p>
+      <p className="text-caption text-muted-foreground">{t(report.withAffiliate ? 'definition' : 'definitionNoAffiliate')}</p>
     </Panel>
   )
 }

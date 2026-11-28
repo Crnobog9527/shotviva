@@ -77,7 +77,7 @@ async function Account() {
     <>
       <AccountView data={data} actions={actions} site={{ brand: site.brand.name, products: offers, freeCredits: signupGift.granted }}>
         {claimOptions ? <GiftClaimCard credits={claimCredits} options={claimOptions} actions={claimActions} /> : null}
-        <OrgBlock view={org} memberLink={org.kind === 'member' ? <Suspense fallback={null}><MemberLink user={user.id} /></Suspense> : null} customerLink={org.kind === 'owner' && org.org.affiliateEnabled && affiliate ? <Suspense fallback={null}><OwnerCustomerLink user={user.id} /></Suspense> : null} />
+        <OrgBlock view={org} memberLink={memberLinkFor(org, user.id)} customerLink={org.kind === 'owner' && org.org.affiliateEnabled && affiliate ? <Suspense fallback={null}><OwnerCustomerLink user={user.id} /></Suspense> : null} />
         <StoreCard actions={storeActions} />
         {/* 2032: an org staff code earns no personal invite rewards; members promote with the org link above. */}
         {!orgInvites(org) && <InviteCard load={loadMyInvites} />}
@@ -128,6 +128,12 @@ function OrgBlock({ view, customerLink, memberLink }: { view: Awaited<ReturnType
 async function OwnerCustomerLink({ user }: { user: string }) {
   const url = await enterpriseCustomerLink(user)
   return url ? <CustomerLinkRow url={url} /> : null
+}
+
+// Only an org that runs the affiliate program gives its members a promotion link: one bought just as
+// a production tool has no customers to bring (Owner 2026-11-28).
+function memberLinkFor(view: Awaited<ReturnType<typeof readOrgView>>, user: string) {
+  return view.kind === 'member' && view.withAffiliate ? <Suspense fallback={null}><MemberLink user={user} /></Suspense> : null
 }
 
 // Streams in too: a member's promotion link, their own invite code on the page's language.

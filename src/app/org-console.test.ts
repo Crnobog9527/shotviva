@@ -14,6 +14,8 @@ vi.mock('@/core/analytics/replay', () => ({ REPLAY_BLOCK_CLASS: 'sv-replay-block
 
 const { OwnerConsoleView, OwnerEntryRow, PurchasingView } = await import('@/core/org/ui/owner-console')
 const { MembersPanel } = await import('@/core/org/ui/members-panel')
+const { PoolPanel } = await import('@/core/org/ui/owner-panels')
+const { PerformancePanel } = await import('@/core/org/ui/performance-panel')
 const { JoinForm } = await import('@/core/org/ui/join-form')
 
 // Fake data only: no real company, account or price.
@@ -85,6 +87,32 @@ describe.each(['en', 'zh'] as const)('monthly table (%s)', (locale) => {
     // No affiliate: no customer columns and no customer download.
     const none = render(locale, createElement(OwnerConsoleView, { data: owner(), actions: ownerActions, affiliate: true, report: report({ withAffiliate: false, withLevel2: false }) }))
     expect(none.html).not.toContain('kind=customers')
+  })
+})
+
+describe.each(['en', 'zh'] as const)('pool panel without the affiliate program (%s)', (locale) => {
+  it('shows no promotion pool and no move-in form when there is nothing to move in', () => {
+    const { text, html, errors } = render(locale, createElement(PoolPanel, { data: owner({ affiliateEnabled: false, promoPoolCredits: 0, promoExpiresAt: null }, { depositable: 0 }), actions: ownerActions }))
+    expect(errors).toEqual([])
+    expect(text).toContain('120,000')
+    expect(text).not.toMatch(/Promotion|推广/)
+    expect(html).not.toMatch(/<form|<input/)
+    // Purchases going straight into the pool is still said.
+    expect(text).toMatch(locale === 'en' ? /goes straight into the pool/ : /直接存入积分池/)
+  })
+
+  it('keeps the move-in form while the owner holds paid credits, and promotion credits left this month', () => {
+    const { text, html } = render(locale, createElement(PoolPanel, { data: owner({ affiliateEnabled: false, promoPoolCredits: 300 }, { depositable: 700 }), actions: ownerActions }))
+    expect(html).toContain('<form')
+    expect(text).toContain('700')
+    expect(text).toContain(locale === 'en' ? 'Promotion pool' : '推广积分池')
+  })
+})
+
+describe.each(['en', 'zh'] as const)('monthly table without the affiliate program (%s)', (locale) => {
+  it('does not promise customers it does not show', () => {
+    const { text } = render(locale, createElement(PerformancePanel, { report: report({ withAffiliate: false, withLevel2: false }) }))
+    expect(text).not.toMatch(/customer|客户|Sign-ups|注册/i)
   })
 })
 
@@ -167,7 +195,7 @@ describe.each(['en', 'zh'] as const)('promotion pool (%s)', (locale) => {
     expect(month.text).toMatch(locale === 'en' ? /Taken back for refunds\s*1,234/ : /退款扣回\s*1,234/)
     expect(month.text).toMatch(locale === 'en' ? /Returned after a won dispute\s*567/ : /拒付胜诉还回\s*567/)
     // Deposit stays paid-only.
-    expect(text).toContain(locale === 'en' ? 'Deposit your own paid credits' : '存入自己的付费积分')
+    expect(text).toContain(locale === 'en' ? 'Move in paid credits already on your account' : '转入你账号里已有的付费积分')
     // Two forms per kind for the member whose editor is open: allowance and top-up.
     const open = render(locale, createElement(MembersPanel, { data: owner(), actions: ownerActions, initialOpen: MEMBER }))
     expect(open.text).toContain(locale === 'en' ? 'Monthly promotion allowance' : '推广月额度')
