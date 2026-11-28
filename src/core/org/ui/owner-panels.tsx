@@ -32,8 +32,9 @@ export function PoolPanel({ data, actions }: { data: OwnerConsole; actions: Owne
         {promo ? <PromoStat org={data.org} /> : null}
       </div>
       {promo ? <p className="text-caption text-muted-foreground">{t('promoHint')}</p> : null}
-      {/* With the workspace off, the main admin's purchases stay on their own account (2033). */}
-      <p className="text-caption text-muted-foreground">{t(data.org.status === 'active' ? 'purchaseNote' : 'purchaseNoteOff')}</p>
+      {/* Only while the workspace runs do the main admin's purchases go to the pool (2033); with it
+          off, nothing here invites a purchase (review on #985). */}
+      {data.org.status === 'active' ? <p className="text-caption text-muted-foreground">{t('purchaseNote')}</p> : null}
       <MoveInForm data={data} actions={actions} />
     </Panel>
   )
