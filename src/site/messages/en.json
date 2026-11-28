@@ -688,6 +688,8 @@
       "shelfCount": "{count, plural, one {# template} other {# templates}}",
       "shelfMore": "+{count} more",
       "shelfMoreAria": "See all {total} templates in {name}",
+      "shelfExpand": "Show {count} more",
+      "shelfCollapse": "Show fewer",
       "scrollBack": "Scroll back through {name}",
       "scrollOn": "Scroll on through {name}",
       "inSeries": "Series: {name}"

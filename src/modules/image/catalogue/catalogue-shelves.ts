@@ -46,4 +46,11 @@ export function categoryNameAt(filters: readonly FilterNode[], path: readonly st
   return name
 }
 
+// On a phone a shelf is a two-column grid, not a row that scrolls sideways (Owner 2026-11-28: people
+// took the one card on screen for the whole series). A series of up to PHONE_WHOLE shows whole; a
+// larger one shows PHONE_FIRST (two rows) over a button that opens the rest in place.
+export const PHONE_FIRST = 4
+export const PHONE_WHOLE = SHELF_LIMIT
+export const phoneFirst = (count: number): number => (count <= PHONE_WHOLE ? count : PHONE_FIRST)
+
 export const shelfMembers = (series: CatalogueSeries): CatalogueTemplate[] => series.members.slice(0, SHELF_LIMIT)
