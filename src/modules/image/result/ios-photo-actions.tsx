@@ -12,12 +12,15 @@ import { GroundedImg } from './grounded-img'
 import { handPhotoToSystem, type ShareMode } from './share-mode'
 
 // onSaved: the share sheet closed (T107 watermark moment; the OS does not say whether it saved).
-export function IosPhotoActions({ mode, fileUrl, onSaved }: { mode: ShareMode; fileUrl: string; onSaved?(): void }) {
+// holdHint: what the long press is called where this is not an iPhone (a phone whose browser
+// cannot share files: its menu says 保存图片, not 存储图像).
+export function IosPhotoActions({ mode, fileUrl, onSaved, holdHint }: { mode: ShareMode; fileUrl: string; onSaved?(): void; holdHint?: string }) {
   const t = useTranslations('app.result')
   const [unavailable, setUnavailable] = useState(false)
   const [sharing, setSharing] = useState(false)
   const [showPhoto, setShowPhoto] = useState(false)
   const fallback = mode.kind === 'download' || unavailable
+  const hold = holdHint ?? t('holdPhotoHint')
 
   async function saveToPhotos() {
     if (fallback) return setShowPhoto(true)
@@ -36,9 +39,9 @@ export function IosPhotoActions({ mode, fileUrl, onSaved }: { mode: ShareMode; f
       <button type="button" className={buttonVariants({ variant: 'cta', size: 'cta' })} disabled={mode.kind === 'loading' || sharing} onClick={saveToPhotos}>
         <ImageDownIcon />{t(mode.kind === 'loading' ? 'preparingPhoto' : 'saveToPhotos')}
       </button>
-      <p className="text-caption text-muted-foreground">{t(fallback ? 'holdPhotoHint' : 'saveToPhotosHint')}</p>
+      <p className="text-caption text-muted-foreground">{fallback ? hold : t('saveToPhotosHint')}</p>
       {showPhoto ? (
-        <ResponsiveSheet open onOpenChange={setShowPhoto} title={t('saveToPhotos')} description={t('holdPhotoHint')}>
+        <ResponsiveSheet open onOpenChange={setShowPhoto} title={t('saveToPhotos')} description={hold}>
           <GroundedImg src={fileUrl} alt={t('views.result')} data-vaul-no-drag="" className={`${REPLAY_BLOCK_CLASS} mt-4 block max-h-[65dvh] w-full object-contain`} />
         </ResponsiveSheet>
       ) : null}

@@ -1,23 +1,53 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 
 import { buttonVariants } from '@/core/ui/button'
 
-import { usePhoneSave } from '../batch/batch-save-button'
 import { PhotoSaveButton } from '../batch/photo-save-button'
+import { saveRoute } from './album-save'
+import { AlbumView } from './album-view'
 import { downloadEach, pickedSource, toDownload, type DownloadProgress } from './bulk-save'
+import type { BulkSavedAction } from './share-types'
 
-// "Download" for the works picked on Photos. On a phone that can share files they go to the
-// photo library through the share sheet, ten at a time (as a batch's Save all does); anywhere
-// else each file is fetched and saved on its own. Remount it (key) when the picked works change.
-export function BulkSaveButton({ jobIds }: { jobIds: readonly string[] }) {
-  const phone = usePhoneSave()
+// "Download" for the works picked on Photos, by what the browser can do (album-save.ts): a phone
+// that can share files sends them to the photo library through the share sheet, ten at a time (as
+// a batch's Save all does); a phone that cannot opens the album view, where a long press saves
+// each one to the gallery; a desktop fetches and saves each file. Remount it (key) when the
+// picked works change.
+export function BulkSaveButton({ jobIds, saved }: { jobIds: readonly string[]; saved?: BulkSavedAction }) {
+  const coarse = useCoarsePointer()
   const [refused, setRefused] = useState(false)
   const links = useMemo(() => pickedSource(jobIds), [jobIds])
-  if (phone && !refused) return <PhotoSaveButton links={links} count={jobIds.length} className="min-w-0 flex-1" onUnsupported={() => setRefused(true)} />
+  const route = coarse === null ? null : saveRoute(coarse, navigator, refused)
+  if (route === 'share') return <PhotoSaveButton links={links} count={jobIds.length} className="min-w-0 flex-1" onUnsupported={() => setRefused(true)} />
+  if (route === 'album') return <AlbumButton jobIds={jobIds} saved={saved} />
   return <DownloadEach jobIds={jobIds} />
+}
+
+const COARSE = '(pointer: coarse)'
+const subscribe = (notify: () => void) => {
+  const query = window.matchMedia(COARSE)
+  query.addEventListener('change', notify)
+  return () => query.removeEventListener('change', notify)
+}
+// null on the server; the bar itself only renders in the browser.
+const useCoarsePointer = () => useSyncExternalStore<boolean | null>(subscribe, () => window.matchMedia(COARSE).matches, () => null)
+
+// Opens the album view. The line under it says why this is not a plain download.
+function AlbumButton({ jobIds, saved }: { jobIds: readonly string[]; saved?: BulkSavedAction }) {
+  const t = useTranslations('app.workShare.bulk')
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="flex min-w-0 flex-1 flex-col">
+      <button type="button" aria-haspopup="dialog" onClick={() => setOpen(true)} className={buttonVariants({ variant: 'glass', size: 'touch', className: 'gap-2' })}>
+        {t('album', { count: jobIds.length })}
+      </button>
+      <p className="mt-1.5 text-caption leading-[1.4] text-muted-foreground">{t('albumWhy')}</p>
+      {open ? <AlbumView jobIds={jobIds} saved={saved} onClose={() => setOpen(false)} /> : null}
+    </div>
+  )
 }
 
 // done: what the finished runs came to (saved adds up over retries; failed is what is left).

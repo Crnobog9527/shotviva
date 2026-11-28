@@ -54,7 +54,7 @@ export { decodeChips, encodeChips } from './photos/company/category-chips'
 export { heldBy, offersFilter, PhotoFilterRail, photosHref } from './photos/photo-filter'
 export { toCompanyItems } from './photos/company/company-items'
 // 作品集分享 (§6.2): the Photos picker's action type and the Share links list.
-export type { BulkDeleteAction, BulkDeleteResult, CreateShareAction, CreateShareRequest, CreateShareResult } from './work-share/share-types'
+export type { BulkDeleteAction, BulkDeleteResult, BulkSavedAction, CreateShareAction, CreateShareRequest, CreateShareResult } from './work-share/share-types'
 export { PhotosCount } from './photos/photos-count'
 export { toPhotoItem, type PhotoItem, type TemplateLookup } from './photos/photo-item'
 export { editDisplay, editOriginal } from './photos/edit-display'

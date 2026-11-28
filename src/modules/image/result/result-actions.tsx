@@ -31,6 +31,17 @@ export type ShareLink = { jobId: string; create: CreateShareAction }
 const subscribe = () => () => {}
 const onIos = () => isIosBrowser(navigator)
 const serverSnapshot = () => false
+const onTouch = () => window.matchMedia('(pointer: coarse)').matches
+
+// Phones where the primary is 存入相册 and not a download. An iPhone always. Any other phone
+// whose browser cannot hand the file to the share sheet (Huawei's browser, WeChat): a download
+// there lands in a Download folder the gallery never shows, so the primary opens the photo full
+// size for a long press, as the iPhone's fallback does.
+function useHoldToSave(mode: ShareMode): { hold: boolean; ios: boolean } {
+  const ios = useSyncExternalStore(subscribe, onIos, serverSnapshot)
+  const touch = useSyncExternalStore(subscribe, onTouch, serverSnapshot)
+  return { hold: ios || (touch && mode.kind === 'download'), ios }
+}
 
 const LABEL = { white: 'downloadWhite', transparent: 'downloadTransparent' } as const
 const LABEL_PX = { white: 'downloadWhitePx', transparent: 'downloadTransparentPx' } as const
@@ -44,7 +55,7 @@ export default function ResultActions({ fileUrl, name, shareText, px, work, wate
   const saved = useWatermarkMoment(watermarked)
   const [background] = useCutOutChoice(fileUrl, work)
   const mode = useShareFile(shareSource(fileUrl, work, background), name, background === 'transparent')
-  const ios = useSyncExternalStore(subscribe, onIos, serverSnapshot)
+  const phone = useHoldToSave(mode)
   // One ZIP, not two downloads: iOS Safari saves only the first file of a tap and Android Chrome
   // asks before a second, so one file is what lands on every phone.
   const pair = background ? (
@@ -53,7 +64,7 @@ export default function ResultActions({ fileUrl, name, shareText, px, work, wate
       {t('downloadBoth')}
     </a>
   ) : null
-  if (ios) return <div className="grid gap-2"><IosPhotoActions mode={mode} fileUrl={fileHref(fileUrl, background, false)} onSaved={saved} />{pair}{link ? <ShareAction mode={mode} link={link} name={name} shareText={shareText} onShared={saved} block /> : null}</div>
+  if (phone.hold) return <div className="grid gap-2"><IosPhotoActions mode={mode} fileUrl={fileHref(fileUrl, background, false)} onSaved={saved} holdHint={phone.ios ? undefined : t('holdToAlbumHint')} />{pair}{link ? <ShareAction mode={mode} link={link} name={name} shareText={shareText} onShared={saved} block /> : null}</div>
   const label = () => {
     if (px) return t.rich(background ? LABEL_PX[background] : 'downloadPx', { px, cost: sizeTag, mono: monoTag })
     return t(background ? LABEL[background] : 'download')
