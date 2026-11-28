@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { namedFor } from '../batch/photo-save'
-import { downloadEach, downloadHref, fetchWork, nameFrom, pickedLinks, pickedSource } from './bulk-save'
+import { downloadEach, downloadHref, fetchWork, nameFrom, pickedLinks, pickedSource, toDownload } from './bulk-save'
 
 const A = '11111111-1111-4111-8111-111111111111'
 const B = '22222222-2222-4222-8222-222222222222'
@@ -24,10 +24,35 @@ describe('saving the works picked on Photos', () => {
       log.push(`get ${id}`)
       return id === B ? null : { name: `${id}.png`, blob: new Blob(['x']) }
     }
-    const progress = await downloadEach([A, B, A], (p) => steps.push(`${p.saved}/${p.failed}`), () => true, get, (file) => void log.push(`save ${file.name}`))
-    expect(progress).toEqual({ saved: 2, failed: 1 })
+    const progress = await downloadEach([A, B, A], (p) => steps.push(`${p.saved}/${p.failed.length}`), () => true, get, (file) => void log.push(`save ${file.name}`))
+    expect(progress).toEqual({ saved: 2, failed: [B] })
     expect(log).toEqual([`get ${A}`, `save ${A}.png`, `get ${B}`, `get ${A}`, `save ${A}.png`])
     expect(steps).toEqual(['1/0', '1/1', '2/1'])
+  })
+
+  it('retries only the works that failed, never the ones already saved', async () => {
+    const C = '33333333-3333-4333-8333-333333333333'
+    const asked: string[] = []
+    const savedNames: string[] = []
+    let broken = new Set([B, C])
+    const get = async (id: string) => {
+      asked.push(id)
+      return broken.has(id) ? null : { name: id, blob: new Blob(['x']) }
+    }
+    const save = (file: { name: string }) => void savedNames.push(file.name)
+    // The first press asks for everything picked.
+    expect(toDownload([A, B, C], null)).toEqual([A, B, C])
+    const first = await downloadEach(toDownload([A, B, C], null), () => undefined, () => true, get, save)
+    expect(first).toEqual({ saved: 1, failed: [B, C] })
+    // The second asks for the two that failed; one of them arrives now.
+    broken = new Set([C])
+    const second = await downloadEach(toDownload([A, B, C], first), () => undefined, () => true, get, save)
+    expect(second).toEqual({ saved: 1, failed: [C] })
+    expect(asked).toEqual([A, B, C, B, C])
+    // A was fetched and saved once only.
+    expect(savedNames).toEqual([A, B])
+    // Nothing left to retry: nothing is asked for.
+    expect(toDownload([A, B, C], { saved: 3, failed: [] })).toEqual([])
   })
 
   it('stops when the bar is gone, without saving the file in flight', async () => {
@@ -37,7 +62,7 @@ describe('saving the works picked on Photos', () => {
       alive = false
       return { name: id, blob: new Blob(['x']) }
     }
-    expect(await downloadEach([A, B], () => undefined, () => alive, get, (file) => void saved.push(file.name))).toEqual({ saved: 0, failed: 0 })
+    expect(await downloadEach([A, B], () => undefined, () => alive, get, (file) => void saved.push(file.name))).toEqual({ saved: 0, failed: [] })
     expect(saved).toEqual([])
   })
 

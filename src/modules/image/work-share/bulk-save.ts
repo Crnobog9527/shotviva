@@ -50,8 +50,10 @@ export async function fetchWork(jobId: string, fetcher: typeof fetch = fetch): P
   }
 }
 
-// The object URL outlives the click long enough for the browser to start saving, then goes.
-const REVOKE_AFTER_MS = 30_000
+// The object URL goes shortly after the click, not at once: the browser reads it when the
+// download starts, a moment after the click, and a URL revoked before that saves nothing. Files
+// are fetched one at a time, so only the last few seconds' worth are held.
+const REVOKE_AFTER_MS = 4_000
 
 export function saveBlob({ name, blob }: Saved): void {
   const url = URL.createObjectURL(blob)
@@ -65,10 +67,12 @@ export function saveBlob({ name, blob }: Saved): void {
   setTimeout(() => URL.revokeObjectURL(url), REVOKE_AFTER_MS)
 }
 
-export type DownloadProgress = { saved: number; failed: number }
+// failed: the works that could not be fetched, so a retry asks for those only (asking for all
+// again would save the ones that arrived a second time and record their downloads twice).
+export type DownloadProgress = { saved: number; failed: string[] }
 
-// One after another, so one file is in memory at a time. onStep: after each work, how many were
-// saved and how many could not be fetched. alive: false stops the run (the bar closed).
+// One after another. onStep: after each work, how many were saved and which could not be
+// fetched. alive: false stops the run (the bar closed).
 export async function downloadEach(
   jobIds: readonly string[],
   onStep: (progress: DownloadProgress) => void,
@@ -76,7 +80,7 @@ export async function downloadEach(
   get: (jobId: string) => Promise<Saved | null> = fetchWork,
   save: (file: Saved) => void = saveBlob,
 ): Promise<DownloadProgress> {
-  const progress: DownloadProgress = { saved: 0, failed: 0 }
+  const progress: DownloadProgress = { saved: 0, failed: [] }
   for (const id of jobIds) {
     if (!alive()) break
     const file = await get(id)
@@ -85,9 +89,12 @@ export async function downloadEach(
       save(file)
       progress.saved += 1
     } else {
-      progress.failed += 1
+      progress.failed.push(id)
     }
-    onStep({ ...progress })
+    onStep({ saved: progress.saved, failed: [...progress.failed] })
   }
   return progress
 }
+
+// What the button does next: every picked work the first time, then only the ones that failed.
+export const toDownload = (picked: readonly string[], last: DownloadProgress | null): readonly string[] => (last ? last.failed : picked)

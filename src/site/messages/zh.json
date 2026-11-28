@@ -2294,7 +2294,7 @@
       "copiedHint": "链接已复制，打开微信粘贴发送"
     },
     "workShare": {
-      "bulk": {"download": "下载 {count, plural, other {# 张}}", "downloading": "正在下载第 {started}/{total} 张，浏览器询问时请允许下载多个文件。", "downloaded": "已下载 {total} 张，去下载文件夹里看看。", "downloadFailed": "有 {count} 张没能下载，请再点一次下载。", "delete": "删除", "deleteTitle": "{count, plural, =1 {删除这张作品？} other {删除这 # 张作品？}}", "deleteBody": "删除后无法恢复，已消耗的积分不会退还。", "deleteConfirm": "{count, plural, =1 {删除作品} other {删除 # 张作品}}", "deleting": "正在删除…", "deleteError": "没能完成删除，可能只删掉了一部分。请再试一次。", "deleteRetry": "再试一次", "cancel": "取消", "close": "知道了", "partTitle": "{count, plural, =0 {没有删除任何作品} other {已删除 # 张}}", "keptOrg": "有 {count} 张是企业作品，只能由企业管理员删除。", "keptRunning": "有 {count} 张仍在生成，完成后才能删除。", "keptFailed": "有 {count} 张没能删除，请稍后再试。"},
+      "bulk": {"download": "下载 {count, plural, other {# 张}}", "downloading": "正在下载第 {started}/{total} 张，浏览器询问时请允许下载多个文件。", "downloaded": "已下载 {total} 张，去下载文件夹里看看。", "downloadFailed": "有 {count} 张没能下载，再点一次只重试没下到的。", "downloadRetry": "重试 {count, plural, other {# 张}}", "delete": "删除", "deleteTitle": "{count, plural, =1 {删除这张作品？} other {删除这 # 张作品？}}", "deleteBody": "删除后无法恢复，已消耗的积分不会退还。", "deleteConfirm": "{count, plural, =1 {删除作品} other {删除 # 张作品}}", "deleting": "正在删除…", "deleteError": "没能完成删除，可能只删掉了一部分。请再试一次。", "deleteRetry": "再试一次", "cancel": "取消", "close": "知道了", "partTitle": "{count, plural, =0 {没有删除任何作品} other {已删除 # 张}}", "keptOrg": "有 {count} 张是企业作品，只能由企业管理员删除。", "keptRunning": "有 {count} 张仍在生成，完成后才能删除。", "keptFailed": "有 {count} 张没能删除，请稍后再试。"},
       "start": "选择",
       "startAria": "选择作品，下载、删除或用一个链接分享",
       "selected": "{count, plural, =0 {选择作品} other {已选 # 张}}",
