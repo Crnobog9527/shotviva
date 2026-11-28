@@ -762,6 +762,7 @@
       "shelfMoreAria": "See all {total} templates in {name}",
       "shelfExpand": "Show {count} more",
       "shelfCollapse": "Show fewer",
+      "membersExpand": "Show all",
       "scrollBack": "Scroll back through {name}",
       "scrollOn": "Scroll on through {name}",
       "inSeries": "Series: {name}"
