@@ -51,7 +51,7 @@ export function DoneGrid({ items, now, timeZone, running, liveTemplates, share, 
   // A colleague's work is not the reader's: its own tile and viewer, and never the reader's viewer.
   const card = (item: PhotoItem) =>
     item.maker ? (
-      <ColleagueCard item={item} eager={at(item) < EAGER_TILES} remove={company?.remove ?? null} />
+      <ColleagueCard item={item} place={at(item)} remove={company?.remove ?? null} />
     ) : (
       <DoneCard item={item} meta={tileMeta(item, t)} live={liveTemplates.includes(item.templateId)} place={at(item)} />
     )

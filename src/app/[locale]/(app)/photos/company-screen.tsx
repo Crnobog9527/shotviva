@@ -2,10 +2,11 @@ import { getTranslations } from 'next-intl/server'
 
 import { TabRootHeader } from '@/core/app-shell'
 import { maskPhone } from '@/core/auth/phone'
-import { encodeOwnJobsCursor, fileUrlFor, listOwnRunning, ownJobsByIds, type OwnJobsCursor } from '@/core/jobs'
+import { encodeOwnJobsCursor, fileUrlFor, FIRST_SCREEN_THUMBS, firstThumbUrls, listOwnRunning, ownJobsByIds, type OwnJobsCursor } from '@/core/jobs'
 import { accountLabels } from '@/core/org/console'
-import { listCompanyPhotos, ME, orgWorkMakers, PERSONAL, type CompanyFilter, type CompanySeat } from '@/core/org/works'
+import { listCompanyPhotos, ME, orgWorkMakers, PERSONAL, signedOrgTiles, type CompanyFilter, type CompanySeat } from '@/core/org/works'
 import { CompanyFilterRail, DoneGrid, PhotosCount, companyHref, toCompanyItems, toPhotoItem, useCompanyChips, type TemplateLookup } from '@/modules/image'
+import { r2Store } from '@/core/storage'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { deleteOrgWorkAction } from '../account/enterprise/works/actions'
@@ -44,12 +45,20 @@ export async function CompanyPhotos({ db, userId, seat, now, timeZone, filter, u
     getTranslations('app.photos'),
   ])
   const mine = page.works.flatMap((work) => (work.userId === userId ? [work.id] : []))
-  const [own, labels] = await Promise.all([
+  // The first screen's tile copies are signed into the page, as on the personal view: the
+  // reader's own as their owner, colleagues' through the member check, each only where the tile
+  // already exists. The rest go through the routes.
+  const first = page.works.slice(0, FIRST_SCREEN_THUMBS)
+  const [own, labels, theirTiles] = await Promise.all([
     ownJobsByIds(db, userId, mine),
     accountLabels(db, members.flatMap((m) => (m.userId ? [m.userId] : [])), maskPhone),
+    signedOrgTiles({ db, store: r2Store }, userId, first.flatMap((work) => (work.userId && work.userId !== userId && !work.archived ? [work.id] : []))),
   ])
+  const firstOwn = new Set(first.flatMap((work) => (work.userId === userId ? [work.id] : [])))
+  const myTiles = await firstThumbUrls(r2Store, own.filter((job) => firstOwn.has(job.id)), FIRST_SCREEN_THUMBS, 'tile')
+  const signed = new Map([...theirTiles, ...myTiles])
   const fallback = tp('fallbackName')
-  const items = toCompanyItems(page.works, { me: userId, own: new Map(own.map((job) => [job.id, job])), templates: lookup, labels, fallbackName: fallback, fileUrlFor })
+  const items = toCompanyItems(page.works, { me: userId, own: new Map(own.map((job) => [job.id, job])), templates: lookup, labels, fallbackName: fallback, fileUrlFor, signed })
   // The reader's own photos in flight belong with everyone's works or their own, not under a
   // colleague's (or the archived, or the personal) filter.
   const running = filter === null || filter === ME ? runningJobs.map((job) => toPhotoItem(job, lookup, null, fallback)) : []
