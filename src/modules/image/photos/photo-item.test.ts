@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { Job } from '@/core/jobs'
 
 import { echoTranslate } from '../echo-translate'
-import { doneWhen, runningMeta, tileMeta, toPhotoItem } from './photo-item'
+import { doneWhen, tileMeta, toPhotoItem } from './photo-item'
 
 const job: Job = {
   id: 'j1',
@@ -53,10 +53,9 @@ describe('photo items', () => {
     expect(doneWhen(at, new Date('2026-11-05T17:00:00Z'), 'Asia/Shanghai', t, day)).toBe('photos.yesterday')
   })
 
-  it('writes a tile\'s and a running photo\'s settings line', () => {
+  it('writes a tile\'s settings line', () => {
     const t = echoTranslate()
     const item = { aspect: '16:9' as const, resolution: '2k' as const, credits: 4 }
     expect(tileMeta(item, t)).toMatch(/^photos.tileMeta \{"size":/)
-    expect(runningMeta({ ...item, aspect: '1:1' }, t)).toBe('photos.runningMeta {"size":"1:1","tier":"tiers.2k.name","count":4}')
   })
 })

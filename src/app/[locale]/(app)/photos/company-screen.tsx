@@ -5,7 +5,7 @@ import { maskPhone } from '@/core/auth/phone'
 import { encodeOwnJobsCursor, fileUrlFor, listOwnRunning, ownJobsByIds, type OwnJobsCursor } from '@/core/jobs'
 import { accountLabels } from '@/core/org/console'
 import { listCompanyPhotos, orgWorkMakers, PERSONAL, type CompanyFilter, type CompanySeat } from '@/core/org/works'
-import { CompanyFilterRail, DoneGrid, PhotosCount, RunningList, companyHref, toCompanyItems, toPhotoItem, useCompanyChips, type TemplateLookup } from '@/modules/image'
+import { CompanyFilterRail, DoneGrid, PhotosCount, companyHref, toCompanyItems, toPhotoItem, useCompanyChips, type TemplateLookup } from '@/modules/image'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { deleteOrgWorkAction } from '../account/enterprise/works/actions'
@@ -55,12 +55,11 @@ export async function CompanyPhotos({ db, userId, seat, now, timeZone, filter, u
   return (
     <>
       <TabRootHeader title={tp('title')} aside={<PhotosCount runningIds={running.map((item) => item.id)} done={page.total} />} />
-      <RunningList server={running} covers={covers} />
       <DoneGrid
         items={items}
         now={now}
         timeZone={timeZone}
-        anyRunning={running.length > 0}
+        running={{ server: running, covers }}
         liveTemplates={liveTemplates}
         share={createWorkShareAction}
         total={page.total}

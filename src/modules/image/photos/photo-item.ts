@@ -92,9 +92,3 @@ export function doneWhen(iso: string, now: Date, timeZone: string, t: Translate,
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
-
-// "1:1 · Standard · 2 credits" for a photo still developing.
-export function runningMeta(item: Pick<PhotoItem, 'aspect' | 'resolution' | 'credits'>, t: Translate): string {
-  const size = item.aspect === 'original' ? t('sizes.original') : item.aspect
-  return t('photos.runningMeta', { size, tier: tierName(item.resolution, t), count: item.credits })
-}

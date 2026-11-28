@@ -1,14 +1,17 @@
 import { Reveal } from '@/core/ui/reveal-item'
+import { Layers } from 'lucide-react'
 import { useFormatter, useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 
 import { ZipButtonLazy as ZipButton } from '../batch/zip-button-lazy'
-import { groupByBatch, groupByDay, type DaySection, type DoneEntry } from './batch-groups'
+import { dayKeyIn, groupByBatch, groupByDay, type DaySection, type DoneEntry } from './batch-groups'
 import { ColleagueCard, type DeleteCompanyWork } from './company/colleague-card'
 import { DoneCard, EAGER_TILES } from './done-card'
+import { DAY_BAR, DAY_LABEL, GRID } from './grid'
 import { LoadMore } from './load-more'
 import { PhotosEmpty } from './photos-empty'
 import { doneWhen, tileMeta, type PhotoItem } from './photo-item'
+import { RunningList } from './running-list'
 import { WorksIndex } from './viewer/works-index'
 import { ShareSelectProvider } from '../work-share/select-context'
 import { ShareBar } from '../work-share/share-bar'
@@ -24,12 +27,16 @@ import type { CreateShareAction } from '../work-share/share-types'
 // company: Photos' company view (§6.5「作品页就是企业作品」): the filter rail under the heading, what
 // an empty filter says, and the org owner's delete for colleagues' works (null for staff).
 export type CompanyGrid = { filter: ReactNode; emptyNote: string; remove: DeleteCompanyWork | null }
-type Props = { items: PhotoItem[]; now: Date; timeZone: string; anyRunning: boolean; liveTemplates: string[]; share?: CreateShareAction; more?: string | null; total?: number; company?: CompanyGrid }
+// running: the photos still developing (the server's, the tab adds its own) and the covers that
+// stand in for them; they are the first tiles of Today.
+export type Running = { server: PhotoItem[]; covers: Record<string, string | null> }
+type Props = { items: PhotoItem[]; now: Date; timeZone: string; running: Running; liveTemplates: string[]; share?: CreateShareAction; more?: string | null; total?: number; company?: CompanyGrid }
 
-export function DoneGrid({ items, now, timeZone, anyRunning, liveTemplates, share, more = null, total = items.length, company }: Props) {
+export function DoneGrid({ items, now, timeZone, running, liveTemplates, share, more = null, total = items.length, company }: Props) {
   const t = useTranslations('app')
   const format = useFormatter()
-  if (items.length === 0) return <Nothing company={company} anyRunning={anyRunning} />
+  const today = t('photos.today')
+  if (items.length === 0) return <Nothing company={company} running={running} today={today} />
   const entries = groupByBatch(items)
   // Display order: the viewer steps through it, and the first tiles load first.
   const ordered = entries.flatMap((entry) => (entry.kind === 'photo' ? [entry.item] : entry.items))
@@ -44,7 +51,6 @@ export function DoneGrid({ items, now, timeZone, anyRunning, liveTemplates, shar
     ) : (
       <DoneCard item={item} meta={tileMeta(item, t)} live={liveTemplates.includes(item.templateId)} place={at(item)} />
     )
-  const days = groupByDay(entries, timeZone)
   const grid = (
     <section aria-labelledby="done-h">
       <WorksIndex items={ordered.filter((item) => !item.maker)} />
@@ -53,10 +59,7 @@ export function DoneGrid({ items, now, timeZone, anyRunning, liveTemplates, shar
         {share ? <ShareToggle /> : null}
       </div>
       {company?.filter}
-      {days.map((day, index) => (
-        // The oldest day shown may go on into the next page: its count would be short.
-        <Day key={day.key} day={day} title={when(day.first)} counted={more === null || index < days.length - 1} card={card} when={when} />
-      ))}
+      <Days entries={entries} zone={{ now, timeZone }} running={running} today={today} whole={more === null} card={card} when={when} />
       {more ? <LoadMore href={more} shown={items.length} total={total} /> : null}
       <p className="mx-(--gutter) mt-6 max-w-[72ch] text-caption leading-[1.4] text-muted-foreground">{t('photos.footnote')}</p>
       {share ? <ShareBar create={share} /> : null}
@@ -65,9 +68,31 @@ export function DoneGrid({ items, now, timeZone, anyRunning, liveTemplates, shar
   return share ? <ShareSelectProvider>{grid}</ShareSelectProvider> : grid
 }
 
-function Nothing({ company, anyRunning }: { company?: CompanyGrid; anyRunning: boolean }) {
-  if (company) return <CompanyEmpty company={company} />
-  return anyRunning ? null : <PhotosEmpty />
+type DaysProps = { entries: DoneEntry[]; zone: { now: Date; timeZone: string }; running: Running; today: string; whole: boolean; card(item: PhotoItem): ReactNode; when(iso: string): string }
+
+// The list cut into days. Developing photos lead Today's grid; with no finished work today they
+// bring their own Today section. whole: no older page remains, so the last day's count is right
+// (otherwise that day may go on into the next page and its count would be short).
+function Days({ entries, zone, running, today, whole, card, when }: DaysProps) {
+  const days = groupByDay(entries, zone.timeZone)
+  const todayListed = days[0]?.key === dayKeyIn(zone.timeZone)(zone.now)
+  const developing = <RunningList server={running.server} covers={running.covers} today={todayListed ? undefined : today} />
+  return (
+    <>
+      {todayListed ? null : developing}
+      {days.map((day, index) => (
+        <Day key={day.key} day={day} title={when(day.first)} counted={whole || index < days.length - 1} card={card} when={when} lead={todayListed && index === 0 ? developing : null} />
+      ))}
+    </>
+  )
+}
+
+// No finished work: the developing ones alone under Today, or the empty state (which hides itself
+// while this tab has a photo developing the server did not list).
+function Nothing({ company, running, today }: { company?: CompanyGrid; running: Running; today: string }) {
+  const developing = <RunningList server={running.server} covers={running.covers} today={today} />
+  if (company) return <>{developing}<CompanyEmpty company={company} /></>
+  return <>{developing}{running.server.length > 0 ? null : <PhotosEmpty />}</>
 }
 
 // The company view with nothing under the chosen filter: the rail stays, so the way back is there.
@@ -82,33 +107,33 @@ function CompanyEmpty({ company }: { company: CompanyGrid }) {
   )
 }
 
-const GRID = 'grid grid-cols-3 gap-1 px-(--gutter) sm:grid-cols-4 md:gap-2 lg:grid-cols-6'
 
-type DayProps = { day: DaySection; title: string; counted: boolean; card(item: PhotoItem): ReactNode; when(iso: string): string }
+type DayProps = { day: DaySection; title: string; counted: boolean; card(item: PhotoItem): ReactNode; when(iso: string): string; lead?: ReactNode }
 
 // One day: its heading is a frosted label that stays under the top of the screen while the day
 // scrolls by (below the desktop tab bar), so a long day never loses its date. A label, not a
 // band: the page's ground is not flat, and a band would show its edges at rest.
-function Day({ day, title, counted, card, when }: DayProps) {
+function Day({ day, title, counted, card, when, lead }: DayProps) {
   const t = useTranslations('app.photos')
   const id = `day-${day.key}`
   return (
     <section aria-labelledby={id}>
-      <div className="pointer-events-none sticky top-[calc(var(--sat)+8px)] z-10 px-(--gutter) pt-5 pb-2 md:top-16">
-        <div className="frost hairline inline-flex min-h-8 items-baseline gap-2 rounded-full px-3 py-1.5">
+      <div className={DAY_BAR}>
+        <div className={DAY_LABEL}>
           <h3 id={id} className="text-body leading-[1.25] font-semibold">{title}</h3>
           {counted ? <span className="text-caption text-bone-dim tabular-nums">{t('dayCount', { count: day.count })}</span> : null}
         </div>
       </div>
       <ul className={GRID}>
+        {lead}
         {day.entries.map((entry) =>
           entry.kind === 'photo' ? (
             <Reveal as="li" key={entry.item.id}>
               {card(entry.item)}
             </Reveal>
           ) : (
-            <li key={entry.batchId} className="col-span-full">
-              <BatchGroup entry={entry} when={when(entry.items[0]!.createdAt)} card={card} />
+            <li key={entry.batchId} className="group/batch contents">
+              <BatchStack entry={entry} when={when(entry.items[0]!.createdAt)} card={card} />
             </li>
           ),
         )}
@@ -117,25 +142,48 @@ function Day({ day, title, counted, card, when }: DayProps) {
   )
 }
 
-// One batch (T107): a ruled band across the grid with what it was and its ZIP, then its photos
-// in batch order on the same grid. The grid's own gutter is undone so the inner one lines up.
-function BatchGroup({ entry, when, card }: { entry: Extract<DoneEntry, { kind: 'batch' }>; when: string; card(item: PhotoItem): ReactNode }) {
-  const t = useTranslations('app.photos.batch')
-  const id = `batch-${entry.batchId}`
+// One batch (T107), as a stack (2026-11-28; it was a ruled band across the grid, which cut the
+// page into strips): one tile, its first photo under the batch's count. Pressing it opens the
+// batch in place: a line across the grid with what it was, its ZIP and "Collapse", then its photos
+// in batch order, each an ordinary tile. A checkbox and CSS do the opening, so it costs no script;
+// the <li> is display: contents, so the stack, the line and the photos are all cells of the grid.
+function BatchStack({ entry, when, card }: { entry: Extract<DoneEntry, { kind: 'batch' }>; when: string; card(item: PhotoItem): ReactNode }) {
+  const t = useTranslations('app.photos')
+  const toggle = `batch-${entry.batchId}`
+  const first = entry.items[0]!
+  const title = t('batch.title', { count: entry.items.length, templates: entry.templates })
   return (
-    <section aria-labelledby={id} className="-mx-(--gutter) my-2 border-y border-hairline py-4">
-      <div className="mx-(--gutter) mb-3 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+    <>
+      <label className="press relative block cursor-pointer rounded-inner group-has-[:checked]/batch:hidden has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring">
+        <input id={toggle} type="checkbox" aria-label={t('batch.open', { title })} className="sr-only" />
+        <span aria-hidden="true" className="absolute inset-x-2 -top-[3px] h-2 rounded-t-[8px] bg-accent" />
+        <span className="relative block aspect-[4/5] overflow-hidden rounded-inner bg-muted">
+          {/* The first photo's tile copy again: the same address as its own tile, so one fetch. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {first.thumbUrl ? <img src={first.thumbUrl} alt="" width={320} height={400} loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover" /> : null}
+          <span className="frost absolute top-1.5 right-1.5 inline-flex min-h-6 items-center gap-1 rounded-full px-2 text-caption leading-none font-semibold text-photo-ink tabular-nums">
+            <Layers aria-hidden strokeWidth={2} className="size-3.5" />
+            {entry.items.length}
+          </span>
+        </span>
+      </label>
+      <div className="col-span-full hidden flex-wrap items-center justify-between gap-x-4 gap-y-2 pt-2 pb-1 group-has-[:checked]/batch:flex">
         <div className="min-w-0">
-          <h4 id={id} className="text-body leading-[1.25] font-semibold">{t('title', { count: entry.items.length, templates: entry.templates })}</h4>
-          <p className="mt-1 text-caption text-muted-foreground">{when}</p>
+          <p className="text-body leading-[1.25] font-semibold">{title}</p>
+          <p className="text-caption text-muted-foreground">{when}</p>
         </div>
-        {entry.paid > 0 ? <ZipButton batchId={entry.batchId} count={entry.paid} className="max-w-full" /> : null}
+        <div className="flex items-center gap-2">
+          {entry.paid > 0 ? <ZipButton batchId={entry.batchId} count={entry.paid} className="max-w-full" /> : null}
+          <label htmlFor={toggle} className="press hairline inline-flex min-h-9 cursor-pointer items-center rounded-full bg-wash px-4 text-caption font-medium">
+            {t('batch.close')}
+          </label>
+        </div>
       </div>
-      <ul className={GRID}>
-        {entry.items.map((item) => (
-          <li key={item.id}>{card(item)}</li>
-        ))}
-      </ul>
-    </section>
+      {entry.items.map((item) => (
+        <div key={item.id} className="hidden group-has-[:checked]/batch:block">
+          {card(item)}
+        </div>
+      ))}
+    </>
   )
 }
