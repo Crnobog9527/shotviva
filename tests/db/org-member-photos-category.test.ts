@@ -127,6 +127,12 @@ describe('the company view by category', () => {
     expect(second.map((row) => row.id)).toEqual(newest.slice(2, 5))
     const up = await call({ p_limit: 1000, p_from_at: cursor.created_at, p_from_id: cursor.id })
     expect(up.map((row) => row.id)).toEqual(newest.slice(0, 2))
+    // A capped window keeps the rows nearest the cursor, and the cap holds whatever is asked.
+    const deep = second[2]!
+    const near = await call({ p_limit: 2, p_from_at: deep.created_at, p_from_id: deep.id })
+    expect(near.map((row) => row.id)).toEqual(newest.slice(3, 5))
+    expect((await call({ p_limit: 100000 })).length).toBe(newest.length)
+    expect((await call({ p_limit: 0 })).length).toBe(1)
     // Load more's list: down to the cursor and one page more, every work once.
     const all = await listCompanyPhotos(rest, c.veteran, { category: A, until: { createdAt: cursor.created_at, id: cursor.id } })
     expect(all.works.map((w) => w.id)).toEqual(newest)
@@ -142,8 +148,15 @@ describe('who may read it', () => {
     expect(await ids(stranger, { filter: c.peer, category: A })).toEqual([])
     expect(await listCompanyPhotoCategories(rest, stranger)).toEqual([])
     expect(await listCompanyPhotoCategories(rest, stranger, c.peer)).toEqual([])
-    const direct = await rest.rpc('org_member_photo_works', { p_user: stranger, p_scope: 'member', p_member: c.peer })
-    expect(direct.data).toEqual([])
+    // Straight at the functions, every scope: still nothing.
+    for (const scope of ['all', 'mine', 'member', 'archived', 'personal']) {
+      for (const category of [A, B]) {
+        const direct = await rest.rpc('org_member_photos_in_category', { p_user: stranger, p_category: category, p_scope: scope, p_member: c.peer })
+        expect(direct.error).toBeNull()
+        // 'personal' is the stranger's own works only when they hold a seat: they hold none.
+        expect(direct.data).toEqual([])
+      }
+    }
   })
 
   it('gives a removed member nothing, and the rest no longer their personal works', async () => {
@@ -180,7 +193,6 @@ describe('who may read it', () => {
 
   it('is closed to browsers', async () => {
     const fns = [
-      'org_member_photo_works(uuid, text, uuid)',
       'org_member_photos_in_category(uuid, text, text, uuid, integer, timestamptz, uuid, timestamptz, uuid)',
       'org_member_photo_categories(uuid, text, uuid)',
     ]

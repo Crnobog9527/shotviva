@@ -50,6 +50,7 @@ export { AfterSuccess } from './generation/after-success'
 export { RunningList } from './photos/running-list'
 export { DoneGrid } from './photos/done-grid'
 export { CompanyCategoryRail, CompanyFilterRail, companyHref, useCompanyChips } from './photos/company/company-filter'
+export { decodeChips, encodeChips } from './photos/company/category-chips'
 export { heldBy, offersFilter, PhotoFilterRail, photosHref } from './photos/photo-filter'
 export { toCompanyItems } from './photos/company/company-items'
 // 作品集分享 (§6.2): the Photos picker's action type and the Share links list.

@@ -28,9 +28,10 @@ export function useCompanyChips(members: readonly Member[], me: string, personal
   ]
 }
 
-// The company view's address: whose works, which category, and Load more's cursor.
-export const companyHref = (filter: CompanyFilter, until?: string, category?: string | null) => {
-  const query = new URLSearchParams({ ...(filter ? { member: filter } : {}), ...(category ? { category } : {}), ...(until ? { until } : {}) }).toString()
+// The company view's address: whose works, which category, Load more's cursor, and with it the
+// category chips the first screen read (category-chips.ts).
+export const companyHref = (filter: CompanyFilter, until?: string, category?: string | null, chips?: string) => {
+  const query = new URLSearchParams({ ...(filter ? { member: filter } : {}), ...(category ? { category } : {}), ...(until ? { until } : {}), ...(until && chips ? { cc: chips } : {}) }).toString()
   return query ? `/photos?${query}` : '/photos'
 }
 
@@ -48,12 +49,11 @@ export function CompanyFilterRail({ chips, current, category = null }: { chips: 
 
 // The second rail: which template category, among the works of the chosen maker (migration 2040).
 // Shown once it can narrow something (two categories), or while one is chosen (the way back).
-export function CompanyCategoryRail({ categories, member, current }: { categories: readonly CompanyPhotoCategory[]; member: CompanyFilter; current: string | null }) {
+export function CompanyCategoryRail({ categories, total, member, current }: { categories: readonly CompanyPhotoCategory[]; total: number; member: CompanyFilter; current: string | null }) {
   const t = useTranslations('app.photos.filter')
   const zh = useLocale() === 'zh'
   const shown = categories.filter((c) => !c.system)
   if (shown.length < 2 && current === null) return null
-  const total = categories.reduce((sum, c) => sum + c.works, 0)
   return (
     <FilterRail
       label={t('label')}
