@@ -51,8 +51,7 @@ export async function resolveJobThumb(deps: { db: SupabaseClient; store: ObjectS
 }
 
 // How many of Photos' newest works get their signed URL written into the page: the first screen
-// (two rows of six on a desktop, four rows of three on a phone; done-card.tsx fetches as many
-// at once).
+// (two rows of six on a desktop, four rows of three on a phone).
 export const FIRST_SCREEN_THUMBS = 12
 
 // Photos' first screen: the signed URL of each of the caller's own newest works that already has
