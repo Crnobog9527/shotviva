@@ -34,9 +34,12 @@ export function workMarkKey(pool: CreditPool, visibility: 'public' | 'private'):
   return pool === 'free' ? 'watermark' : null
 }
 
-export function WorkMark({ pool, visibility, className }: { pool: CreditPool; visibility: 'public' | 'private'; className?: string }) {
+// personal: on Photos' company view (§6.5), one of the reader's own works among the company's;
+// it says so first, since everything else there is the company's.
+export function WorkMark({ pool, visibility, personal, className }: { pool: CreditPool; visibility: 'public' | 'private'; personal?: boolean; className?: string }) {
   const t = useTranslations('app.work')
   const key = workMarkKey(pool, visibility)
-  if (!key) return null
-  return <span className={cn('frost inline-flex min-h-6 items-center rounded-full px-2 text-caption leading-none font-medium text-photo-ink', className)}>{t(key)}</span>
+  if (!key && !personal) return null
+  const text = [personal ? t('personal') : null, key ? t(key) : null].filter(Boolean).join(' · ')
+  return <span className={cn('frost inline-flex min-h-6 max-w-[calc(100%-12px)] items-center truncate rounded-full px-2 text-caption leading-none font-medium text-photo-ink', className)}>{text}</span>
 }

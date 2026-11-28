@@ -23,8 +23,8 @@ export { hasInputPreview, originalUrlFor, resolveJobOriginal } from './job-origi
 export { deleteOwnWork } from './delete-work'
 export { deleteWorkFiles, keptInputsOf, photosForAgain, workFileKeys, type AgainPhoto } from './kept-inputs'
 export { findJobByIdempotencyKey, findLastWorks, findOwnJob, findOwnJobs, LAST_WORKS, STATUS_IDS_MAX } from './job-lookup'
-export { fileUrlFor, thumbUrlFor, toJobView, type JobView } from './job-view'
-export { FIRST_SCREEN_THUMBS, firstThumbUrls, resolveJobThumb } from './job-thumb'
+export { fileUrlFor, thumbUrlFor, tileUrlFor, toJobView, type JobView } from './job-view'
+export { FIRST_SCREEN_THUMBS, firstThumbUrls, resolveJobThumb, type ThumbSize } from './job-thumb'
 export {
   ProviderError,
   type GenerationProvider,
@@ -37,7 +37,7 @@ export {
 } from './provider'
 export { RATE_LIMIT, assertWithinRateLimit, countsAgainst, isLiveRunning, rateLimitVerdict, type ReplayOf } from './rate-limit'
 export { accountLimits } from './account-limits'
-export { decodeOwnJobsCursor, encodeOwnJobsCursor, listMonthWorks, listOwnJobs, listRunningJobIds, PHOTOS_PAGE, type MonthWorks, type OwnJobs, type OwnJobsCursor } from './own-jobs'
+export { decodeOwnJobsCursor, encodeOwnJobsCursor, listMonthWorks, listOwnJobs, listOwnRunning, listRunningJobIds, ownJobsByIds, PHOTOS_PAGE, type MonthWorks, type OwnJobs, type OwnJobsCursor } from './own-jobs'
 export { ENV_PROVIDER_SOURCE, modelFromTag, providerTag } from './provider-tag'
 export { runGeneration, type GenerationDeps } from './run-generation'
 // Shared with the admin test run (T85): the same provider call and screening cost.

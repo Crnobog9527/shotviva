@@ -13,7 +13,9 @@ export async function GET(request: NextRequest, { params }: RouteContext<'/api/f
   try {
     const user = await requireApiUser()
     const deps = { db: createAdminSupabase(), store: r2Store() }
-    const target = await resolveJobThumb(deps, { userId: user.id, jobId: (await params).jobId })
+    // ?size=tile: the smaller copy Photos' grid shows; anything else is the list copy.
+    const size = request.nextUrl.searchParams.get('size') === 'tile' ? 'tile' : 'thumb'
+    const target = await resolveJobThumb(deps, { userId: user.id, jobId: (await params).jobId }, size)
     return NextResponse.redirect(new URL(target, request.nextUrl), { status: 302, headers: { 'Cache-Control': 'private, no-store' } })
   } catch (error) {
     return errorResponse(error, 'files')

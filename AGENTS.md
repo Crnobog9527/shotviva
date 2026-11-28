@@ -42,6 +42,22 @@ answered and resolved. The list below applies to both reviewers.
 - Do not report style, naming, wording or formatting; lint and the type checker cover those.
   Docs, copy and image-only changes need no findings unless something there is broken.
 
+## Browser validation
+
+For Codex and Claude sessions that validate in a browser (Owner's rule, 2026-11-28).
+
+- Run every browser step in a **headless** browser (headless Chrome or Playwright). Never open,
+  drive or take over the Owner's own Google Chrome or any other desktop browser, and never bring
+  a browser window to the foreground.
+- Sign test identities in by opening the one-time link from
+  `pnpm qa:login-email <email> --host user|admin|preview` (or `pnpm qa:login <persona>`) inside the
+  headless browser. Never paste these links into chat or PRs.
+- Known limitation: the Waffo test-mode checkout does not complete in headless runs but works by
+  hand (issue #999). Steps that need a completed Waffo payment are done by the Owner by hand, or
+  marked "covered by DB tests" in the result.
+- Set up validation test data through the admin and org consoles only, never hand-written SQL,
+  and restore it afterwards.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 ## This is NOT the Next.js you know

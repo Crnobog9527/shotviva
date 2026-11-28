@@ -1,5 +1,5 @@
 import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
-import { thumbUrlFor } from '@/core/jobs/job-view'
+import { tileUrlFor } from '@/core/jobs/job-view'
 import { ThumbImg } from '@/core/ui/thumb-img'
 import { useTranslations } from 'next-intl'
 
@@ -9,13 +9,14 @@ import { SelectTile } from '../work-share/select-tile'
 import type { PhotoItem } from './photo-item'
 import { WorkLink } from './viewer/work-link'
 
-// The first screen is fetched at once (two rows of six on a desktop, four of three on a phone);
-// the rest wait until they are scrolled near. Only a phone's first row goes ahead of everything
-// else: one of those tiles is the page's largest paint, and on a slow connection every picture
-// asked for at high priority shares the line with it. FIRST_SCREEN_THUMBS (core/jobs) signs the
-// same number.
-export const EAGER_TILES = 12
-const FIRST_ROW = 3
+// A phone's first screen (three rows of three) is fetched at once; the rest wait until they are
+// near the viewport, which on a desktop is at once for its second row too. The first six go ahead
+// of everything else (a phone's first two rows, a desktop's first): one of them is the page's
+// largest paint, and not always the very first, because the browser passes over a flat picture
+// (a cut-out on white) when it picks one. Every picture fetched eagerly shares a slow line with
+// it, so the eager set stays as small as the first screen (measured 2026-11-28, #998).
+export const EAGER_TILES = 9
+const FIRST_ROW = 6
 
 // One finished work on Photos' grid (2026-11-28): the picture alone, so a phone shows a dozen
 // works where it showed two. Its name and settings are the viewer's to tell; with a pointer they
@@ -32,10 +33,10 @@ export function DoneCard({ item, meta, live, place }: { item: PhotoItem; meta: s
           {item.thumbUrl ? (
             <ThumbImg
               src={item.thumbUrl}
-              fallback={thumbUrlFor(item.id)}
+              fallback={tileUrlFor(item.id)}
               alt={t('photos.photoAlt', { name: item.templateName })}
-              width={480}
-              height={600}
+              width={320}
+              height={400}
               loading={place < EAGER_TILES ? 'eager' : 'lazy'}
               fetchPriority={place < FIRST_ROW ? 'high' : 'auto'}
               decoding="async"
@@ -45,6 +46,7 @@ export function DoneCard({ item, meta, live, place }: { item: PhotoItem; meta: s
           <WorkMark
             pool={item.creditPool}
             visibility={item.visibility}
+            personal={item.personal}
             className="absolute bottom-1.5 left-1.5 transition-opacity duration-250 group-hover:opacity-0 [@media(hover:hover)]:group-focus-within:opacity-0"
           />
           <span
