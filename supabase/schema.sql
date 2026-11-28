@@ -4172,7 +4172,7 @@ CREATE OR REPLACE FUNCTION "public"."_invite_code_org"("p_owner" "uuid") RETURNS
     SET "search_path" TO ''
     AS $$
   select o.id from public.org_members m
-    join public.orgs o on o.id = m.org_id and o.status = 'active' and o.affiliate_enabled
+    join public.orgs o on o.id = m.org_id and o.affiliate_enabled
     join public.affiliates a on a.org_id = o.id and a.status = 'active'
    where m.user_id = p_owner and m.status = 'active'
    limit 1
@@ -4496,7 +4496,7 @@ begin
       select o.id,a.user_id into v_org,v_account from public.org_members m
         join public.orgs o on o.id=m.org_id
         join public.affiliates a on a.org_id=o.id
-        where m.user_id=new.inviter_user_id and m.status='active' and o.status='active' and o.affiliate_enabled
+        where m.user_id=new.inviter_user_id and m.status='active' and o.affiliate_enabled
           and a.status='active';
       if found then
         v_source:='org_l1'; v_member:=new.inviter_user_id; v_via:=null;
@@ -4505,7 +4505,7 @@ begin
           join public.affiliates a on a.user_id=inviter.referred_by and a.org_id is not null
           join public.orgs o on o.id=a.org_id
           where inviter.id=new.inviter_user_id and inviter.referred_source='org_l1'
-            and o.status='active' and o.affiliate_enabled and o.affiliate_levels=2 and a.status='active';
+            and o.affiliate_enabled and o.affiliate_levels=2 and a.status='active';
         if not found then return null; end if;
         v_source:='org_l2'; v_via:=new.inviter_user_id;
       end if;
@@ -4656,6 +4656,17 @@ $$;
 
 
 ALTER FUNCTION "public"."_org_check_limits"("p_input" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_org_code_owner"("p_owner" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select public._in_active_org(p_owner) or public._invite_code_org(p_owner) is not null
+$$;
+
+
+ALTER FUNCTION "public"."_org_code_owner"("p_owner" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."_org_held_follows_ledger"() RETURNS "trigger"
@@ -5197,7 +5208,7 @@ begin
   begin
     select o.id,o.signup_bonus_credits into v_org,v_credits from public.affiliates a
       join public.orgs o on o.id=a.org_id
-      where a.user_id=new.referred_by and a.status='active' and o.status='active' and o.affiliate_enabled;
+      where a.user_id=new.referred_by and a.status='active' and o.affiliate_enabled;
     if not found or v_credits is null or v_credits <= 0 then return null; end if;
     -- A paid account is never a new user (redeem_code refuses it too; this is belt and braces).
     if exists(select from public.payments where user_id=new.id) then return null; end if;
@@ -5251,7 +5262,7 @@ begin
     if not found or p.referred_source is distinct from 'signup' or p.banned_at is not null then return; end if;
     select o.id,o.signup_bonus_credits into v_org,v_now from public.affiliates a
       join public.orgs o on o.id=a.org_id
-      where a.user_id=p.referred_by and a.status='active' and o.status='active' and o.affiliate_enabled;
+      where a.user_id=p.referred_by and a.status='active' and o.affiliate_enabled;
     if not found or v_now is null or v_now <= 0 then return; end if;
     if exists(select from public.payments where user_id=p_user) then return; end if;
     if public._in_active_org(p_user) or exists(select from public.org_members m where m.org_id=v_org and m.user_id=p_user and m.status='active') then return; end if;
@@ -5285,7 +5296,7 @@ CREATE OR REPLACE FUNCTION "public"."_org_staff_code"("p_code" "text", "p_user" 
   select coalesce(p_code collate "C" ~ '^[A-Za-z0-9]{4,20}$' and exists (
     select 1 from public.codes c
       join public.org_members m on m.user_id = c.owner_user_id and m.status = 'active'
-      join public.orgs o on o.id = m.org_id and o.status = 'active' and o.affiliate_enabled
+      join public.orgs o on o.id = m.org_id and o.affiliate_enabled
       join public.affiliates a on a.org_id = o.id and a.status = 'active'
       join public.affiliate_settings s on s.singleton and s.enabled
       -- As redeem_code: a banned owner's code is expired, and a full one cannot be redeemed.
@@ -6454,7 +6465,7 @@ CREATE OR REPLACE FUNCTION "public"."_signup_org_ref"("p_slug" "text") RETURNS b
     select 1 from public.affiliates a
       join public.orgs o on o.id = a.org_id
       join public.affiliate_settings s on s.singleton and s.enabled
-     where a.slug = p_slug and a.status = 'active' and o.status = 'active' and o.affiliate_enabled), false)
+     where a.slug = p_slug and a.status = 'active' and o.affiliate_enabled), false)
 $_$;
 
 
@@ -15902,7 +15913,7 @@ CREATE OR REPLACE FUNCTION "public"."code_preview_credits"("offer" "public"."cod
     SET "search_path" TO ''
     AS $$
   select case
-    when offer.kind = 'invite' and public._in_active_org(offer.owner_user_id) then
+    when offer.kind = 'invite' and public._org_code_owner(offer.owner_user_id) then
       coalesce((select o.signup_bonus_credits from public.orgs o where o.id = public._invite_code_org(offer.owner_user_id)), 0)
     when offer.kind = 'invite' then
       (select (value->>'inviteeCredits')::integer from public.system_settings where key = 'code_invite_rewards')
@@ -15922,7 +15933,7 @@ begin
   if p_code is null or p_code collate "C" !~ '^[A-Za-z0-9]{4,20}$' then return null; end if;
   select * into v_offer from public.codes where code = upper(p_code);
   if not found then return null; end if;
-  if v_offer.kind <> 'invite' or not public._in_active_org(v_offer.owner_user_id) then
+  if v_offer.kind <> 'invite' or not public._org_code_owner(v_offer.owner_user_id) then
     return public.code_preview_credits(v_offer);
   end if;
   v_org := public._invite_code_org(v_offer.owner_user_id);
@@ -15946,7 +15957,7 @@ CREATE OR REPLACE FUNCTION "public"."code_preview_org"("offer" "public"."codes")
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-  select offer.kind = 'invite' and public._in_active_org(offer.owner_user_id)
+  select offer.kind = 'invite' and public._org_code_owner(offer.owner_user_id)
 $$;
 
 
@@ -16670,7 +16681,7 @@ begin
       if (v_profile.referred_source = 'signup' and exists (
            select 1 from public.affiliates a join public.orgs o on o.id = a.org_id
             where a.user_id = v_profile.referred_by and a.status = 'active'
-              and o.status = 'active' and o.affiliate_enabled))
+              and o.affiliate_enabled))
          or public._signup_staff_code_channel(p_user_id) then
         v_partner := public.signup_gift_setting_int('signup_gift_per_ip_partner', 20);
         v_per_ip := case when v_per_ip = 0 or v_partner = 0 then 0 else greatest(v_per_ip, v_partner) end;
@@ -19510,7 +19521,7 @@ begin
     org_code := exists (select from public.org_members m
       join public.orgs o on o.id = m.org_id
       join public.affiliates a on a.org_id = o.id
-      where m.user_id = offer.owner_user_id and m.status = 'active' and o.status = 'active' and o.affiliate_enabled
+      where m.user_id = offer.owner_user_id and m.status = 'active' and o.affiliate_enabled
         and a.status = 'active' and a.user_id <> p_user
         and (profile.referred_by is null or profile.referred_by = a.user_id)
         and not exists (select from public.org_members c
@@ -29370,6 +29381,10 @@ REVOKE ALL ON FUNCTION "public"."_org_bulk_replayed"("p_request" "text", "p_org"
 
 
 REVOKE ALL ON FUNCTION "public"."_org_check_limits"("p_input" "jsonb") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_org_code_owner"("p_owner" "uuid") FROM PUBLIC;
 
 
 
