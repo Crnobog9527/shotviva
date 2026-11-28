@@ -24,6 +24,7 @@ export function MatrixAction({ cta, max, error, onGenerate, inline = false }: { 
     : cta.kind === 'generate' ? t.rich('noticeGenerate', { b })
     : cta.kind === 'get-credits' ? t.rich('noticeCredits', { b, count: cta.count, total: cta.total })
     : cta.kind === 'blocked' && cta.block === 'too-many' ? t.rich('noticeTooMany', { b, max })
+    : cta.kind === 'promo-short' ? t.rich('noticePromoShort', { b, count: cta.needed })
     : null
   return (
     <ActionBar className={inline ? undefined : PAGE} inline={inline}>
@@ -51,7 +52,7 @@ function Primary({ cta, onGenerate }: { cta: MatrixCta; onGenerate(): void }) {
   }
   return (
     <button type="button" disabled className={buttonVariants({ variant: 'glass', size: 'cta', className: 'w-full rounded-tile text-cta text-muted-foreground' })}>
-      {t(cta.kind === 'checking' ? 'checking' : `block.${cta.block}`)}
+      {t(cta.kind === 'checking' ? 'checking' : cta.kind === 'promo-short' ? 'promoShort' : `block.${cta.block}`)}
     </button>
   )
 }

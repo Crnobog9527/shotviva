@@ -41,6 +41,8 @@ export type DraftInput = {
   single?: boolean
   // 在职成员只用企业积分 (§6.5): an active org member's org shares; null/absent: not a member.
   poolChoice?: PoolChoiceOffer | null
+  // An active member of an affiliate org: Batch create may use 1K from the promotion share (2034).
+  batchPromo?: boolean
   // Signed out on the public template panel: picked photos stay in this browser (no upload, no
   // job; its primary is the sign-up button).
   local?: boolean

@@ -23,6 +23,8 @@ export type MatrixWorkspaceProps = {
   // effective_limits()' batch part from the server (an org can lift past the tier).
   batch?: BatchLimits | null
   limit: number
+  // An active member of an affiliate org: the batch may use 1K from the promotion share (2034).
+  promo?: boolean
 }
 
 // Batch create (Owner 2026-11-12): one form for both ways. One template on many photos is a
@@ -36,8 +38,8 @@ export function MatrixWorkspace(props: MatrixWorkspaceProps) {
   return <BatchForm {...props} caps={caps} />
 }
 
-function BatchForm({ templates, browse, initial, balance, tier, limit, caps }: MatrixWorkspaceProps & { caps: BatchCaps }) {
-  const session = useBatchSession({ templates, initial, balance, limit, caps, onStarted: () => window.scrollTo({ top: 0 }) })
+function BatchForm({ templates, browse, initial, balance, tier, limit, caps, promo }: MatrixWorkspaceProps & { caps: BatchCaps }) {
+  const session = useBatchSession({ templates, initial, balance, limit, caps, promo, onStarted: () => window.scrollTo({ top: 0 }) })
   const { draft, refusal } = session
   const reveal = useReveal<HTMLDivElement>()
   if (session.ids.length > 0) {
@@ -47,7 +49,7 @@ function BatchForm({ templates, browse, initial, balance, tier, limit, caps }: M
     <div className="lg:grid lg:grid-cols-[minmax(380px,440px)_minmax(0,1fr)] lg:items-start lg:gap-x-12 lg:px-(--gutter)">
       <div ref={reveal} className="min-w-0 px-(--gutter) lg:px-0">
         <MatrixHead caps={caps} />
-        <MatrixForm draft={draft} templates={templates} browse={browse} balancePaid={balance.paid} tier={tier} />
+        <MatrixForm draft={draft} templates={templates} browse={browse} tier={tier} page />
         <MatrixAction cta={draft.cta} max={caps.cells} error={refusal.message(draft.error)} onGenerate={session.generate} />
       </div>
       <MatrixStage draft={draft} />

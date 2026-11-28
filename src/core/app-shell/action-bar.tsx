@@ -32,9 +32,18 @@ function FixedBar({ children, className }: { children: ReactNode; className?: st
   useEffect(() => {
     const element = bar.current
     if (!element) return
-    const observer = new ResizeObserver(() => setHeight(element.offsetHeight + 16))
+    // --action-bar-h: the fixed bar's height, so sticky things in the page (Batch create's bulk
+    // bar) can stop above it rather than under it.
+    const root = document.documentElement.style
+    const observer = new ResizeObserver(() => {
+      setHeight(element.offsetHeight + 16)
+      root.setProperty('--action-bar-h', `${element.offsetHeight}px`)
+    })
     observer.observe(element)
-    return () => observer.disconnect()
+    return () => {
+      observer.disconnect()
+      root.removeProperty('--action-bar-h')
+    }
   }, [])
   return (
     <>

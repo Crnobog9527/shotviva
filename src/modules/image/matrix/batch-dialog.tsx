@@ -35,6 +35,8 @@ export type BatchDialogProps = {
   // effective_limits()' batch part from the server (an org can lift past the tier).
   batch?: BatchLimits | null
   limit: number
+  // An active member of an affiliate org: the batch may use 1K from the promotion share (2034).
+  promo?: boolean
 }
 
 // Batch create as a dialog on Create (Owner 2026-11-12): the same form as the /generate/batch
@@ -47,10 +49,10 @@ export function BatchDialog(props: BatchDialogProps) {
   return caps ? <BatchDialogBody {...props} caps={caps} /> : null
 }
 
-function BatchDialogBody({ open, onClose, requested, templates, browse, balance, tier, limit, caps }: BatchDialogProps & { caps: BatchCaps }) {
+function BatchDialogBody({ open, onClose, requested, templates, browse, balance, tier, limit, caps, promo }: BatchDialogProps & { caps: BatchCaps }) {
   const t = useTranslations('app.matrix')
   const scroller = useRef<HTMLDivElement>(null)
-  const session = useBatchSession({ templates, initial: requested, balance, limit, caps, onStarted: () => scroller.current?.scrollTo({ top: 0 }) })
+  const session = useBatchSession({ templates, initial: requested, balance, limit, caps, promo, onStarted: () => scroller.current?.scrollTo({ top: 0 }) })
   useOpening(open, requested, session, caps)
   useKeepTemplates(open, session.draft.values.templateIds)
   const results = session.ids.length > 0
@@ -76,7 +78,7 @@ function BatchDialogBody({ open, onClose, requested, templates, browse, balance,
       bar={<MatrixAction inline cta={draft.cta} max={caps.cells} error={refusal.message(draft.error)} onGenerate={session.generate} />}
       stage={<MatrixStage draft={draft} className="block" />}
     >
-      <MatrixForm draft={draft} templates={templates} browse={browse} balancePaid={balance.paid} tier={tier} />
+      <MatrixForm draft={draft} templates={templates} browse={browse} tier={tier} />
     </BatchFrame>
   )
 }

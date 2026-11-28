@@ -5,9 +5,10 @@ import { useState, type ReactNode } from 'react'
 
 import type { MembershipTier } from '@/core/config'
 import { offeredToggles, useFoodOffer } from '@/core/templates/offered-toggles'
+import { cn } from '@/core/ui/cn'
 
 import { BatchPhotos } from '../workspace/batch-photos'
-import { ResolutionPicker, SizePicker } from '../workspace/option-pickers'
+import { SizePicker } from '../workspace/option-pickers'
 import { PhotoPickers } from '../workspace/photo-pickers'
 import { sizeLabel } from '../workspace/workspace-options'
 import { chosenAspect } from '../workspace/output-choice'
@@ -17,25 +18,27 @@ import { CatalogueFormStatus } from '../catalogue/catalogue-form-status'
 import { batchCounts, MATRIX_TEMPLATES, type BatchCaps } from '../gated/feature-access'
 import { IntroTrigger } from '../gated/intro-trigger'
 import { TierBadge } from '../gated/tier-badge'
-import { MatrixGrid } from './matrix-grid'
-import { pickTemplate, toggleCell, totalsByResolution, withoutTemplate } from './matrix-state'
+import { pickTemplate, withoutTemplate } from './matrix-state'
+import { ReviewListView } from './review-list'
 import { TemplatePicker } from './template-picker'
 import { TemplateSettings } from './template-settings'
 import { TemplatesSection } from './templates-section'
 import type { MatrixDraft } from './use-matrix-draft'
 
-type Props = { draft: MatrixDraft; templates: readonly CatalogueTemplate[]; browse: PickerBrowse | null; balancePaid: number; tier: MembershipTier | null }
+// `page`: the /generate/batch page (its Generate bar is fixed on phones), not the dialog.
+type Props = { draft: MatrixDraft; templates: readonly CatalogueTemplate[]; browse: PickerBrowse | null; tier: MembershipTier | null; page?: boolean }
 
 // Batch create's form (T107, Owner 2026-11-12), one column like the workspace (DESIGN §4.3):
-// templates → photos → the grid with its prices → each template's text and options → the one
-// size and resolution of the batch. From lg the grid moves to the right column, beside the form.
+// templates → photos → the review list (each result's tier, note and price, Owner 2026-11-28) →
+// each template's text and options → the one size of the batch. From lg the list moves to the
+// right column, beside the form.
 // The plan's limits (draft.caps) shape it: on Pro one template, and the two places a Pro member
 // reaches for more (a second template, a full tray) carry the locked Max mark, nothing else.
-export function MatrixForm({ draft, templates, browse, balancePaid, tier }: Props) {
+export function MatrixForm({ draft, templates, browse, tier, page = false }: Props) {
   const t = useTranslations('app')
-  const { caps, photos, change, chosen, cells } = draft
+  const { caps, photos, chosen } = draft
   const shown = photos.photos.filter((photo) => photo.upload.phase !== 'error')
-  const grid = chosen.length > 0 && shown.length > 0 ? <MatrixGrid templates={chosen} photos={shown} cells={cells} total={draft.total} count={draft.count} max={caps.cells} onToggle={(key) => change((v) => toggleCell(v, key))} /> : null
+  const ready = chosen.length > 0 && shown.length > 0
   return (
     <>
       <TemplatesBlock draft={draft} templates={templates} browse={browse} tier={tier} />
@@ -43,9 +46,9 @@ export function MatrixForm({ draft, templates, browse, balancePaid, tier }: Prop
         {photos.photos.length ? <BatchPhotos photos={photos.photos} max={caps.cells} tier={tier} onAdd={photos.add} onRemove={photos.remove} /> : <PhotoPickers onPick={photos.add} multiple />}
         {caps.templates === 1 && photos.photos.length >= caps.cells ? <MoreLocked tier={tier} tab="batch" /> : null}
       </Section>
-      {grid ? <Section id="grid-h" title={t('matrix.gridTitle')} className="lg:hidden">{grid}</Section> : null}
+      {ready ? <Section id="grid-h" title={t('matrix.gridTitle')} aside={<ReviewCount draft={draft} />} className="lg:hidden"><ReviewListView draft={draft} page={page} /></Section> : null}
       <SettingsSection draft={draft} photos={shown} />
-      {chosen.length > 0 ? <OutputSections draft={draft} balancePaid={balancePaid} firstRatio={shown[0]?.originalRatio} /> : null}
+      {chosen.length > 0 ? <OutputSections draft={draft} firstRatio={shown[0]?.originalRatio} /> : null}
     </>
   )
 }
@@ -101,23 +104,26 @@ function SettingsSection({ draft, photos }: { draft: MatrixDraft; photos: Matrix
   )
 }
 
-// Size and resolution, one choice for the whole batch, from what every chosen template offers;
-// each resolution card shows what the whole batch would cost there.
-function OutputSections({ draft, balancePaid, firstRatio }: { draft: MatrixDraft; balancePaid: number; firstRatio?: number }) {
+// The size, one choice for the whole batch, from what every chosen template offers. Each result's
+// tier is picked in the review list (Owner 2026-11-28).
+function OutputSections({ draft, firstRatio }: { draft: MatrixDraft; firstRatio?: number }) {
   const t = useTranslations('app')
-  const { options, values, change, cells } = draft
+  const { options, values, change } = draft
   const aspect = chosenAspect(values.aspect, options, firstRatio)
   return (
-    <>
-      <Section id="size-h" title={t('workspace.size')} aside={aspect ? <span className="text-caption text-muted-foreground">{sizeLabel(aspect, t)}</span> : null}>
-        <SizePicker options={options} photoRatio={firstRatio} value={values.aspect} onChange={(next) => change((v) => ({ ...v, aspect: next }))} />
-      </Section>
-      {options.resolutions.length > 1 ? (
-        <Section id="res-h" title={t('workspace.resolution')} aside={<span className="text-caption text-muted-foreground">{t('matrix.resolutionAside')}</span>}>
-          <ResolutionPicker options={options} aspect={values.aspect} photoRatio={firstRatio} value={values.resolution} costs={totalsByResolution(cells)} balance={{ paid: balancePaid, free: 0 }} onChange={(next) => change((v) => ({ ...v, resolution: next }))} />
-        </Section>
-      ) : null}
-    </>
+    <Section id="size-h" title={t('workspace.size')} aside={aspect ? <span className="text-caption text-muted-foreground">{sizeLabel(aspect, t)}</span> : null}>
+      <SizePicker options={options} photoRatio={firstRatio} value={values.aspect} onChange={(next) => change((v) => ({ ...v, aspect: next }))} />
+    </Section>
+  )
+}
+
+// How many results the batch makes of the plan's most, and what they cost.
+function ReviewCount({ draft }: { draft: MatrixDraft }) {
+  const t = useTranslations('app.matrix')
+  return (
+    <span aria-live="polite" className={cn('text-caption', draft.count > draft.caps.cells ? 'text-destructive' : 'text-muted-foreground')}>
+      {t.rich('gridTotal', { count: draft.count, max: draft.caps.cells, total: draft.total, mono: (chunks) => <span className="font-mono">{chunks}</span> })}
+    </span>
   )
 }
 
@@ -164,16 +170,19 @@ function MoreLocked({ tier, tab }: { tier: MembershipTier | null; tab: 'batch' |
   )
 }
 
-// The grid beside the form from lg up (the stage column of the workspace).
+// The review list beside the form from lg up (the stage column of the workspace).
 // `className` replaces the page's sticky column (the dialog gives it a scrolling column).
 export function MatrixStage({ draft, className = 'hidden lg:sticky lg:top-20 lg:block lg:max-w-[560px] lg:pt-6' }: { draft: MatrixDraft; className?: string }) {
   const t = useTranslations('app.matrix')
   const shown = draft.photos.photos.filter((photo) => photo.upload.phase !== 'error')
   return (
     <aside aria-labelledby="grid-lg-h" className={className}>
-      <h2 id="grid-lg-h" className="mb-3 text-headline leading-[1.2] font-semibold tracking-[-0.01em]">{t('gridTitle')}</h2>
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <h2 id="grid-lg-h" className="text-headline leading-[1.2] font-semibold tracking-[-0.01em]">{t('gridTitle')}</h2>
+        {draft.chosen.length > 0 && shown.length > 0 ? <ReviewCount draft={draft} /> : null}
+      </div>
       {draft.chosen.length > 0 && shown.length > 0 ? (
-        <MatrixGrid templates={draft.chosen} photos={shown} cells={draft.cells} total={draft.total} count={draft.count} max={draft.caps.cells} onToggle={(key) => draft.change((v) => toggleCell(v, key))} />
+        <ReviewListView draft={draft} />
       ) : (
         <p className="hairline rounded-panel bg-card p-5 text-caption leading-[1.45] text-muted-foreground">{t(draft.caps.templates > 1 ? 'gridEmpty' : 'gridEmptyOne', { max: draft.caps.cells, templates: draft.caps.templates })}</p>
       )}

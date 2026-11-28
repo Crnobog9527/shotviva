@@ -14,13 +14,13 @@ import { onlyTemplate, withTemplates } from './matrix-state'
 import { submitBatch } from './submit-batch'
 import { MATRIX_VIEW, useMatrixDraft } from './use-matrix-draft'
 
-type Input = { templates: readonly CatalogueTemplate[]; initial: string[]; balance: Balance; limit: number; caps: BatchCaps; onStarted(): void }
+type Input = { templates: readonly CatalogueTemplate[]; initial: string[]; balance: Balance; limit: number; caps: BatchCaps; promo?: boolean; onStarted(): void }
 
 // One Batch create, whichever frame shows it (the dialog on Create, or the /generate/batch
 // page): the draft, its results in the generation store (MATRIX_VIEW, so a refresh lands on
 // them), Generate behind the #515 latch, and the ways back to the form.
-export function useBatchSession({ templates, initial, balance, limit, caps, onStarted }: Input) {
-  const draft = useMatrixDraft({ templates, initial, balance, limit, caps })
+export function useBatchSession({ templates, initial, balance, limit, caps, promo, onStarted }: Input) {
+  const draft = useMatrixDraft({ templates, initial, balance, limit, caps, promo })
   const ids = useWorkspaceJobs(MATRIX_VIEW)
   const refusal = useBatchRefusal()
   const [latch] = useState(createSubmitLatch)
