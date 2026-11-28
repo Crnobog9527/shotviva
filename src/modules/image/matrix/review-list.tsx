@@ -8,7 +8,7 @@ import { cn } from '@/core/ui/cn'
 
 import { BulkBar } from './bulk-bar'
 import { poolTotals } from './cell-choices'
-import { CheckBox } from './check-box'
+import { CheckBox, pressedOf } from './check-box'
 import { keptCells } from './matrix-state'
 import { ReviewGroupView } from './review-group'
 import type { GroupBy } from './review-groups'
@@ -19,7 +19,7 @@ import type { MatrixDraft } from './use-matrix-draft'
 // 出图前核对一下 (Owner 2026-11-28): the batch as a list, one row per result, in place of the
 // photo × template grid. What it will spend from each pool and the whole batch's tier sit on top;
 // below, the grouping, folding all, and the groups.
-export function ReviewListView({ draft }: { draft: MatrixDraft }) {
+export function ReviewListView({ draft, page = false }: { draft: MatrixDraft; page?: boolean }) {
   const list = useReviewList(draft)
   return (
     <div>
@@ -43,7 +43,7 @@ export function ReviewListView({ draft }: { draft: MatrixDraft }) {
           />
         ))}
       </div>
-      <BulkBar draft={draft} list={list} />
+      <BulkBar draft={draft} list={list} page={page} />
       <ReviewSheets draft={draft} list={list} />
     </div>
   )
@@ -93,7 +93,7 @@ function SelectAll({ draft, list }: { draft: MatrixDraft; list: ReviewList }) {
   const picked = list.bulk.selected.size
   const state = picked === 0 ? 'off' : picked === keys.length ? 'on' : 'some'
   return (
-    <button type="button" aria-pressed={state === 'on'} onClick={() => (state === 'on' ? list.bulk.clear() : list.bulk.setMany(keys, true))} className="inline-flex min-h-11 items-center gap-2 px-2 text-caption font-medium whitespace-nowrap text-bone-dim hover:text-foreground">
+    <button type="button" aria-pressed={pressedOf(state)} onClick={() => (state === 'on' ? list.bulk.clear() : list.bulk.setMany(keys, true))} className="inline-flex min-h-11 items-center gap-2 px-2 text-caption font-medium whitespace-nowrap text-bone-dim hover:text-foreground">
       <CheckBox state={state} />
       {t('selectAll')}
     </button>
