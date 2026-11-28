@@ -152,6 +152,23 @@ describe('T107 preflight and independent jobs', () => {
     expect((await batchArchive(db, userId, quote.batch_id)).files.map(file => file.jobId)).toEqual(jobs.map(job => job.id))
   })
 
+  // Owner 2026-11-28: each cell picks its own tier (one size for the batch); a plain account's
+  // batch stays paid only, so a 1K cell is refused before anything is quoted.
+  it('quotes each cell at its own tier and refuses a 1K cell for a plain account', async () => {
+    const { db, deps, userId, cells } = await setup('max_monthly')
+    const mixed = [cells[0]!, { ...cells[1]!, inputs: { ...cells[1]!.inputs, resolution: '4k' as const } }]
+    const quote = await preflightBatch(db, userId, mixed, deps.provider)
+    // templates[0] prices its seeded default; templates[1] is 2 / 3 / 4 (4K = 4).
+    const twoK = (await sql.query(`select (credits_cost->>'2k')::int as cost from public.templates where id=$1`, [templates[0]])).rows[0].cost
+    expect(quote.cells.map(c => c.expected_credits)).toEqual([twoK, 4])
+    const jobs = await Promise.all(mixed.map((cell, i) => runGeneration(deps, toGenerationRequest(userId, { ...cell, ...quote, ...quote.cells[i] }))))
+    expect(jobs.map(job => [job.status, job.credit_pool, job.credits_cost])).toEqual([['succeeded', 'paid', twoK], ['succeeded', 'paid', 4]])
+    const oneK = [{ ...cells[0]!, inputs: { ...cells[0]!.inputs, resolution: '1k' as const } }, cells[1]!]
+    await expect(preflightBatch(db, userId, oneK, deps.provider)).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+    const otherSize = [cells[0]!, { ...cells[1]!, inputs: { ...cells[1]!.inputs, aspect_ratio: '1:1' as const } }]
+    await expect(preflightBatch(db, userId, otherSize, deps.provider)).rejects.toMatchObject({ code: 'INVALID_INPUT' })
+  })
+
   it('preflights all paid credits and never falls through to free after an intervening spend', async () => {
     const { db, deps, userId, cells } = await setup('max_monthly')
     const batch = await preflightBatch(db, userId, cells, deps.provider)
