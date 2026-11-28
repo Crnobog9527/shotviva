@@ -25,7 +25,8 @@ import { TemplateSettings } from './template-settings'
 import { TemplatesSection } from './templates-section'
 import type { MatrixDraft } from './use-matrix-draft'
 
-type Props = { draft: MatrixDraft; templates: readonly CatalogueTemplate[]; browse: PickerBrowse | null; tier: MembershipTier | null }
+// `page`: the /generate/batch page (its Generate bar is fixed on phones), not the dialog.
+type Props = { draft: MatrixDraft; templates: readonly CatalogueTemplate[]; browse: PickerBrowse | null; tier: MembershipTier | null; page?: boolean }
 
 // Batch create's form (T107, Owner 2026-11-12), one column like the workspace (DESIGN §4.3):
 // templates → photos → the review list (each result's tier, note and price, Owner 2026-11-28) →
@@ -33,7 +34,7 @@ type Props = { draft: MatrixDraft; templates: readonly CatalogueTemplate[]; brow
 // right column, beside the form.
 // The plan's limits (draft.caps) shape it: on Pro one template, and the two places a Pro member
 // reaches for more (a second template, a full tray) carry the locked Max mark, nothing else.
-export function MatrixForm({ draft, templates, browse, tier }: Props) {
+export function MatrixForm({ draft, templates, browse, tier, page = false }: Props) {
   const t = useTranslations('app')
   const { caps, photos, chosen } = draft
   const shown = photos.photos.filter((photo) => photo.upload.phase !== 'error')
@@ -45,7 +46,7 @@ export function MatrixForm({ draft, templates, browse, tier }: Props) {
         {photos.photos.length ? <BatchPhotos photos={photos.photos} max={caps.cells} tier={tier} onAdd={photos.add} onRemove={photos.remove} /> : <PhotoPickers onPick={photos.add} multiple />}
         {caps.templates === 1 && photos.photos.length >= caps.cells ? <MoreLocked tier={tier} tab="batch" /> : null}
       </Section>
-      {ready ? <Section id="grid-h" title={t('matrix.gridTitle')} aside={<ReviewCount draft={draft} />} className="lg:hidden"><ReviewListView draft={draft} /></Section> : null}
+      {ready ? <Section id="grid-h" title={t('matrix.gridTitle')} aside={<ReviewCount draft={draft} />} className="lg:hidden"><ReviewListView draft={draft} page={page} /></Section> : null}
       <SettingsSection draft={draft} photos={shown} />
       {chosen.length > 0 ? <OutputSections draft={draft} firstRatio={shown[0]?.originalRatio} /> : null}
     </>

@@ -11,3 +11,7 @@ export function CheckBox({ state }: { state: 'on' | 'off' | 'some' }) {
     </span>
   )
 }
+
+// The state a check button announces: a group or "select all" with some of its rows picked is
+// neither on nor off.
+export const pressedOf = (state: 'on' | 'off' | 'some') => (state === 'some' ? 'mixed' : state === 'on')

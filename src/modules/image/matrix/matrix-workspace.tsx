@@ -49,7 +49,7 @@ function BatchForm({ templates, browse, initial, balance, tier, limit, caps, pro
     <div className="lg:grid lg:grid-cols-[minmax(380px,440px)_minmax(0,1fr)] lg:items-start lg:gap-x-12 lg:px-(--gutter)">
       <div ref={reveal} className="min-w-0 px-(--gutter) lg:px-0">
         <MatrixHead caps={caps} />
-        <MatrixForm draft={draft} templates={templates} browse={browse} tier={tier} />
+        <MatrixForm draft={draft} templates={templates} browse={browse} tier={tier} page />
         <MatrixAction cta={draft.cta} max={caps.cells} error={refusal.message(draft.error)} onGenerate={session.generate} />
       </div>
       <MatrixStage draft={draft} />

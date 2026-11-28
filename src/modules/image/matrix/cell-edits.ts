@@ -36,3 +36,29 @@ export function withRemoved(values: MatrixValues, keys: readonly CellKey[], remo
 
 // The note a result sends: blank is none, so the job looks as it did before notes.
 export const sentNote = (note: string) => cleanNote(note) || undefined
+
+// One bulk change, for its undo: the field it touched and what each touched result had there
+// before. Undo puts back only that, so edits made since (another row's note, the same rows' other
+// fields) stay.
+export type CellField = 'tiers' | 'notes' | 'removed'
+export type CellSnapshot = { field: CellField; before: [CellKey, string | boolean | undefined][] }
+
+export function snapshotCells(values: MatrixValues, keys: readonly CellKey[], field: CellField): CellSnapshot {
+  const removed = new Set(values.removed)
+  const at = (key: CellKey) => (field === 'removed' ? removed.has(key) : field === 'tiers' ? values.tiers[key] : values.notes[key])
+  return { field, before: keys.map((key) => [key, at(key)]) }
+}
+
+export function restoreCells(values: MatrixValues, snapshot: CellSnapshot): MatrixValues {
+  if (snapshot.field === 'removed') {
+    const back = snapshot.before.filter(([, was]) => was === true).map(([key]) => key)
+    const keep = snapshot.before.filter(([, was]) => was !== true).map(([key]) => key)
+    return withRemoved(withRemoved(values, keep, false), back, true)
+  }
+  const record = { ...values[snapshot.field] } as Record<CellKey, string>
+  for (const [key, was] of snapshot.before) {
+    if (was === undefined) delete record[key]
+    else record[key] = was as string
+  }
+  return { ...values, [snapshot.field]: record }
+}

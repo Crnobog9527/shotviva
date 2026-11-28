@@ -6,7 +6,9 @@ import type { ReactNode } from 'react'
 
 import { cn } from '@/core/ui/cn'
 
+import { BulkBar } from './bulk-bar'
 import { poolTotals } from './cell-choices'
+import { CheckBox, pressedOf } from './check-box'
 import { keptCells } from './matrix-state'
 import { ReviewGroupView } from './review-group'
 import type { GroupBy } from './review-groups'
@@ -17,18 +19,31 @@ import type { MatrixDraft } from './use-matrix-draft'
 // 出图前核对一下 (Owner 2026-11-28): the batch as a list, one row per result, in place of the
 // photo × template grid. What it will spend from each pool and the whole batch's tier sit on top;
 // below, the grouping, folding all, and the groups.
-export function ReviewListView({ draft }: { draft: MatrixDraft }) {
+export function ReviewListView({ draft, page = false }: { draft: MatrixDraft; page?: boolean }) {
   const list = useReviewList(draft)
   return (
     <div>
       <ReviewSummary draft={draft} list={list} />
       <div className="mt-3 mb-1 flex items-center justify-between gap-2">
         <GroupSwitch by={list.by} onBy={list.setBy} />
-        <FoldAll open={list.allOpen} onClick={list.foldAll} />
+        <span className="flex items-center">
+          <FoldAll open={list.allOpen} onClick={list.foldAll} />
+          <SelectAll draft={draft} list={list} />
+        </span>
       </div>
       <div className="grid gap-2.5">
-        {list.groups.map((group) => <ReviewGroupView key={`${group.by}-${group.id}`} group={group} open={list.open.has(group.id)} onToggle={() => list.toggle(group.id)} actions={list.actions} />)}
+        {list.groups.map((group) => (
+          <ReviewGroupView
+            key={`${group.by}-${group.id}`}
+            group={group}
+            open={list.open.has(group.id)}
+            onToggle={() => list.toggle(group.id)}
+            onSelect={(on) => list.bulk.setMany(group.rows.map((row) => row.cell.key), on)}
+            actions={list.actions}
+          />
+        ))}
       </div>
+      <BulkBar draft={draft} list={list} page={page} />
       <ReviewSheets draft={draft} list={list} />
     </div>
   )
@@ -69,6 +84,19 @@ function GroupSwitch({ by, onBy }: { by: GroupBy; onBy(by: GroupBy): void }) {
         </button>
       ))}
     </div>
+  )
+}
+
+function SelectAll({ draft, list }: { draft: MatrixDraft; list: ReviewList }) {
+  const t = useTranslations('app.matrix.review')
+  const keys = draft.cells.map((cell) => cell.key)
+  const picked = list.bulk.selected.size
+  const state = picked === 0 ? 'off' : picked === keys.length ? 'on' : 'some'
+  return (
+    <button type="button" aria-pressed={pressedOf(state)} onClick={() => (state === 'on' ? list.bulk.clear() : list.bulk.setMany(keys, true))} className="inline-flex min-h-11 items-center gap-2 px-2 text-caption font-medium whitespace-nowrap text-bone-dim hover:text-foreground">
+      <CheckBox state={state} />
+      {t('selectAll')}
+    </button>
   )
 }
 

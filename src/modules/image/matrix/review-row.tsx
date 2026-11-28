@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl'
 import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
 import { cn } from '@/core/ui/cn'
 
+import { CheckBox } from './check-box'
 import { coverOf, type ReviewActions } from './review-actions'
 import type { GroupBy, ReviewRow } from './review-groups'
 import { RowNote } from './row-note'
@@ -21,7 +22,10 @@ export function ReviewRowView({ row, by, actions }: { row: ReviewRow; by: GroupB
   const label = by === 'template' ? t('rowPhoto', { index: index + 1 }) : cell.template.name
   const sub = by === 'template' ? photo.name : cell.template.categoryName
   return (
-    <li className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2.5 gap-y-2 px-3 py-3 md:items-start md:gap-x-3 md:gap-y-1.5">
+    <li className={cn('grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 py-3 pr-3 pl-0.5 md:items-start md:gap-x-3 md:gap-y-1.5 md:pl-1', actions.selected.has(cell.key) && 'bg-wash-faint')}>
+      <button type="button" aria-pressed={actions.selected.has(cell.key)} aria-label={t('selectRow', { index: index + 1, template: cell.template.name })} onClick={() => actions.toggleSelect(cell.key)} className="grid size-11 place-items-center self-center md:row-span-2">
+        <CheckBox state={actions.selected.has(cell.key) ? 'on' : 'off'} />
+      </button>
       <div className={cn('flex items-center gap-1 md:row-span-2 md:gap-1.5', cell.removed && 'opacity-45')}>
         <img src={photo.url} alt={t('rowPhoto', { index: index + 1 })} className={cn(REPLAY_BLOCK_CLASS, 'hairline h-[52px] w-[42px] rounded-[10px] bg-muted object-cover md:h-[65px] md:w-[52px] md:rounded-[12px]')} />
         <ArrowRightIcon aria-hidden="true" className="size-3.5 text-muted-foreground" />
@@ -34,7 +38,7 @@ export function ReviewRowView({ row, by, actions }: { row: ReviewRow; by: GroupB
       <div className="md:self-start">
         <TierChip cell={cell} promo={actions.promo} onOpen={() => actions.openTier(cell.key)} />
       </div>
-      <div className="col-span-3 md:col-span-2 md:col-start-2">
+      <div className="col-span-3 col-start-2 md:col-span-2 md:col-start-3">
         {cell.removed ? <p className="py-0.5 text-caption text-muted-foreground">{t('skippedLine')}</p> : <RowNote cell={cell} actions={actions} />}
       </div>
     </li>
