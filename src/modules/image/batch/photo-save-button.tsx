@@ -8,17 +8,17 @@ import { cn } from '@/core/ui/cn'
 
 import type { Translate } from '@/core/translate'
 
-import { usePhotoSave, type PhotoSaveState } from './use-photo-save'
+import { usePhotoSave, type PhotoLinkSource, type PhotoSaveState } from './use-photo-save'
 
-type Props = { batchId: string; count: number; className?: string; onUnsupported(): void }
+type Props = { links: PhotoLinkSource; count: number; className?: string; onUnsupported(): void }
 
-// Save-to-phone for one batch: same quiet ghost button as the ZIP. The line under it says what
+// Save-to-phone for one batch, or for the works picked on Photos: same quiet ghost button as the ZIP. The line under it says what
 // the next tap does or how far along the groups are.
-export function PhotoSaveButton({ batchId, count, className, onUnsupported }: Props) {
+export function PhotoSaveButton({ links, count, className, onUnsupported }: Props) {
   const t = useTranslations('app.batchSave')
   const errors = useTranslations('app.errors')
   const zip = useTranslations('app.batchZip')
-  const { state, press } = usePhotoSave(batchId)
+  const { state, press } = usePhotoSave(links)
   useEffect(() => {
     if (state.kind === 'unsupported') onUnsupported()
   }, [state.kind, onUnsupported])

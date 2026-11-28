@@ -65,9 +65,22 @@ export const nextChunk = (photos: PhotoLink[], savedNames: ReadonlySet<string>, 
 const TYPE_BY_EXTENSION: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg' }
 
 // The File keeps the bytes exactly as stored (same resolution and cleanliness as the ZIP entry).
+// A name given before the bytes were known (Photos' picked works: a free public work comes back
+// as a watermarked JPEG) takes the extension the bytes have.
+const EXTENSION_BY_TYPE: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }
+
+export function namedFor(name: string, blobType: string): { name: string; type: string } {
+  const dot = name.lastIndexOf('.')
+  const extension = dot > 0 ? name.slice(dot + 1).toLowerCase() : ''
+  const type = blobType || TYPE_BY_EXTENSION[extension] || 'image/png'
+  const wanted = EXTENSION_BY_TYPE[type]
+  if (!wanted || TYPE_BY_EXTENSION[extension] === type) return { name, type }
+  return { name: `${dot > 0 ? name.slice(0, dot) : name}.${wanted}`, type }
+}
+
 function fileFrom(blob: Blob, name: string): File {
-  const type = blob.type || TYPE_BY_EXTENSION[name.split('.').pop()?.toLowerCase() ?? ''] || 'image/png'
-  return new File([blob], name, { type })
+  const named = namedFor(name, blob.type)
+  return new File([blob], named.name, { type: named.type })
 }
 
 // Blobs, not <img>: the share sheet needs the bytes. no-store so a cached copy made without

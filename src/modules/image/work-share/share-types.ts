@@ -5,3 +5,10 @@ export type CreateShareResult = { path: string } | { failed: 'gone' | 'busy' | '
 export type CreateShareAction = (request: CreateShareRequest) => Promise<CreateShareResult>
 
 export { WORK_SHARE_MAX_WORKS as SHARE_MAX, WORK_SHARE_NOTE_MAX as SHARE_NOTE_MAX, WORK_SHARE_TITLE_MAX as SHARE_TITLE_MAX } from '@/core/work-share/share-schema'
+
+// Deleting the picked works (作品页改版 PR④): the page's server action, and what came of it. A work
+// that stayed is counted by why: still generating, an org work (only the org's owner deletes it),
+// or an error. Works that are already gone or not the reader's count as deleted: nothing of
+// theirs is left to show.
+export type BulkDeleteResult = { deleted: number; running: number; org: number; failed: number }
+export type BulkDeleteAction = (jobIds: string[]) => Promise<BulkDeleteResult>

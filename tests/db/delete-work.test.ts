@@ -7,6 +7,7 @@ import { listJobs, parseJobFilters, viewWork } from '@/core/admin'
 import {
   deleteOwnJob,
   deleteOwnWork,
+  deleteOwnWorks,
   findJobByIdempotencyKey,
   findOwnJob,
   listOwnJobs,
@@ -124,6 +125,30 @@ describe('deleting a work', () => {
     await expect(
       reserveJob(service, { jobId: randomUUID(), userId, module: 'image', templateId: 'edit', source: 'web', parentJobId: job.id, inputs: { resolution: '1k' } }),
     ).rejects.toMatchObject({ code: 'NOT_FOUND' })
+  })
+
+  it('deletes several at once and says what stayed', async () => {
+    const mine = await work()
+    const second = await work()
+    await db.query('update public.generation_jobs set user_id = $2 where id = $1', [second.job.id, mine.userId])
+    const other = await work()
+    const running = randomUUID()
+    await reserveJob(service, { jobId: running, userId: mine.userId, module: 'image', templateId, source: 'web', inputs: { resolution: '1k' } })
+    const deps = { db: service, store: mine.r2.store }
+    const credits = (await profileOf(db, mine.userId)).credits
+    // Mine twice (counted once), someone else's and a made-up id (nothing of mine to show: counted
+    // as gone, and the other person's work untouched), and one still generating (stays).
+    const result = await deleteOwnWorks(deps, mine.userId, [mine.job.id, second.job.id, mine.job.id, other.job.id, randomUUID(), running])
+    expect(result).toEqual({ deleted: 4, running: 1, org: 0, failed: 0 })
+    expect((await rowOf(mine.job.id)).deleted_at).not.toBeNull()
+    expect((await rowOf(second.job.id)).deleted_at).not.toBeNull()
+    expect((await rowOf(other.job.id)).deleted_at).toBeNull()
+    expect((await rowOf(running)).deleted_at).toBeNull()
+    expect(mine.files.some((key) => mine.r2.objects.has(key))).toBe(false)
+    expect(other.files.every((key) => other.r2.objects.has(key))).toBe(true)
+    // No credits move.
+    expect((await profileOf(db, mine.userId)).credits).toBe(credits)
+    expect(await deleteOwnWorks(deps, mine.userId, [])).toEqual({ deleted: 0, running: 0, org: 0, failed: 0 })
   })
 
   it('is the owner’s only, finished works only, and fine to repeat', async () => {
