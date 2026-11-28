@@ -1260,7 +1260,7 @@
       "saveToPhotos": "存入相册",
       "saveToPhotosHint": "在弹出的菜单中选择「存储图像」。",
       "preparingPhoto": "正在准备图片…",
-      "holdPhotoHint": "长按图片，再选择「存储图像」。",
+      "holdPhotoHint": "长按图片，再选择「存储图像」。", "holdToAlbumHint": "长按图片，再选择「保存图片」，就会存进手机相册。",
       "longPress": "长按图片直接存进相册（JPG，画质不变）；要无损 PNG 原图请点「下载」",
       "photosHint": "存进相册：点右边的分享，再选「存储图像」",
       "makeAnotherWith": "用 {name} 再做一张",
@@ -2294,7 +2294,7 @@
       "copiedHint": "链接已复制，打开微信粘贴发送"
     },
     "workShare": {
-      "bulk": {"download": "下载 {count, plural, other {# 张}}", "downloading": "正在下载第 {started}/{total} 张，浏览器询问时请允许下载多个文件。", "downloaded": "已下载 {total} 张，去下载文件夹里看看。", "downloadFailed": "有 {count} 张没能下载，再点一次只重试没下到的。", "downloadRetry": "重试 {count, plural, other {# 张}}", "delete": "删除", "deleteTitle": "{count, plural, =1 {删除这张作品？} other {删除这 # 张作品？}}", "deleteBody": "删除后无法恢复，已消耗的积分不会退还。", "deleteConfirm": "{count, plural, =1 {删除作品} other {删除 # 张作品}}", "deleting": "正在删除…", "deleteError": "没能完成删除，可能只删掉了一部分。请再试一次。", "deleteRetry": "再试一次", "cancel": "取消", "close": "知道了", "partTitle": "{count, plural, =0 {没有删除任何作品} other {已删除 # 张}}", "keptOrg": "有 {count} 张是企业作品，只能由企业管理员删除。", "keptRunning": "有 {count} 张仍在生成，完成后才能删除。", "keptFailed": "有 {count} 张没能删除，请稍后再试。"},
+      "bulk": {"download": "下载 {count, plural, other {# 张}}", "downloading": "正在下载第 {started}/{total} 张，浏览器询问时请允许下载多个文件。", "downloaded": "已下载 {total} 张，去下载文件夹里看看。", "downloadFailed": "有 {count} 张没能下载，再点一次只重试没下到的。", "downloadRetry": "重试 {count, plural, other {# 张}}", "album": "保存 {count, plural, other {# 张}}到相册", "albumWhy": "这个浏览器不能一次存多张：打开后逐张长按，就能存进相册。", "albumTitle": "保存到相册 · 共 {count, plural, other {# 张}}", "albumHint": "长按图片 → 保存图片，就会存进手机相册。每张都要长按一次。", "albumCount": "第 {index}/{total} 张", "albumRetry": "这张没加载出来，点一下重试", "albumDone": "完成", "delete": "删除", "deleteTitle": "{count, plural, =1 {删除这张作品？} other {删除这 # 张作品？}}", "deleteBody": "删除后无法恢复，已消耗的积分不会退还。", "deleteConfirm": "{count, plural, =1 {删除作品} other {删除 # 张作品}}", "deleting": "正在删除…", "deleteError": "没能完成删除，可能只删掉了一部分。请再试一次。", "deleteRetry": "再试一次", "cancel": "取消", "close": "知道了", "partTitle": "{count, plural, =0 {没有删除任何作品} other {已删除 # 张}}", "keptOrg": "有 {count} 张是企业作品，只能由企业管理员删除。", "keptRunning": "有 {count} 张仍在生成，完成后才能删除。", "keptFailed": "有 {count} 张没能删除，请稍后再试。"},
       "start": "选择",
       "startAria": "选择作品，下载、删除或用一个链接分享",
       "selected": "{count, plural, =0 {选择作品} other {已选 # 张}}",
