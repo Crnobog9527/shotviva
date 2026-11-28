@@ -51,7 +51,8 @@ function Dial({ kind, count, of, label, ringLabel }: DialProps) {
   )
 }
 
-type Props = { balance: Balance; giftRefused: SignupGiftRefusal | null; allowance: Allowance | null; freeGift: number }
+// buy: false for org staff, who get their credits from the org instead of a buy link (Owner 2026-11-28).
+type Props = { balance: Balance; giftRefused: SignupGiftRefusal | null; allowance: Allowance | null; freeGift: number; buy?: boolean }
 
 // The account page's note, by refusal reason (1350).
 const REFUSAL_COPY = { same_ip_pending: 'signupGiftRefused', daily_cap: 'signupGiftRefusedCap', paused: 'signupGiftRefusedPaused', staff: 'signupGiftRefusedStaff' } as const
@@ -74,7 +75,7 @@ function useDialCopy(balance: Balance, figures: DialFigures) {
   return { paid, free }
 }
 
-export function CreditDials({ balance, giftRefused, allowance, freeGift }: Props) {
+export function CreditDials({ balance, giftRefused, allowance, freeGift, buy = true }: Props) {
   const t = useTranslations('app.account.credits')
   const balanceT = useTranslations('app.balance')
   const copy = useDialCopy(balance, dialFigures(balance, allowance, freeGift, giftRefused !== null))
@@ -85,10 +86,12 @@ export function CreditDials({ balance, giftRefused, allowance, freeGift }: Props
         <Dial kind="free" count={balance.free} {...copy.free} />
       </div>
       {giftRefused ? <p className="mt-2 text-caption text-muted-foreground">{balanceT(REFUSAL_COPY[giftRefused])}</p> : null}
-      <PaywallButton trigger="account" options={{ step: 'packs' }} className="press mt-2 inline-flex min-h-11 items-center gap-1 text-caption font-medium text-foreground">
-        {t('buy')}
-        <Chevron className="size-4" />
-      </PaywallButton>
+      {buy ? (
+        <PaywallButton trigger="account" options={{ step: 'packs' }} className="press mt-2 inline-flex min-h-11 items-center gap-1 text-caption font-medium text-foreground">
+          {t('buy')}
+          <Chevron className="size-4" />
+        </PaywallButton>
+      ) : <p className="mt-2 text-caption text-muted-foreground">{t('fromOrg')}</p>}
     </>
   )
 }

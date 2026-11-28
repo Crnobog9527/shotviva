@@ -308,7 +308,7 @@ describe.each(['en', 'zh'] as const)('purchasing and the staff link (%s)', (loca
     const { html, text, errors } = render(locale, createElement(OwnerConsoleView, { data: owner({ status: 'suspended' }), actions: ownerActions, report: null, affiliate: true }))
     expect(errors).toEqual([])
     expect(text).toContain(locale === 'en' ? 'The company workspace is not active' : '企业工作台未开启：')
-    expect(text).not.toMatch(/purchase|buy|购买/i)
+    expect(text).toContain(locale === 'en' ? 'goes to your own account' : '进入你自己的账号')
     expect(text).not.toMatch(/paused|暂停|inactive|已停用/i)
     expect(html).not.toContain('text-destructive')
     expect((html.match(/disabled=""/g) ?? []).length).toBeGreaterThanOrEqual(3)

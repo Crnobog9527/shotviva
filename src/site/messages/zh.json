@@ -734,6 +734,8 @@
       "shelfCount": "共 {count} 个",
       "shelfMore": "+{count} 个",
       "shelfMoreAria": "查看「{name}」全部 {total} 个模板",
+      "shelfExpand": "展开其余 {count} 个",
+      "shelfCollapse": "收起",
       "scrollBack": "向前滚动「{name}」",
       "scrollOn": "向后滚动「{name}」",
       "inSeries": "系列：{name}"
@@ -1456,7 +1458,8 @@
         "paidRingOf": "付费积分剩余 {count}，共 {total}",
         "paidRing": "付费积分剩余 {count}",
         "freeRingOf": "免费积分剩余 {count}，共 {total}",
-        "freeRing": "免费积分剩余 {count}"
+        "freeRing": "免费积分剩余 {count}",
+        "fromOrg": "积分由企业分配。需要更多积分，请联系企业管理员。"
       },
       "settings": {
         "title": "设置",
@@ -1909,7 +1912,8 @@
         "promoNone": "本月还没有推广积分",
         "promoHint": "推广积分生成的图带水印、公开展示且不可商用；每月底（UTC），企业池和成员未用完的推广积分一并清零。",
         "hintPaidOnly": "你买的积分存在这里，分给成员后，由成员用于自己的出图。",
-        "purchaseNote": "企业正常使用期间，你购买的积分会直接存入积分池。这些购买不能自助申请退款，如需退款请联系客服。"
+        "purchaseNote": "企业正常使用期间，你购买的积分会直接存入积分池。这些购买不能自助申请退款，如需退款请联系客服。",
+        "purchaseNoteOff": "企业工作台未开启期间，你购买的积分进入你自己的账号、不进积分池，出图时可以直接使用。"
       },
       "packages": {
         "title": "企业套餐",

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { CatalogueTemplate } from './catalogue-template'
-import { categoryNameAt, sameName, shelfMembers, shelveEntries, SHELF_LIMIT } from './catalogue-shelves'
+import { categoryNameAt, PHONE_FIRST, PHONE_WHOLE, phoneFirst, sameName, shelfMembers, shelveEntries, SHELF_LIMIT } from './catalogue-shelves'
 import type { CatalogueSeries, FilterNode, GridEntry } from './catalogue-view'
 
 const template = (id: string) => ({ id, name: id }) as CatalogueTemplate
@@ -47,6 +47,15 @@ describe('Create category shelves (Owner 2026-11-25)', () => {
 
   it('draws at most SHELF_LIMIT templates on a shelf', () => {
     expect(shelfMembers(series('big', 'Big', SHELF_LIMIT + 3))).toHaveLength(SHELF_LIMIT)
+  })
+
+  it('shows a small series whole on a phone, and two rows of a larger one', () => {
+    expect(phoneFirst(3)).toBe(3)
+    expect(phoneFirst(PHONE_WHOLE)).toBe(PHONE_WHOLE)
+    expect(phoneFirst(PHONE_WHOLE + 1)).toBe(PHONE_FIRST)
+    expect(phoneFirst(21)).toBe(PHONE_FIRST)
+    // The cards a phone hides until 「展开」 are ones the desktop row already draws.
+    expect(PHONE_WHOLE).toBeLessThanOrEqual(SHELF_LIMIT)
   })
 
   it('names the category a path chooses', () => {
