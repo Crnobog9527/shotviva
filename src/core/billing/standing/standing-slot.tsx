@@ -16,15 +16,18 @@ import type { MemberStanding } from '../subscription/standing'
 // core/billing/subscription: that barrel carries the account page's Plan card and its client
 // pieces (the Waffo cancel sheet), which must not ride into the marketing pages' first load. Signed out, unverified, or a failed
 // read: nothing is sent, the cards read as for a new buyer, and checkout still refuses (409).
+// What `userId` holds, for the paywall. Never throws for the org reads (they fail soft below).
+export async function readMemberStanding(userId: string): Promise<MemberStanding> {
+  const admin = createAdminSupabase()
+  const [standing, orgMember, orgPool] = await Promise.all([readStanding(admin, userId), memberRead(admin, userId), ownerRead(admin, userId)])
+  return { ...standing, ...(orgMember ? { orgMember } : {}), ...(orgPool ? { orgPool } : {}) }
+}
+
 async function standingOf(): Promise<MemberStanding | null> {
   try {
     const user = await getSessionUser()
     if (!user?.verified) return null
-    const admin = createAdminSupabase()
-    const [standing, orgMember, orgPool] = await Promise.all([
-      readStanding(admin, user.id), memberRead(admin, user.id), ownerRead(admin, user.id),
-    ])
-    return { ...standing, ...(orgMember ? { orgMember } : {}), ...(orgPool ? { orgPool } : {}) }
+    return await readMemberStanding(user.id)
   } catch (error) {
     // Next's own control flow (prerender bail-outs, redirects) must pass through.
     unstable_rethrow(error)
