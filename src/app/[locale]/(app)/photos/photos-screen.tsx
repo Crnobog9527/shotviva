@@ -41,19 +41,21 @@ async function Photos({ back, until, member, category, mark }: Asked) {
   const db = createAdminSupabase()
   // An active member of an org whose workspace is on sees the company's works here instead. The
   // personal list is read alongside, not after, so nobody else waits for the seat check; a
-  // company member's copy of it is dropped.
+  // company member's copy of it is dropped. Under a filter the list and what the filter offers
+  // wait for the seat check instead: a company member's page (its own rail, no categories) never
+  // calls the filter's functions (migration 2039).
   // The first screen's small copies are signed while the templates are still being read.
-  const works = listOwnJobs(db, user.id, now, cursor, undefined, filter).then(async (own) => ({ own, signed: await firstThumbUrls(r2Store, own.done, FIRST_SCREEN_THUMBS, 'tile') }))
-  works.catch(() => undefined)
-  const locale = await currentLocale()
   const seated = readCompanySeat(db, user.id)
-  // What the filter offers: read once the seat check says this is a personal page (a company
-  // member's page never asks), while the templates are still coming. Without it the page still
-  // lists, with no rail.
+  seated.catch(() => undefined)
+  const list = () => listOwnJobs(db, user.id, now, cursor, undefined, filter).then(async (own) => ({ own, signed: await firstThumbUrls(r2Store, own.done, FIRST_SCREEN_THUMBS, 'tile') }))
+  const works = filter ? seated.then((seat) => (seat ? null : list())) : list()
+  works.catch(() => undefined)
+  // Without the chips the page still lists, with no rail.
   const offered = seated.then((seat) => (seat ? [] : listOwnPhotoCategories(db, user.id))).catch((error: unknown) => {
     logger.error('photos.categories_failed', { error })
     return [] as OwnPhotoCategory[]
   })
+  const locale = await currentLocale()
   const [seat, templates, posters] = await Promise.all([seated, cachedWebTemplates(locale, true), cachedPosterTemplates(locale)])
   const tp = await getTranslations('app.photos')
   const fallback = tp('fallbackName')
@@ -67,7 +69,9 @@ async function Photos({ back, until, member, category, mark }: Asked) {
   if (seat) {
     return <CompanyPhotos db={db} userId={user.id} seat={seat} now={now} timeZone={timeZone} filter={(await member) ?? null} until={cursor} lookup={lookup} liveTemplates={liveTemplates} covers={covers} />
   }
-  const [{ own, signed }, categories] = await Promise.all([works, offered])
+  const [personal, categories] = await Promise.all([works, offered])
+  // Not a company member here, so the list was read.
+  const { own, signed } = personal!
   const running = own.running.map((job) => toPhotoItem(job, lookup, null, fallback))
   const done = own.done.map((job) => toPhotoItem(job, lookup, fileUrlFor(job.id), fallback, signed.get(job.id)))
   // How many works the filter holds: the chip's own count (what is listed, if the chips failed).
