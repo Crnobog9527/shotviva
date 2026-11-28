@@ -13,7 +13,7 @@ import { actInputSchema, experimentRowSchema, resultRowSchema, saveInputSchema, 
 // A few experiments ever run at once; the newest 50 cover the history the page shows.
 const LIST_LIMIT = 50
 const COLUMNS =
-  'id, surface, name, goal, status, winner_variant_id, started_at, ended_at, created_at, experiment_variants!experiment_variants_experiment_id_fkey(id, option_id, label, weight, is_control, archived_at, fallback_variant_id)'
+  'id, surface, name, goal, status, winner_variant_id, started_at, ended_at, retired_at, created_at, experiment_variants!experiment_variants_experiment_id_fkey(id, option_id, label, weight, is_control, archived_at, fallback_variant_id)'
 
 const fail = (what: string, error: { message: string; code?: string }): never => {
   const known = experimentErrorFor(error)
@@ -64,6 +64,12 @@ export async function actOnExperiment(db: SupabaseClient, actorId: string, input
   const parsed = actInputSchema.safeParse(input)
   if (!parsed.success) throw new AppError('INVALID_INPUT', EXPERIMENT_ERRORS.input)
   const { id, action, variant, fallback } = parsed.data
+  // Restoring the default is its own function (2038): it only applies to an ended experiment.
+  if (action === 'restore') {
+    const restored = await db.rpc('admin_experiment_restore_default', { p_actor: actorId, p_id: id })
+    if (restored.error) fail(action, restored.error)
+    return
+  }
   const { error } = await db.rpc('admin_experiment_act', { p_actor: actorId, p_id: id, p_action: action, p_variant: variant, p_fallback: fallback })
   if (error) fail(action, error)
 }

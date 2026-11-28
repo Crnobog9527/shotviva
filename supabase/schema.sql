@@ -9591,6 +9591,26 @@ end $$;
 ALTER FUNCTION "public"."admin_experiment_act"("p_actor" "uuid", "p_id" bigint, "p_action" "text", "p_variant" bigint, "p_fallback" bigint) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."admin_experiment_restore_default"("p_actor" "uuid", "p_id" bigint) RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_exp public.experiments;
+begin
+  perform admin.require_experiment_admin(p_actor);
+  select * into v_exp from public.experiments where id = p_id for update;
+  if not found then raise exception 'EXPERIMENT_NOT_FOUND'; end if;
+  if v_exp.status <> 'ended' or v_exp.retired_at is not null then raise exception 'EXPERIMENT_BAD_STATE'; end if;
+  update public.experiments set retired_at = now(), updated_at = now() where id = p_id;
+  insert into public.admin_audit_log (action, user_id, reason, target_id)
+  values ('experiment_restore_default', p_actor, format('%s: %s back to its default', v_exp.name, v_exp.surface), p_id::text);
+end $$;
+
+
+ALTER FUNCTION "public"."admin_experiment_restore_default"("p_actor" "uuid", "p_id" bigint) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."admin_experiment_results"("p_id" bigint) RETURNS TABLE("variant_id" bigint, "signups" bigint, "first_generations" bigint, "payments" bigint, "now_on" bigint, "moved" bigint)
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -16573,6 +16593,7 @@ CREATE OR REPLACE FUNCTION "public"."experiments_live"() RETURNS "jsonb"
         and not exists (select 1 from public.experiments l where l.surface = e.surface and l.status in ('running', 'paused'))
       order by e.surface, e.ended_at desc
     ) ended
+    where ended.retired_at is null
   )
   select coalesce(jsonb_agg(jsonb_build_object(
     'id', l.id, 'surface', l.surface, 'status', l.status, 'winner', l.winner_variant_id,
@@ -22815,7 +22836,7 @@ CREATE TABLE IF NOT EXISTS "public"."admin_audit_log" (
     "reason" "text" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "target_id" "text",
-    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text", 'experiment_save'::"text", 'experiment_start'::"text", 'experiment_pause'::"text", 'experiment_resume'::"text", 'experiment_end'::"text", 'experiment_archive_variant'::"text", 'experiment_delete'::"text", 'blog_save'::"text", 'blog_publish'::"text", 'blog_unpublish'::"text", 'org_create'::"text", 'org_update'::"text", 'org_grant'::"text", 'org_package_save'::"text", 'org_add_member'::"text", 'payment_fees_start'::"text", 'partner_promo_set'::"text", 'partner_promo_confirm'::"text", 'partner_promo_reject'::"text", 'partner_promo_run'::"text", 'partner_promo_topup'::"text", 'payment_acknowledge'::"text", 'payment_unacknowledge'::"text", 'partner_promo_void'::"text", 'org_transfer_owner'::"text"]))),
+    CONSTRAINT "admin_audit_log_action_check" CHECK (("action" = ANY (ARRAY['ban_user'::"text", 'unban_user'::"text", 'view_work'::"text", 'replay_checkout'::"text", 'decide_refund'::"text", 'submit_dispute'::"text", 'clawback_payment'::"text", 'save_code'::"text", 'set_code_active'::"text", 'affiliate_create'::"text", 'affiliate_decide'::"text", 'affiliate_set'::"text", 'affiliate_rebind'::"text", 'affiliate_adjust'::"text", 'affiliate_commission_release'::"text", 'affiliate_payout_decide'::"text", 'affiliate_settings'::"text", 'affiliate_recompute'::"text", 'waffo_renewal_settled'::"text", 'waffo_renewal_refunded'::"text", 'catalog_save'::"text", 'catalog_prepare'::"text", 'catalog_publish'::"text", 'catalog_retry'::"text", 'catalog_archive'::"text", 'catalog_waffo'::"text", 'gallery_setting'::"text", 'moderate_work'::"text", 'template_sync_active'::"text", 'template_sync_sale'::"text", 'series_sync_active'::"text", 'template_apply_active'::"text", 'template_apply_cover'::"text", 'series_set_active'::"text", 'series_set_show_members'::"text", 'template_delete'::"text", 'provider_declare_tiers'::"text", 'series_delete'::"text", 'series_sync_delete'::"text", 'experiment_save'::"text", 'experiment_start'::"text", 'experiment_pause'::"text", 'experiment_resume'::"text", 'experiment_end'::"text", 'experiment_archive_variant'::"text", 'experiment_delete'::"text", 'blog_save'::"text", 'blog_publish'::"text", 'blog_unpublish'::"text", 'org_create'::"text", 'org_update'::"text", 'org_grant'::"text", 'org_package_save'::"text", 'org_add_member'::"text", 'payment_fees_start'::"text", 'partner_promo_set'::"text", 'partner_promo_confirm'::"text", 'partner_promo_reject'::"text", 'partner_promo_run'::"text", 'partner_promo_topup'::"text", 'payment_acknowledge'::"text", 'payment_unacknowledge'::"text", 'partner_promo_void'::"text", 'org_transfer_owner'::"text", 'experiment_restore_default'::"text"]))),
     CONSTRAINT "admin_audit_log_reason_check" CHECK (("length"("reason") > 0)),
     CONSTRAINT "admin_audit_log_target_id_check" CHECK (("length"("target_id") > 0))
 );
@@ -23412,6 +23433,7 @@ CREATE TABLE IF NOT EXISTS "public"."experiments" (
     "created_by" "uuid" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "retired_at" timestamp with time zone,
     CONSTRAINT "experiments_check" CHECK ((("status" = 'draft'::"text") = ("started_at" IS NULL))),
     CONSTRAINT "experiments_check1" CHECK ((("status" = 'ended'::"text") = ("ended_at" IS NOT NULL))),
     CONSTRAINT "experiments_goal_check" CHECK (("goal" = ANY (ARRAY['signup'::"text", 'first_generation'::"text", 'payment'::"text"]))),
@@ -30151,6 +30173,11 @@ GRANT ALL ON FUNCTION "public"."admin_edit_reference_asset"("p_actor" "uuid", "p
 
 REVOKE ALL ON FUNCTION "public"."admin_experiment_act"("p_actor" "uuid", "p_id" bigint, "p_action" "text", "p_variant" bigint, "p_fallback" bigint) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."admin_experiment_act"("p_actor" "uuid", "p_id" bigint, "p_action" "text", "p_variant" bigint, "p_fallback" bigint) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."admin_experiment_restore_default"("p_actor" "uuid", "p_id" bigint) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."admin_experiment_restore_default"("p_actor" "uuid", "p_id" bigint) TO "service_role";
 
 
 

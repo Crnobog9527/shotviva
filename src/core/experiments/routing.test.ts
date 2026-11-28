@@ -54,6 +54,12 @@ describe('routeExperiment', () => {
     expect(routeExperiment(input(), [], registry)).toEqual({ option: 'tote', rewrite: null, cookie: null })
   })
 
+  it('serves the default page in both languages, with no rewrite and no cookie, once an ended experiment is retired (empty live list)', () => {
+    for (const pathname of ['/', '/zh']) {
+      expect(routeExperiment(input({ pathname, cookie: '3.11.11' }), [], registry)).toEqual({ option: 'tote', rewrite: null, cookie: null })
+    }
+  })
+
   it('previews an option for one request only, and ignores unknown options', () => {
     expect(routeExperiment(input({ params: new URLSearchParams('sv_preview=art-style') }), [], registry)).toEqual({ option: 'art-style', rewrite: '/x/hero/art-style', cookie: null })
     expect(routeExperiment(input({ params: new URLSearchParams('sv_preview=nope') }), [], registry).rewrite).toBeNull()

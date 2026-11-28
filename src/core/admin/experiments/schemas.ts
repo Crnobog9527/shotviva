@@ -24,6 +24,8 @@ export const experimentRowSchema = z.object({
   winner_variant_id: z.number().int().nullable(),
   started_at: z.string().nullable(),
   ended_at: z.string().nullable(),
+  // Set when an ended experiment was sent back to the surface's default (migration 2038).
+  retired_at: z.string().nullable(),
   created_at: z.string(),
   experiment_variants: z.array(variantRowSchema),
 })
@@ -45,7 +47,7 @@ export const saveInputSchema = z.object({
 })
 export type SaveInput = z.infer<typeof saveInputSchema>
 
-export const ACTIONS = ['start', 'pause', 'resume', 'end', 'archive', 'delete'] as const
+export const ACTIONS = ['start', 'pause', 'resume', 'end', 'archive', 'delete', 'restore'] as const
 export type ExperimentAction = (typeof ACTIONS)[number]
 
 export const actInputSchema = z.object({
