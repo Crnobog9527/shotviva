@@ -6382,9 +6382,12 @@ begin
     raise exception 'CREDITS_INSUFFICIENT';
   end if;
   if not s.active_org then
-    -- 2034: the workspace is off; paid first, then free, each wholly from the org or the member.
-    if s.org_paid >= p_cost or s.own_paid >= p_cost then return 'paid'; end if;
-    if s.org_promo >= p_cost or s.own_free >= p_cost then return 'free'; end if;
+    -- 2034: the workspace is off; the org's shares first (paid, then this month's promotion,
+    -- which expires), then the member's own (paid, then free); each wholly from one of them.
+    if s.org_paid >= p_cost then return 'paid'; end if;
+    if s.org_promo >= p_cost then return 'free'; end if;
+    if s.own_paid >= p_cost then return 'paid'; end if;
+    if s.own_free >= p_cost then return 'free'; end if;
     raise exception 'CREDITS_INSUFFICIENT';
   end if;
   if p_choice is not null and p_source = 'web' and s.org_paid > 0 and s.org_promo > 0 then
