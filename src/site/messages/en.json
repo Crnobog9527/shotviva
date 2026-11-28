@@ -1801,10 +1801,10 @@
     "org": {
       "metaTitle": "Company",
       "back": "Back to account",
-      "suspendedBanner": "This company account is paused. Members keep their credits, but pool actions are off until it's reactivated. Contact us to resume.",
+      "suspendedBanner": "This company account is inactive: neither the company workspace nor the company affiliate programme is on. Members keep the credits they have, but the pool, allowances and staff link are off. Contact us to reactivate it.",
       "errors": {
         "NOT_OWNER": "Only the company's main admin can do this.",
-        "SUSPENDED": "This company account is paused, so credits can't be moved right now. Contact us to reactivate it.",
+        "SUSPENDED": "The company workspace isn't active, so credits can't be moved right now. Contact us to turn it on.",
         "POOL_INSUFFICIENT": "The company pool doesn't have enough credits for that.",
         "CREDITS_INSUFFICIENT": "You don't have that many credits of your own to put in. Credits the company gave you can't be deposited back.",
         "MEMBER_NOT_FOUND": "That person is no longer in the company.",
@@ -1829,19 +1829,20 @@
           "console": "Workspace",
           "works": "Works",
           "purchasing": "Purchasing",
-          "mine": "Mine"
+          "mine": "Customers"
         },
-        "mine": "My company"
+        "mine": "My customers"
       },
       "entry": {
         "title": "Company",
         "pool": "Pool {pool} credits",
-        "suspended": "Account paused",
         "open": "Manage",
         "customerTitle": "Customer referral link",
         "customerHint": "For inviting and winning customers. Sign-ups and purchases through it earn commission for your company affiliate. This is not the staff link.",
         "copy": "Copy link",
-        "copied": "Copied"
+        "copied": "Copied",
+        "workspaceOff": "Company workspace not active",
+        "inactive": "Company account inactive"
       },
       "pool": {
         "title": "Credit pools",
@@ -1850,7 +1851,7 @@
         "unit": "credits",
         "yours": "Yours to move in",
         "yoursNote": "paid credits already on your account",
-        "suspended": "The company is paused: moving credits in is off.",
+        "suspended": "The company workspace isn't active: moving credits in is off.",
         "depositLabel": "Move in paid credits already on your account",
         "depositPlaceholder": "Number of credits",
         "depositHint": "Only paid credits can be moved in. Once moved, they can't be refunded or moved back.",
@@ -1876,7 +1877,7 @@
       "invite": {
         "title": "Staff-only link",
         "hint": "Send it only to your own staff. They sign up or sign in and join the company, then use the credits you give them.",
-        "suspended": "The company is paused, so nobody can join with this link for now.",
+        "suspended": "The company workspace isn't active, so nobody can join with this link for now.",
         "copy": "Copy link",
         "copied": "Link copied.",
         "copyFailed": "Select and copy the link above.",
@@ -1887,6 +1888,7 @@
         "resetDone": "New link ready.",
         "cancel": "Cancel",
         "warning": "Don't send it to customers. A customer who opens it joins your company as staff instead of counting as a customer you referred.",
+        "warningNoAffiliate": "Don't pass it on. Anyone who opens it joins your company as staff and can be given its credits.",
         "toAffiliate": "To invite customers, use the customer referral link in Company affiliate"
       },
       "members": {
@@ -1953,14 +1955,15 @@
         "downloadMembers": "Download CSV",
         "downloadCustomers": "Download customers CSV",
         "definition": "Given: credits the company gave the member (monthly top-up and hand allocations). Used: company credits they spent, after refunds. Sign-ups: customers who joined through them this month. Paying: customers who paid this month. Spend: what those customers paid this month in USD, before tax and after refunds. A member who left keeps the customers they brought. Customers appear only as a masked email or phone.",
-        "hintNoAffiliate": "What each person was given and used, month by month (UTC months).",
-        "definitionNoAffiliate": "Given: credits the company gave the member (monthly top-up and hand allocations). Used: company credits they spent, after refunds."
+        "hintNoAffiliate": "The credits each person was given and used, month by month (UTC months).",
+        "definitionNoAffiliate": "Given: credits the company gave the member (monthly top-up and hand allocations). Used: company credits they spent, after refunds.",
+        "titleNoAffiliate": "Monthly usage",
+        "captionNoAffiliate": "Credit usage of each member in {month}"
       },
       "staff": {
-        "suspended": "Your company account is paused. Your own credits are unaffected.",
+        "suspended": "Your company's workspace is off, so there are no more monthly top-ups. Credits the company already gave you can still be used.",
         "allowance": "Monthly allowance",
         "allocated": "Given this month",
-        "remaining": "Company credits left",
         "promoTitle": "My promo link",
         "promoHint": "Customers who sign up with your link count for your company.",
         "customers": "Customers",
@@ -1975,24 +1978,19 @@
         "paidCredits": "Paid credits",
         "promoCredits": "Promotion credits",
         "promoCreditsHint": "Promotion credits from your company: images are watermarked, public and not for commercial use. They are used only when paid credits can't cover a generation, before your own free credits, and whatever is left goes at the end of the month (UTC).",
-        "used": "Used this month",
-        "promoLeft": "Left",
-        "metaTitle": "My company",
-        "open": "View",
-        "entryHint": "My customers and this month in detail",
-        "paidLeft": "Paid credits left",
-        "promoLeftLabel": "Promotion credits left",
-        "monthly": "{count} a month",
-        "pageIntro": "Credits your company gives you each month, and the customers who signed up with your link. Only your own numbers are shown here.",
-        "pageIntroNoAffiliate": "Credits your company gives you each month. Only your own numbers are shown here.",
-        "entryHintNoAffiliate": "This month's credits in detail"
+        "metaTitle": "My customers",
+        "pageIntro": "Customers who signed up with your referral link, and what they paid this month. Only your own numbers are shown here.",
+        "entryNote": "Credits your company gives you each month for your own images.",
+        "works": "Company works",
+        "worksNote": "Everything the company made",
+        "left": "Left"
       },
       "join": {
         "metaTitle": "Join a company",
         "invalidTitle": "This link doesn't work",
         "invalidBody": "The invite link is wrong or has been reset. Ask your company admin for a new one.",
-        "suspendedTitle": "Company paused",
-        "suspendedBody": "{org} isn't accepting new members right now.",
+        "suspendedTitle": "Can't join right now",
+        "suspendedBody": "{org}'s company workspace isn't active, so it isn't taking new members right now.",
         "alreadyTitle": "You're already in {org}",
         "alreadyBody": "Your account is already a member of this company.",
         "otherTitle": "You're in another company",
@@ -2174,7 +2172,8 @@
         "give": "Give",
         "given": "Gave {total} to {count}.",
         "allowanceConfirmPaidOnly": "This replaces their monthly allowances."
-      }
+      },
+      "workspaceOffBanner": "The company workspace is not active: the pool, member allowances and staff link are off, and the people already here keep the credits they hold. Commissions on customers already linked to the company carry on, and new customers who sign up through the customer referral link in Company affiliate are still linked to the company. Contact us to turn the workspace on."
     },
     "templateShare": {
       "modeOff": "Share templates",

@@ -54,6 +54,11 @@ describe('buildOrgReport', () => {
     expect(lines[3]).toBe('"Total","","","200","20","2","2","50.00"')
   })
 
+  it('names the member file for usage in an org without the affiliate program', async () => {
+    const { db } = fake({ id: ORG, affiliate_enabled: false, affiliate_levels: 1 }, { org_member_stats: [stats(OWNER, 'owner')] })
+    expect((await run(db)).filename).toBe('usage-2026-11.csv')
+  })
+
   it('adds the level-2 columns only for an org with level 2 on', async () => {
     const { db } = fake({ id: ORG, affiliate_enabled: true, affiliate_levels: 2 }, { org_member_stats: [stats(OWNER, 'owner')] })
     expect((await run(db)).body).toContain('"S2"')

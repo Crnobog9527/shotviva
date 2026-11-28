@@ -32,7 +32,9 @@ export function PoolPanel({ data, actions }: { data: OwnerConsole; actions: Owne
         {promo ? <PromoStat org={data.org} /> : null}
       </div>
       {promo ? <p className="text-caption text-muted-foreground">{t('promoHint')}</p> : null}
-      <p className="text-caption text-muted-foreground">{t('purchaseNote')}</p>
+      {/* Only while the workspace runs do the main admin's purchases go to the pool (2033); with it
+          off, nothing here invites a purchase (review on #985). */}
+      {data.org.status === 'active' ? <p className="text-caption text-muted-foreground">{t('purchaseNote')}</p> : null}
       <MoveInForm data={data} actions={actions} />
     </Panel>
   )
@@ -68,7 +70,7 @@ function MoveInForm({ data, actions }: { data: OwnerConsole; actions: OwnerActio
       }}
     >
       <Stat label={t('yours')} value={format.number(data.depositable)} note={t('yoursNote')} />
-      {suspended ? <p role="status" className="text-label text-destructive">{t('suspended')}</p> : null}
+      {suspended ? <p role="status" className="text-label text-muted-foreground">{t('suspended')}</p> : null}
       <label className="grid gap-1 text-label">
         <span className="font-medium">{t('depositLabel')}</span>
         <input className={FIELD} inputMode="numeric" value={amount} placeholder={t('depositPlaceholder')} onChange={(e) => setAmount(e.target.value.replace(/\D/g, '').slice(0, 10))} />

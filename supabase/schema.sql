@@ -4172,7 +4172,7 @@ CREATE OR REPLACE FUNCTION "public"."_invite_code_org"("p_owner" "uuid") RETURNS
     SET "search_path" TO ''
     AS $$
   select o.id from public.org_members m
-    join public.orgs o on o.id = m.org_id and o.status = 'active' and o.affiliate_enabled
+    join public.orgs o on o.id = m.org_id and o.affiliate_enabled
     join public.affiliates a on a.org_id = o.id and a.status = 'active'
    where m.user_id = p_owner and m.status = 'active'
    limit 1
@@ -4496,7 +4496,7 @@ begin
       select o.id,a.user_id into v_org,v_account from public.org_members m
         join public.orgs o on o.id=m.org_id
         join public.affiliates a on a.org_id=o.id
-        where m.user_id=new.inviter_user_id and m.status='active' and o.status='active' and o.affiliate_enabled
+        where m.user_id=new.inviter_user_id and m.status='active' and o.affiliate_enabled
           and a.status='active';
       if found then
         v_source:='org_l1'; v_member:=new.inviter_user_id; v_via:=null;
@@ -4505,7 +4505,7 @@ begin
           join public.affiliates a on a.user_id=inviter.referred_by and a.org_id is not null
           join public.orgs o on o.id=a.org_id
           where inviter.id=new.inviter_user_id and inviter.referred_source='org_l1'
-            and o.status='active' and o.affiliate_enabled and o.affiliate_levels=2 and a.status='active';
+            and o.affiliate_enabled and o.affiliate_levels=2 and a.status='active';
         if not found then return null; end if;
         v_source:='org_l2'; v_via:=new.inviter_user_id;
       end if;
@@ -4658,6 +4658,17 @@ $$;
 ALTER FUNCTION "public"."_org_check_limits"("p_input" "jsonb") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_org_code_owner"("p_owner" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select public._in_active_org(p_owner) or public._invite_code_org(p_owner) is not null
+$$;
+
+
+ALTER FUNCTION "public"."_org_code_owner"("p_owner" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_org_held_follows_ledger"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -4667,12 +4678,19 @@ declare
   d public.org_held_draws;
   back integer;
   v_draw integer;
+  v_active boolean;
 begin
   if new.delta < 0 then
     select * into m from public.org_members where user_id = new.user_id and status = 'active' for update;
     if not found then return new; end if;
-    v_draw := case when new.kind = 'reserve' then least(m.held_credits, -new.delta)
-                   else greatest(0, m.held_credits - new.balance_after) end;
+    if new.kind = 'reserve' then
+      select o.status = 'active' into v_active from public.orgs o where o.id = m.org_id;
+      v_draw := case when v_active then least(m.held_credits, -new.delta)
+                     when m.held_credits >= -new.delta then -new.delta
+                     else 0 end;
+    else
+      v_draw := greatest(0, m.held_credits - new.balance_after);
+    end if;
     if v_draw > 0 or m.held_credits > new.balance_after then
       update public.org_members set held_credits = least(held_credits - v_draw, new.balance_after) where org_id = m.org_id and user_id = m.user_id;
     end if;
@@ -4864,6 +4882,7 @@ CREATE OR REPLACE FUNCTION "public"."_org_promo_follows_ledger"() RETURNS "trigg
 declare
   m public.org_members;
   d public.org_promo_draws;
+  o public.orgs;
   v_draw integer;
   back integer;
 begin
@@ -4872,7 +4891,11 @@ begin
     if not found or m.held_promo_credits = 0 then return new; end if;
     -- Only a generation reserve spends the org's share first; any other free-pool debit (an admin
     -- adjustment, an old grant's expiry) only keeps the share within the balance.
-    v_draw := case when new.kind = 'reserve' then least(m.held_promo_credits, -new.delta) else 0 end;
+    select * into o from public.orgs where id = m.org_id;
+    v_draw := case when new.kind <> 'reserve' then 0
+                   when o.status = 'active' then least(m.held_promo_credits, -new.delta)
+                   when m.held_promo_credits >= -new.delta and o.promo_expires_at > now() then -new.delta
+                   else 0 end;
     update public.org_members set held_promo_credits = least(held_promo_credits - v_draw, new.balance_after)
      where org_id = m.org_id and user_id = m.user_id;
     if v_draw > 0 then
@@ -4880,8 +4903,7 @@ begin
         values (new.idempotency_key, m.org_id, m.user_id,
           -- The month the share was funded for (the org's promotion month), not the debit's: a job
           -- reserved after month end but before the expiry pass still spends last month's credits.
-          coalesce((select public._utc_period(o.promo_expires_at - interval '1 second') from public.orgs o where o.id = m.org_id),
-                   public._utc_period(new.created_at)), v_draw);
+          coalesce(public._utc_period(o.promo_expires_at - interval '1 second'), public._utc_period(new.created_at)), v_draw);
     end if;
   elsif new.kind = 'refund' then
     select * into d from public.org_promo_draws
@@ -4890,8 +4912,8 @@ begin
     back := least(new.delta, d.drawn - d.restored);
     update public.org_promo_draws set restored = restored + back where debit_key = d.debit_key;
     -- Only while that month is still the org's live promotion month; otherwise it has expired.
-    if d.period is distinct from (select case when o.promo_expires_at > now() then public._utc_period(o.promo_expires_at - interval '1 second') end
-                                    from public.orgs o where o.id = d.org_id) then
+    if d.period is distinct from (select case when o2.promo_expires_at > now() then public._utc_period(o2.promo_expires_at - interval '1 second') end
+                                    from public.orgs o2 where o2.id = d.org_id) then
       perform public._apply_credit_change(new.user_id, 'free', 'org_promo_expire', -back,
         'org promotion credits expired ' || d.period, 'org_promo_return:' || new.idempotency_key);
       return new;
@@ -5132,6 +5154,52 @@ $$;
 ALTER FUNCTION "public"."_org_require_admin"("p_actor" "uuid") OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "public"."profiles" (
+    "id" "uuid" NOT NULL,
+    "role" "text" DEFAULT 'user'::"text" NOT NULL,
+    "credits" integer DEFAULT 0 NOT NULL,
+    "paid_until" timestamp with time zone,
+    "signup_ip" "inet",
+    "banned_at" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "free_credits" integer DEFAULT 0 NOT NULL,
+    "code_redeem_attempts" timestamp with time zone[] DEFAULT '{}'::timestamp with time zone[] NOT NULL,
+    "referred_by" "uuid",
+    "referred_at" timestamp with time zone,
+    "referred_source" "text",
+    "signup_gift_refusal" "text",
+    "referred_member" "uuid",
+    "referred_via" "uuid",
+    "org_pool_choice" "text",
+    CONSTRAINT "profiles_credits_check" CHECK (("credits" >= 0)),
+    CONSTRAINT "profiles_free_credits_check" CHECK (("free_credits" >= 0)),
+    CONSTRAINT "profiles_org_pool_choice_check" CHECK (("org_pool_choice" = ANY (ARRAY['paid'::"text", 'promo'::"text"]))),
+    CONSTRAINT "profiles_referred_source_check" CHECK (("referred_source" = ANY (ARRAY['signup'::"text", 'first_checkout'::"text", 'admin'::"text", 'org_l1'::"text", 'org_l2'::"text"]))),
+    CONSTRAINT "profiles_role_check" CHECK (("role" = ANY (ARRAY['user'::"text", 'admin'::"text"]))),
+    CONSTRAINT "profiles_signup_gift_refusal_check" CHECK (("signup_gift_refusal" = ANY (ARRAY['same_ip'::"text", 'same_ip_pending'::"text", 'daily_cap'::"text", 'paused'::"text", 'staff'::"text"])))
+);
+
+
+ALTER TABLE "public"."profiles" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."_org_seat_shares"("p_profile" "public"."profiles") RETURNS TABLE("active_org" boolean, "org_paid" integer, "org_promo" integer, "own_paid" integer, "own_free" integer)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select o.status = 'active',
+         least(m.held_credits, p_profile.credits),
+         case when o.promo_expires_at > now() then least(m.held_promo_credits, p_profile.free_credits) else 0 end,
+         p_profile.credits - least(m.held_credits, p_profile.credits),
+         p_profile.free_credits - least(m.held_promo_credits, p_profile.free_credits)
+    from public.org_members m join public.orgs o on o.id = m.org_id
+   where m.user_id = p_profile.id and m.status = 'active'
+$$;
+
+
+ALTER FUNCTION "public"."_org_seat_shares"("p_profile" "public"."profiles") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_org_setting_at"("p_org" "uuid", "p_key" "text", "p_at" timestamp with time zone, "p_now" "jsonb") RETURNS "jsonb"
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -5197,7 +5265,7 @@ begin
   begin
     select o.id,o.signup_bonus_credits into v_org,v_credits from public.affiliates a
       join public.orgs o on o.id=a.org_id
-      where a.user_id=new.referred_by and a.status='active' and o.status='active' and o.affiliate_enabled;
+      where a.user_id=new.referred_by and a.status='active' and o.affiliate_enabled;
     if not found or v_credits is null or v_credits <= 0 then return null; end if;
     -- A paid account is never a new user (redeem_code refuses it too; this is belt and braces).
     if exists(select from public.payments where user_id=new.id) then return null; end if;
@@ -5251,7 +5319,7 @@ begin
     if not found or p.referred_source is distinct from 'signup' or p.banned_at is not null then return; end if;
     select o.id,o.signup_bonus_credits into v_org,v_now from public.affiliates a
       join public.orgs o on o.id=a.org_id
-      where a.user_id=p.referred_by and a.status='active' and o.status='active' and o.affiliate_enabled;
+      where a.user_id=p.referred_by and a.status='active' and o.affiliate_enabled;
     if not found or v_now is null or v_now <= 0 then return; end if;
     if exists(select from public.payments where user_id=p_user) then return; end if;
     if public._in_active_org(p_user) or exists(select from public.org_members m where m.org_id=v_org and m.user_id=p_user and m.status='active') then return; end if;
@@ -5285,7 +5353,7 @@ CREATE OR REPLACE FUNCTION "public"."_org_staff_code"("p_code" "text", "p_user" 
   select coalesce(p_code collate "C" ~ '^[A-Za-z0-9]{4,20}$' and exists (
     select 1 from public.codes c
       join public.org_members m on m.user_id = c.owner_user_id and m.status = 'active'
-      join public.orgs o on o.id = m.org_id and o.status = 'active' and o.affiliate_enabled
+      join public.orgs o on o.id = m.org_id and o.affiliate_enabled
       join public.affiliates a on a.org_id = o.id and a.status = 'active'
       join public.affiliate_settings s on s.singleton and s.enabled
       -- As redeem_code: a banned owner's code is expired, and a full one cannot be redeemed.
@@ -6307,61 +6375,35 @@ $$;
 ALTER FUNCTION "public"."_payment_granted_credits"("p_payment" "public"."payments") OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."profiles" (
-    "id" "uuid" NOT NULL,
-    "role" "text" DEFAULT 'user'::"text" NOT NULL,
-    "credits" integer DEFAULT 0 NOT NULL,
-    "paid_until" timestamp with time zone,
-    "signup_ip" "inet",
-    "banned_at" timestamp with time zone,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "free_credits" integer DEFAULT 0 NOT NULL,
-    "code_redeem_attempts" timestamp with time zone[] DEFAULT '{}'::timestamp with time zone[] NOT NULL,
-    "referred_by" "uuid",
-    "referred_at" timestamp with time zone,
-    "referred_source" "text",
-    "signup_gift_refusal" "text",
-    "referred_member" "uuid",
-    "referred_via" "uuid",
-    "org_pool_choice" "text",
-    CONSTRAINT "profiles_credits_check" CHECK (("credits" >= 0)),
-    CONSTRAINT "profiles_free_credits_check" CHECK (("free_credits" >= 0)),
-    CONSTRAINT "profiles_org_pool_choice_check" CHECK (("org_pool_choice" = ANY (ARRAY['paid'::"text", 'promo'::"text"]))),
-    CONSTRAINT "profiles_referred_source_check" CHECK (("referred_source" = ANY (ARRAY['signup'::"text", 'first_checkout'::"text", 'admin'::"text", 'org_l1'::"text", 'org_l2'::"text"]))),
-    CONSTRAINT "profiles_role_check" CHECK (("role" = ANY (ARRAY['user'::"text", 'admin'::"text"]))),
-    CONSTRAINT "profiles_signup_gift_refusal_check" CHECK (("signup_gift_refusal" = ANY (ARRAY['same_ip'::"text", 'same_ip_pending'::"text", 'daily_cap'::"text", 'paused'::"text", 'staff'::"text"])))
-);
-
-
-ALTER TABLE "public"."profiles" OWNER TO "postgres";
-
-
 CREATE OR REPLACE FUNCTION "public"."_reserve_pool"("p_profile" "public"."profiles", "p_cost" integer, "p_source" "text", "p_choice" "text") RETURNS "text"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
 declare
-  v_member boolean := false;
-  v_paid integer;
-  v_promo integer;
+  s record;
   v_pool text;
 begin
   if p_choice is not null and p_choice not in ('paid', 'promo') then
     raise exception 'INVALID_INPUT' using detail = 'pool_choice must be paid or promo';
   end if;
-  select true, least(m.held_credits, p_profile.credits),
-         case when o.promo_expires_at > now() then least(m.held_promo_credits, p_profile.free_credits) else 0 end
-    into v_member, v_paid, v_promo
-    from public.org_members m join public.orgs o on o.id = m.org_id
-   where m.user_id = p_profile.id and m.status = 'active';
-  if not coalesce(v_member, false) then
+  select * into s from public._org_seat_shares(p_profile);
+  if not found then
     if p_profile.credits >= p_cost then return 'paid'; end if;
     if p_profile.free_credits >= p_cost then return 'free'; end if;
     raise exception 'CREDITS_INSUFFICIENT';
   end if;
-  if p_choice is not null and p_source = 'web' and v_paid > 0 and v_promo > 0 then
+  if not s.active_org then
+    -- 2034: the workspace is off; the org's shares first (paid, then this month's promotion,
+    -- which expires), then the member's own (paid, then free); each wholly from one of them.
+    if s.org_paid >= p_cost then return 'paid'; end if;
+    if s.org_promo >= p_cost then return 'free'; end if;
+    if s.own_paid >= p_cost then return 'paid'; end if;
+    if s.own_free >= p_cost then return 'free'; end if;
+    raise exception 'CREDITS_INSUFFICIENT';
+  end if;
+  if p_choice is not null and p_source = 'web' and s.org_paid > 0 and s.org_promo > 0 then
     v_pool := case p_choice when 'paid' then 'paid' else 'free' end;
-    if (case when v_pool = 'paid' then v_paid else v_promo end) < p_cost then
+    if (case when v_pool = 'paid' then s.org_paid else s.org_promo end) < p_cost then
       raise exception 'POOL_CHOICE_INSUFFICIENT';
     end if;
     if p_profile.org_pool_choice is distinct from p_choice then
@@ -6369,8 +6411,8 @@ begin
     end if;
     return v_pool;
   end if;
-  if v_paid >= p_cost then return 'paid'; end if;
-  if v_promo >= p_cost then return 'free'; end if;
+  if s.org_paid >= p_cost then return 'paid'; end if;
+  if s.org_promo >= p_cost then return 'free'; end if;
   raise exception 'ORG_CREDITS_INSUFFICIENT';
 end;
 $$;
@@ -6385,9 +6427,7 @@ CREATE OR REPLACE FUNCTION "public"."_reserve_pool_for_tier"("p_profile" "public
     AS $$
 declare
   v_pool text := case when p_resolution = '1k' then 'free' else 'paid' end;
-  v_member boolean := false;
-  v_paid integer;
-  v_promo integer;
+  s record;
 begin
   if p_source <> 'web' then
     return public._reserve_pool(p_profile, p_cost, p_source, p_choice);
@@ -6395,18 +6435,17 @@ begin
   if p_choice is not null and p_choice not in ('paid', 'promo') then
     raise exception 'INVALID_INPUT' using detail = 'pool_choice must be paid or promo';
   end if;
-  -- Same org shares as _reserve_pool (1897): the paid share, and the promotion share while the
-  -- org's promotion month is live.
-  select true, least(m.held_credits, p_profile.credits),
-         case when o.promo_expires_at > now() then least(m.held_promo_credits, p_profile.free_credits) else 0 end
-    into v_member, v_paid, v_promo
-    from public.org_members m join public.orgs o on o.id = m.org_id
-   where m.user_id = p_profile.id and m.status = 'active';
-  if not coalesce(v_member, false) then
+  select * into s from public._org_seat_shares(p_profile);
+  if not found then
     if (case when v_pool = 'paid' then p_profile.credits else p_profile.free_credits end) >= p_cost then return v_pool; end if;
     raise exception 'CREDITS_INSUFFICIENT';
   end if;
-  if (case when v_pool = 'paid' then v_paid else v_promo end) >= p_cost then return v_pool; end if;
+  if not s.active_org then
+    -- 2034: the workspace is off; wholly from the org's share of the tier's pool or the member's own.
+    if (case when v_pool = 'paid' then greatest(s.org_paid, s.own_paid) else greatest(s.org_promo, s.own_free) end) >= p_cost then return v_pool; end if;
+    raise exception 'CREDITS_INSUFFICIENT';
+  end if;
+  if (case when v_pool = 'paid' then s.org_paid else s.org_promo end) >= p_cost then return v_pool; end if;
   raise exception 'ORG_CREDITS_INSUFFICIENT';
 end;
 $$;
@@ -6454,7 +6493,7 @@ CREATE OR REPLACE FUNCTION "public"."_signup_org_ref"("p_slug" "text") RETURNS b
     select 1 from public.affiliates a
       join public.orgs o on o.id = a.org_id
       join public.affiliate_settings s on s.singleton and s.enabled
-     where a.slug = p_slug and a.status = 'active' and o.status = 'active' and o.affiliate_enabled), false)
+     where a.slug = p_slug and a.status = 'active' and o.affiliate_enabled), false)
 $_$;
 
 
@@ -15902,7 +15941,7 @@ CREATE OR REPLACE FUNCTION "public"."code_preview_credits"("offer" "public"."cod
     SET "search_path" TO ''
     AS $$
   select case
-    when offer.kind = 'invite' and public._in_active_org(offer.owner_user_id) then
+    when offer.kind = 'invite' and public._org_code_owner(offer.owner_user_id) then
       coalesce((select o.signup_bonus_credits from public.orgs o where o.id = public._invite_code_org(offer.owner_user_id)), 0)
     when offer.kind = 'invite' then
       (select (value->>'inviteeCredits')::integer from public.system_settings where key = 'code_invite_rewards')
@@ -15922,7 +15961,7 @@ begin
   if p_code is null or p_code collate "C" !~ '^[A-Za-z0-9]{4,20}$' then return null; end if;
   select * into v_offer from public.codes where code = upper(p_code);
   if not found then return null; end if;
-  if v_offer.kind <> 'invite' or not public._in_active_org(v_offer.owner_user_id) then
+  if v_offer.kind <> 'invite' or not public._org_code_owner(v_offer.owner_user_id) then
     return public.code_preview_credits(v_offer);
   end if;
   v_org := public._invite_code_org(v_offer.owner_user_id);
@@ -15946,7 +15985,7 @@ CREATE OR REPLACE FUNCTION "public"."code_preview_org"("offer" "public"."codes")
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-  select offer.kind = 'invite' and public._in_active_org(offer.owner_user_id)
+  select offer.kind = 'invite' and public._org_code_owner(offer.owner_user_id)
 $$;
 
 
@@ -16670,7 +16709,7 @@ begin
       if (v_profile.referred_source = 'signup' and exists (
            select 1 from public.affiliates a join public.orgs o on o.id = a.org_id
             where a.user_id = v_profile.referred_by and a.status = 'active'
-              and o.status = 'active' and o.affiliate_enabled))
+              and o.affiliate_enabled))
          or public._signup_staff_code_channel(p_user_id) then
         v_partner := public.signup_gift_setting_int('signup_gift_per_ip_partner', 20);
         v_per_ip := case when v_per_ip = 0 or v_partner = 0 then 0 else greatest(v_per_ip, v_partner) end;
@@ -19510,7 +19549,7 @@ begin
     org_code := exists (select from public.org_members m
       join public.orgs o on o.id = m.org_id
       join public.affiliates a on a.org_id = o.id
-      where m.user_id = offer.owner_user_id and m.status = 'active' and o.status = 'active' and o.affiliate_enabled
+      where m.user_id = offer.owner_user_id and m.status = 'active' and o.affiliate_enabled
         and a.status = 'active' and a.user_id <> p_user
         and (profile.referred_by is null or profile.referred_by = a.user_id)
         and not exists (select from public.org_members c
@@ -19587,7 +19626,9 @@ begin
 
   -- 2032: an org staff member's code gives no personal invitee reward (the org bonus instead).
   -- 2032: nor does an active org member's own code, affiliate switch on or off.
-  org_code := org_code or (offer.kind = 'invite' and public._in_active_org(offer.owner_user_id));
+  -- 2035 (review on #991): any staff code is an org code, also when another referrer bound the
+  -- customer first, workspace on or off (_org_code_owner, as the preview).
+  org_code := org_code or (offer.kind = 'invite' and public._org_code_owner(offer.owner_user_id));
   credits := case when offer.kind = 'invite' and org_code then 0
     when offer.kind = 'invite' then
     (select (value->>'inviteeCredits')::integer from public.system_settings where key = 'code_invite_rewards')
@@ -29373,6 +29414,10 @@ REVOKE ALL ON FUNCTION "public"."_org_check_limits"("p_input" "jsonb") FROM PUBL
 
 
 
+REVOKE ALL ON FUNCTION "public"."_org_code_owner"("p_owner" "uuid") FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "public"."_org_held_follows_ledger"() FROM PUBLIC;
 
 
@@ -29438,6 +29483,19 @@ REVOKE ALL ON FUNCTION "public"."_org_replayed"("p_request" "text", "p_org" "uui
 
 
 REVOKE ALL ON FUNCTION "public"."_org_require_admin"("p_actor" "uuid") FROM PUBLIC;
+
+
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."profiles" TO "service_role";
+GRANT SELECT ON TABLE "public"."profiles" TO "authenticated";
+
+
+
+GRANT UPDATE("signup_ip") ON TABLE "public"."profiles" TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."_org_seat_shares"("p_profile" "public"."profiles") FROM PUBLIC;
 
 
 
@@ -29576,15 +29634,6 @@ REVOKE ALL ON FUNCTION "public"."_payment_grant_key"("p_payment" "public"."payme
 
 
 REVOKE ALL ON FUNCTION "public"."_payment_granted_credits"("p_payment" "public"."payments") FROM PUBLIC;
-
-
-
-GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE "public"."profiles" TO "service_role";
-GRANT SELECT ON TABLE "public"."profiles" TO "authenticated";
-
-
-
-GRANT UPDATE("signup_ip") ON TABLE "public"."profiles" TO "service_role";
 
 
 

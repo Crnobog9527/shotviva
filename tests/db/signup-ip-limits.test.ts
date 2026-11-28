@@ -122,14 +122,16 @@ describe('in a rolled-back transaction', () => {
     expect(await sms(address, slug)).toBe('ip_daily')
   })
 
-  it('a personal partner, a paused org, an org with its affiliate switch off, the program off or junk keep the site-wide limits', async () => {
+  // 2035 (A2): an org with its workspace off but the affiliate program on keeps the partner allowance.
+  it('a personal partner, an org with its affiliate switch off, the program off or junk keep the site-wide limits', async () => {
     const personal = await promoter(db)
     const paused = await orgSlug()
     await db.query("update orgs set status='suspended' where id=$1", [paused.orgId])
+    expect(await row(db, 'select _signup_org_ref($1) as ok', [paused.slug])).toEqual({ ok: true })
     const off = await orgSlug()
     await db.query('update orgs set affiliate_enabled=false where id=$1', [off.orgId])
     const valid = await orgSlug()
-    for (const slug of [personal.slug, paused.slug, off.slug, 'Not a slug!', 'nobody-here', null]) {
+    for (const slug of [personal.slug, off.slug, 'Not a slug!', 'nobody-here', null]) {
       expect(await row(db, 'select _signup_org_ref($1) as ok', [slug])).toEqual({ ok: false })
     }
     expect(await row(db, 'select _signup_org_ref($1) as ok', [valid.slug])).toEqual({ ok: true })

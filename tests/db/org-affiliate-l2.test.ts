@@ -110,13 +110,14 @@ it('binds no level 2 for a one-level org, or once level 2 is turned off; existin
   expect(await row(db, 'select affiliate_user_id from affiliate_commissions where payment_id=$1', [p.id])).toEqual({ affiliate_user_id: owner })
 })
 
-it('binds no level 2 while the org is suspended or its affiliate switch is off', async () => {
-  const { orgId, a } = await chain()
+// 2035 (Owner 2026-11-28, A2): level 2 follows the affiliate switch, not the workspace switch.
+it('binds no level 2 while the affiliate switch is off, and still binds it with the workspace off', async () => {
+  const { orgId, a, owner } = await chain()
   await setOrg(orgId, { affiliate_enabled: false })
   expect((await referral((await invitedBy(a)).customer)).referred_by).toBeNull()
   await setOrg(orgId, { affiliate_enabled: true })
   await db.query("update orgs set status='suspended' where id=$1", [orgId])
-  expect((await referral((await invitedBy(a)).customer)).referred_by).toBeNull()
+  expect((await referral((await invitedBy(a)).customer)).referred_by).toBe(owner)
 })
 
 it('never rebinds an already bound customer, and skips the org\'s own members', async () => {
