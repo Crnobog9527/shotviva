@@ -45,6 +45,7 @@ export function BatchDialogSlot({ templates, browse, create }: Props) {
       tier={create.tier}
       batch={create.batch}
       limit={create.concurrency.limit}
+      promo={create.batchPromo === true}
     />
   )
 }

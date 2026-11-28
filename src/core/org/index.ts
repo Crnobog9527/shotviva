@@ -41,5 +41,6 @@ export {
   type PoolMonth,
   type PromoMove,
 } from './promo-actions'
+export { readBatchPromoAllowed } from './batch-promo'
 export { readPoolChoiceOffer, spendableBalance } from './pool-choice'
 export { bulkGrantOrgCredits, bulkSetOrgAllowance, setOrgDefaultAllowances } from './bulk-actions'

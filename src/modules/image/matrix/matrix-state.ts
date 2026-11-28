@@ -1,4 +1,4 @@
-import { tierPool } from '@/core/billing/pools'
+import { tierPool, type CreditPool } from '@/core/billing/pools'
 import { limitsFor } from '@/core/billing/tier-limits'
 import { MAX_BATCH_TEMPLATES } from '@/core/jobs/batch/limits'
 import type { ImageOptions } from '@/core/templates/image-options'
@@ -7,6 +7,7 @@ import { RESOLUTIONS, type OutputAspect, type Resolution } from '@/core/template
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import type { ReadyPhoto } from '../workspace/photo-batch'
 import { missingRequiredCopy } from '../workspace/copy-check'
+import { batchTiers, cellTier } from './cell-choices'
 
 // The Max multi-template batch (T107, ARCHITECTURE §6.2 「多模板批次」): 1–5 templates × the
 // picked photos, one job per kept cell, at most TIER_LIMITS.max.batchMax cells. Size and
@@ -27,26 +28,35 @@ export type MatrixValues = {
   copy: Record<string, Record<string, string>>
   overrides: Record<CellKey, Record<string, string>>
   toggles: Record<string, Record<string, boolean>>
+  // The batch's default tier, and each result's own pick on top of it (Owner 2026-11-28).
   resolution: Resolution
+  tiers: Record<CellKey, Resolution>
+  // Each result's own note (补充说明), sent with that job only.
+  notes: Record<CellKey, string>
   aspect: OutputAspect
 }
 
-export const EMPTY_MATRIX: MatrixValues = { templateIds: [], removed: [], copy: {}, overrides: {}, toggles: {}, resolution: '2k', aspect: 'original' }
+export const EMPTY_MATRIX: MatrixValues = { templateIds: [], removed: [], copy: {}, overrides: {}, toggles: {}, resolution: '2k', tiers: {}, notes: {}, aspect: 'original' }
 
 export type MatrixPhoto = { id: string; originalRatio?: number }
 
-export type MatrixCell = { key: CellKey; template: CatalogueTemplate; photo: MatrixPhoto; credits: number; removed: boolean; copy: Record<string, string> }
+// `tiers` is what this result may pick (its template's sold tiers a batch takes); `tier` is the
+// pick, null when the template offers none.
+export type MatrixCell = {
+  key: CellKey; template: CatalogueTemplate; photo: MatrixPhoto; credits: number; removed: boolean; copy: Record<string, string>
+  tier: Resolution | null; tiers: Resolution[]; pool: CreditPool; note: string
+}
 
-// What every chosen template can make: the sizes and resolutions they share. A batch is one
-// size and one resolution (the preflight refuses a mixed one). A batch is paid credits only and
-// 1K is free credits only (1996), so a batch never offers 1K.
-const BATCH_RESOLUTIONS = RESOLUTIONS.filter((tier) => tierPool(tier) === 'paid')
-
-export function sharedOptions(templates: readonly CatalogueTemplate[]): ImageOptions {
+// What the chosen templates can make together: the sizes they share (a batch is one size; the
+// preflight refuses a mixed one), and every tier any of them offers a batch (each result picks
+// its own among its template's). `promo`: an affiliate org member, who may use 1K (2034).
+export function sharedOptions(templates: readonly CatalogueTemplate[], promo = false): ImageOptions {
   const all = templates.map((template) => template.imageOptions).filter((options): options is ImageOptions => options !== undefined)
-  if (all.length === 0) return { resolutions: [...BATCH_RESOLUTIONS], aspectRatios: [], originalRatio: true }
+  const tiers = new Set(templates.flatMap((template) => batchTiers(template, promo)))
+  const resolutions = RESOLUTIONS.filter((tier) => tiers.has(tier))
+  if (all.length === 0) return { resolutions, aspectRatios: [], originalRatio: true }
   return {
-    resolutions: BATCH_RESOLUTIONS.filter((tier) => all.every((options) => options.resolutions.includes(tier))),
+    resolutions,
     aspectRatios: all[0]!.aspectRatios.filter((ratio) => all.every((options) => options.aspectRatios.includes(ratio))),
     originalRatio: all.every((options) => options.originalRatio),
     ...(all.some((options) => options.exactPixels === false) && { exactPixels: false }),
@@ -60,14 +70,20 @@ export function cellCopy(values: MatrixValues, key: CellKey, templateId: string)
 
 // Template-major: each template's photos in pick order. This is also the batch order (cell
 // position), so the ZIP lists a template's photos together.
-export function matrixCells(templates: readonly CatalogueTemplate[], photos: readonly MatrixPhoto[], values: MatrixValues): MatrixCell[] {
+export function matrixCells(templates: readonly CatalogueTemplate[], photos: readonly MatrixPhoto[], values: MatrixValues, promo = false): MatrixCell[] {
   const removed = new Set(values.removed)
-  return templates.flatMap((template) =>
-    photos.map((photo) => {
+  return templates.flatMap((template) => {
+    const tiers = batchTiers(template, promo)
+    return photos.map((photo) => {
       const key = cellKey(template.id, photo.id)
-      return { key, template, photo, credits: template.creditsCost[values.resolution], removed: removed.has(key), copy: cellCopy(values, key, template.id) }
-    }),
-  )
+      const tier = cellTier(values.tiers[key] ?? values.resolution, tiers)
+      const priced = tier ?? values.resolution
+      return {
+        key, template, photo, tier, tiers, pool: tierPool(priced), note: values.notes[key] ?? '',
+        credits: template.creditsCost[priced], removed: removed.has(key), copy: cellCopy(values, key, template.id),
+      }
+    })
+  })
 }
 
 export const keptCells = (cells: readonly MatrixCell[]) => cells.filter((cell) => !cell.removed)
@@ -78,7 +94,8 @@ export const matrixTotal = (cells: readonly MatrixCell[]) => keptCells(cells).re
 // batch would cost there.
 export function totalsByResolution(cells: readonly MatrixCell[]): Record<Resolution, number> {
   const kept = keptCells(cells)
-  return Object.fromEntries(RESOLUTIONS.map((tier) => [tier, kept.reduce((sum, cell) => sum + cell.template.creditsCost[tier], 0)])) as Record<Resolution, number>
+  const at = (tier: Resolution, cell: MatrixCell) => cell.template.creditsCost[cellTier(tier, cell.tiers) ?? tier]
+  return Object.fromEntries(RESOLUTIONS.map((tier) => [tier, kept.reduce((sum, cell) => sum + at(tier, cell), 0)])) as Record<Resolution, number>
 }
 
 // The same check as the single form (workspace/copy-check): types, choices, numbers, required.
@@ -95,7 +112,7 @@ export function matrixBlock(cells: readonly MatrixCell[], templates: number, pho
   if (photos.picked === 0) return 'photos'
   if (kept.length === 0) return 'empty'
   if (kept.length > maxCells) return 'too-many'
-  if (options.resolutions.length === 0 || (options.aspectRatios.length === 0 && !options.originalRatio)) return 'options'
+  if (kept.some((cell) => cell.tier === null) || (options.aspectRatios.length === 0 && !options.originalRatio)) return 'options'
   if (photos.uploading) return 'uploading'
   if (kept.some(missingCellCopy)) return 'copy'
   return null
@@ -116,6 +133,8 @@ export function withoutTemplate(values: MatrixValues, templateId: string): Matri
     removed: values.removed.filter((key) => !key.startsWith(`${templateId}|`)),
     copy: keep(values.copy),
     overrides: keep(values.overrides) as MatrixValues['overrides'],
+    tiers: keep(values.tiers) as MatrixValues['tiers'],
+    notes: keep(values.notes) as MatrixValues['notes'],
     toggles: keep(values.toggles),
   }
 }

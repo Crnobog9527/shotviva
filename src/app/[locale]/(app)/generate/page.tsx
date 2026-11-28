@@ -1,6 +1,6 @@
 import { orgBalance } from '@/core/billing/pools'
 import type { Metadata } from 'next'
-import { readPoolChoiceOffer } from '@/core/org'
+import { readBatchPromoAllowed, readPoolChoiceOffer } from '@/core/org'
 import { connection } from 'next/server'
 import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
@@ -63,7 +63,7 @@ async function readPersonal(searchParams: Search) {
     loadAccess: sharedCreateFeatureAccess,
     tierOf: () => limitsPromise.then(featureTierOf),
   }).catch(() => false)
-  const [{ balance, favoriteIds }, limits, runningIds, poolChoice, posters] = await Promise.all([
+  const [{ balance, favoriteIds }, limits, runningIds, poolChoice, posters, batchPromo] = await Promise.all([
     createServerSupabase().then((db) => readCreatePersonalData(db, user.id)),
     limitsPromise,
     // RLS hides jobs with private style references. The admin read returns only IDs for this viewer.
@@ -71,9 +71,11 @@ async function readPersonal(searchParams: Search) {
     // 出图时让员工自选 (§6.5): only for a member holding both kinds of org credits.
     readPoolChoiceOffer(admin, user.id),
     posterAllowed,
+    // An affiliate org member's batch may use 1K from the promotion share (2034).
+    readBatchPromoAllowed(admin, user.id),
   ])
   const batch = batchLimitsOf(limits)
-  const create: CreateContext = { balance, tier: limits.tier, batch, concurrency: { limit: limits.concurrency, runningIds }, poolChoice }
+  const create: CreateContext = { balance, tier: limits.tier, batch, concurrency: { limit: limits.concurrency, runningIds }, poolChoice, batchPromo }
   return { chip: poolChoice ? orgBalance(poolChoice) : balance, favoriteIds, tier: limits.tier, batch, create, posters }
 }
 type Personal = Awaited<ReturnType<typeof readPersonal>>
