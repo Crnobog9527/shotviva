@@ -59,3 +59,9 @@ export function samePhoto(cells: readonly MatrixCell[], key: CellKey): CellKey[]
   const id = cells.find((cell) => cell.key === key)?.photo.id
   return cells.filter((cell) => cell.photo.id === id && !cell.removed).map((cell) => cell.key)
 }
+
+// The results a row's tier pick applies to: the row itself, always (even while it is skipped and
+// being brought back by this pick), plus its template's other kept results when asked.
+export function tierTargets(cells: readonly MatrixCell[], key: CellKey, alsoOthers: boolean): CellKey[] {
+  return alsoOthers ? [...new Set([key, ...sameTemplate(cells, key)])] : [key]
+}

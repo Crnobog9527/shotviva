@@ -7,7 +7,7 @@ import type { Resolution } from '@/core/templates/output-options'
 import { withBatchTier, withNote, withNotes, withRemoved, withTiers } from './cell-edits'
 import type { CellKey } from './matrix-state'
 import type { ReviewActions } from './review-actions'
-import { initiallyOpen, reviewGroups, samePhoto, sameTemplate, type GroupBy } from './review-groups'
+import { initiallyOpen, reviewGroups, samePhoto, sameTemplate, tierTargets, type GroupBy } from './review-groups'
 import type { MatrixDraft } from './use-matrix-draft'
 
 // The review list's own state (Owner 2026-11-28): grouping, folds, the row being written, and
@@ -45,7 +45,7 @@ export function useReviewList(draft: MatrixDraft) {
     foldAll: () => setFolds({ by, open: open.size > 0 ? new Set() : new Set(groups.map((group) => group.id)) }),
     pickTier: (key: CellKey | 'batch', tier: Resolution, alsoOthers: boolean) => {
       if (key === 'batch') return change((v) => withBatchTier(v, tier))
-      change((v) => withTiers(v, alsoOthers ? sameTemplate(draft.cells, key) : [key], tier))
+      change((v) => withTiers(v, tierTargets(draft.cells, key, alsoOthers), tier))
     },
     skip: (key: CellKey, skip: boolean) => change((v) => withRemoved(v, [key], skip)),
   }
