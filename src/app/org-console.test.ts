@@ -111,7 +111,7 @@ describe.each(['en', 'zh'] as const)('pool panel without the affiliate program (
 
 describe.each(['en', 'zh'] as const)('monthly table without the affiliate program (%s)', (locale) => {
   it('does not promise customers it does not show', () => {
-    const { text } = render(locale, createElement(PerformancePanel, { report: report({ withAffiliate: false, withLevel2: false }) }))
+    const { text } = render(locale, createElement(PerformancePanel, { report: report({ withAffiliate: false, withLevel2: false }), affiliate: false }))
     expect(text).not.toMatch(/customer|客户|Sign-ups|注册/i)
   })
 })
@@ -164,11 +164,11 @@ describe.each(['en', 'zh'] as const)('enterprise block (%s)', (locale) => {
   })
 
   it('renders the account row', () => {
-    const row = render(locale, createElement(OwnerEntryRow, { name: 'Acme Studio', pool: '120,000', suspended: false, affiliate: false }))
+    const row = render(locale, createElement(OwnerEntryRow, { name: 'Acme Studio', pool: '120,000', setup: 'workspace', affiliate: false }))
     expect(row.errors).toEqual([])
     expect(row.html).toContain('href="/account/enterprise"')
     // With the affiliate on, the area opens on 企业联盟 (Owner 2026-11-22).
-    const affiliateRow = render(locale, createElement(OwnerEntryRow, { name: 'Acme Studio', pool: '120,000', suspended: false, affiliate: true }))
+    const affiliateRow = render(locale, createElement(OwnerEntryRow, { name: 'Acme Studio', pool: '120,000', setup: 'both', affiliate: true }))
     expect(affiliateRow.html).toContain('href="/partners/enterprise"')
   })
 })
@@ -304,16 +304,18 @@ describe.each(['en', 'zh'] as const)('purchasing and the staff link (%s)', (loca
     expect(text).not.toMatch(/[¥￥]|CNY|RMB/)
     expect(text).not.toContain('/join/org/')
   })
-  it('says the account is paused and disables pool actions for a suspended org', () => {
-    const { html, errors } = render(locale, createElement(OwnerConsoleView, { data: owner({ status: 'suspended' }), actions: ownerActions, report: null, affiliate: true }))
+  it('says the workspace is not active and disables pool actions while the affiliate program carries on', () => {
+    const { html, text, errors } = render(locale, createElement(OwnerConsoleView, { data: owner({ status: 'suspended' }), actions: ownerActions, report: null, affiliate: true }))
     expect(errors).toEqual([])
-    expect(html).toMatch(/paused|暂停/)
+    expect(text).toContain(locale === 'en' ? 'The company workspace is not active' : '企业工作台未开启：')
+    expect(text).not.toMatch(/purchase|buy|购买/i)
+    expect(text).not.toMatch(/paused|暂停|inactive|已停用/i)
+    expect(html).not.toContain('text-destructive')
     expect((html.match(/disabled=""/g) ?? []).length).toBeGreaterThanOrEqual(3)
     // An open editor disables its own save / top-up / use-default buttons too.
     const open = render(locale, createElement(MembersPanel, { data: owner({ status: 'suspended' }), actions: ownerActions, initialOpen: MEMBER }))
     expect((open.html.match(/disabled=""/g) ?? []).length).toBeGreaterThanOrEqual(6)
   })
-
 })
 
 describe('messages', () => {

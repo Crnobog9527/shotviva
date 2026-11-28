@@ -53,9 +53,9 @@ describe.each(['en', 'zh'] as const)('a member of an org (%s)', (locale) => {
     expect(text).toContain('—')
   })
 
-  it('shows the paused org on the row', () => {
+  it('says the workspace is off on the row, and that the credits already given still work', () => {
     const { text } = render(locale, createElement(MemberEntry, { data: staff({ status: 'suspended' }) }))
-    expect(text).toMatch(/paused|暂停/)
+    expect(text).toContain(locale === 'en' ? 'workspace is off' : '企业工作台已关闭')
   })
 
   it('puts the promotion link on the highlighted callout with a copy button', () => {

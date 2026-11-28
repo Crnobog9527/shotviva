@@ -17,7 +17,7 @@ import { lastMembership, readMemberSince, readSubscriptionSummary } from '@/core
 import { listMonthWorks } from '@/core/jobs'
 import { serverEnv } from '@/core/env'
 import { readOrgView } from '@/core/org/console'
-import { CustomerLinkRow, MemberEntry, MemberLinkCallout, OwnerEntryRow } from '@/core/org/ui'
+import { CustomerLinkRow, MemberEntry, MemberLinkCallout, orgSetup, OwnerEntryRow } from '@/core/org/ui'
 import { readLinkStatus } from '@/core/partner'
 import { graylumIntroLinks } from '@/core/partner/ui'
 import { formatMoney, hasUnreadReply, listPaymentOptions, paymentChoices, PICKER_LIMIT, ReplyTime } from '@/core/support'
@@ -107,7 +107,7 @@ function OrgBlock({ view, customerLink, memberLink }: { view: Awaited<ReturnType
     return (
       <Group title={t('title')}>
         <RowsPanel>
-          <OwnerEntryRow name={view.org.name} pool={pool} suspended={view.org.status === 'suspended'} affiliate={customerLink !== null} />
+          <OwnerEntryRow name={view.org.name} pool={pool} setup={orgSetup(view.org.status, view.org.affiliateEnabled)} affiliate={customerLink !== null} />
         </RowsPanel>
         {customerLink}
       </Group>
