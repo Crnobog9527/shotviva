@@ -1410,7 +1410,8 @@
         "paidRingOf": "{count} of {total} paid credits left",
         "paidRing": "{count, plural, one {# paid credit} other {# paid credits}} left",
         "freeRingOf": "{count} of {total} free credits left",
-        "freeRing": "{count, plural, one {# free credit} other {# free credits}} left"
+        "freeRing": "{count, plural, one {# free credit} other {# free credits}} left",
+        "fromOrg": "Your company gives you your credits. For more, ask your company admin."
       },
       "settings": {
         "title": "Settings",
@@ -1863,7 +1864,8 @@
         "promoNone": "No promotion credits this month",
         "promoHint": "Images made with promotion credits are watermarked, public and not for commercial use. What is left in the pool and with members goes at the end of the month (UTC).",
         "hintPaidOnly": "The credits you buy are held here. Give them to members, who spend them on their own generations.",
-        "purchaseNote": "What you buy while the company is active goes straight into the pool. These purchases can't be refunded by yourself; for a refund, contact support."
+        "purchaseNote": "What you buy while the company is active goes straight into the pool. These purchases can't be refunded by yourself; for a refund, contact support.",
+        "purchaseNoteOff": "While the company workspace is off, what you buy goes to your own account, not the pool, and you can use it for your own images."
       },
       "packages": {
         "title": "Company packages",

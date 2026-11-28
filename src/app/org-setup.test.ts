@@ -76,9 +76,10 @@ describe.each(['en', 'zh'] as const)('owner, by setup (%s)', (locale) => {
     expect(text).not.toMatch(/paused|暂停/i)
   })
 
-  it('says where purchases go while the workspace runs, and invites none while it is off', () => {
+  // 2034: with the workspace off the main admin's purchases stay on their own account and can be spent.
+  it('says where purchases go: the pool while the workspace runs, the own account while it is off', () => {
     expect(render(locale, createElement(PoolPanel, { data: owner(), actions })).text).toContain(say(locale, 'goes straight into the pool', '直接存入积分池'))
-    expect(render(locale, createElement(PoolPanel, { data: owner({ status: 'suspended' }), actions })).text).not.toMatch(/purchase|buy|购买/i)
+    expect(render(locale, createElement(PoolPanel, { data: owner({ status: 'suspended' }), actions })).text).toContain(say(locale, 'goes to your own account', '进入你自己的账号'))
   })
 
   // Review on #985: with the workspace off, staff codes no longer bring customers to the org and the

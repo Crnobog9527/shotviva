@@ -32,9 +32,9 @@ export function PoolPanel({ data, actions }: { data: OwnerConsole; actions: Owne
         {promo ? <PromoStat org={data.org} /> : null}
       </div>
       {promo ? <p className="text-caption text-muted-foreground">{t('promoHint')}</p> : null}
-      {/* Only while the workspace runs do the main admin's purchases go to the pool (2033); with it
-          off, nothing here invites a purchase (review on #985). */}
-      {data.org.status === 'active' ? <p className="text-caption text-muted-foreground">{t('purchaseNote')}</p> : null}
+      {/* Only while the workspace runs do the main admin's purchases go to the pool (2033); with it off
+          they stay on their own account and can be spent there (2034). */}
+      <p className="text-caption text-muted-foreground">{t(data.org.status === 'active' ? 'purchaseNote' : 'purchaseNoteOff')}</p>
       <MoveInForm data={data} actions={actions} />
     </Panel>
   )
