@@ -71,7 +71,7 @@ async function Account() {
   const more = payments.length >= PICKER_LIMIT
   // Each line with its receipt / invoice links (T80); the support picker keeps the plain labels.
   const lines = purchaseLines(payments, purchases, locale)
-  const data = { email: user.email, phone: maskPhone(user.phone) || null, balance, giftRefused: signupGift.reason, subscription, since, lastMembership: last, works, purchases: lines, morePurchases: more, helpUnread, graylum, graylumLinks: graylumIntroLinks(serverEnv().VERCEL_ENV), affiliate, admin: user.role === 'admin', orgStaff: org.kind === 'member' }
+  const data = { email: user.email, phone: maskPhone(user.phone) || null, balance, giftRefused: signupGift.reason, subscription, since, lastMembership: last, works, purchases: lines, morePurchases: more, helpUnread, graylum, graylumLinks: graylumIntroLinks(serverEnv().VERCEL_ENV), affiliate, admin: user.role === 'admin', orgStaff: org.kind === 'member' && org.status === 'active' }
   // Help & feedback opens over the page (?help=…, T68); its payments picker is the Purchases list.
   return (
     <>
@@ -88,21 +88,21 @@ async function Account() {
   )
 }
 
-// An active member's (and the owner's) own invite code earns no personal invitee or inviter reward
-// while the org is active (2032), so the personal invite card would promise rewards that do not
-// come. They promote with the org's links instead.
-function orgInvites(view: Awaited<ReturnType<typeof readOrgView>>) {
-  if (view.kind === 'member') return view.status === 'active'
-  return view.kind === 'owner' && view.org.status === 'active'
+// An org member's (and the owner's) own invite code earns no personal invitee or inviter reward
+// while the org is active (2032) or runs the affiliate program (2035, A2: then the code is the
+// org's), so the personal invite card would promise rewards that do not come. They promote with
+// the org's links instead.
+// Codes (Owner 2026-11-28): the redeem route refuses every code for an active member of an active
+// org, the main admin included (2032), so the code box is hidden for them. With the workspace off
+// the route accepts codes and the member can spend what they get (2034), so it shows again.
+function usesCodes(view: Awaited<ReturnType<typeof readOrgView>>) {
+  if (view.kind === 'member') return view.status !== 'active'
+  return !(view.kind === 'owner' && view.org.status === 'active')
 }
 
-// Codes (Owner 2026-11-28): the redeem route refuses every code for an active member of an active
-// org, the main admin included (2032). A staff seat of an org whose workspace is off is hidden
-// too: while the seat is active the member spends only the org's shares, so a code's credits
-// could not be used (and staff buy nothing for themselves).
-function usesCodes(view: Awaited<ReturnType<typeof readOrgView>>) {
-  if (view.kind === 'member') return false
-  return !(view.kind === 'owner' && view.org.status === 'active')
+function orgInvites(view: Awaited<ReturnType<typeof readOrgView>>) {
+  if (view.kind === 'member') return view.status === 'active' || view.withAffiliate
+  return view.kind === 'owner' && (view.org.status === 'active' || view.org.affiliateEnabled)
 }
 
 // The enterprise block (ARCHITECTURE §6.5, card E4): the owner gets a row into their console, a
@@ -140,11 +140,10 @@ async function OwnerCustomerLink({ user }: { user: string }) {
 }
 
 // Only an org that runs the affiliate program gives its members a promotion link: one bought just as
-// a production tool has no customers to bring (Owner 2026-11-28). And only while its workspace is
-// on: a staff code binds customers to the org only then (_invite_code_org), so with it off the
-// code is a personal invite and the personal card below shows it.
+// a production tool has no customers to bring (Owner 2026-11-28). Workspace on or off: a staff code
+// binds customers to the org whenever the affiliate program is on (2035, A2).
 function memberLinkFor(view: Awaited<ReturnType<typeof readOrgView>>, user: string) {
-  return view.kind === 'member' && view.withAffiliate && view.status === 'active' ? <Suspense fallback={null}><MemberLink user={user} /></Suspense> : null
+  return view.kind === 'member' && view.withAffiliate ? <Suspense fallback={null}><MemberLink user={user} /></Suspense> : null
 }
 
 // Streams in too: a member's promotion link, their own invite code on the page's language.

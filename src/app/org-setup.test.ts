@@ -76,9 +76,19 @@ describe.each(['en', 'zh'] as const)('owner, by setup (%s)', (locale) => {
     expect(text).not.toMatch(/paused|暂停/i)
   })
 
+  // 2034: with the workspace off the main admin's purchases stay on their own account and can be spent.
   it('says where purchases go: the pool while the workspace runs, the own account while it is off', () => {
     expect(render(locale, createElement(PoolPanel, { data: owner(), actions })).text).toContain(say(locale, 'goes straight into the pool', '直接存入积分池'))
     expect(render(locale, createElement(PoolPanel, { data: owner({ status: 'suspended' }), actions })).text).toContain(say(locale, 'goes to your own account', '进入你自己的账号'))
+  })
+
+  // Review on #985: with the workspace off, staff codes no longer bring customers to the org and the
+  // org signup bonus stops; the banner names only what still works.
+  it('names only what still works on the affiliate side while the workspace is off', () => {
+    const { text } = render(locale, createElement(OwnerConsoleView, { data: owner({ status: 'suspended' }), actions, report: null, affiliate: true }))
+    expect(text).toContain(say(locale, 'Commissions on customers already linked', '已绑定客户的佣金照常计算'))
+    expect(text).toContain(say(locale, 'customer referral link in Company affiliate', '企业联盟里的客户推广链接'))
+    expect(text).not.toMatch(/as usual|照常。|staff (invite|promo)|员工推广|注册赠分|signup bonus/i)
   })
 
   it('calls the month table usage without the affiliate program, also when it could not be read', () => {

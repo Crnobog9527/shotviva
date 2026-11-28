@@ -42,7 +42,8 @@ export type AccountData = {
   // profiles.role = 'admin': the "Admin" row (spec #186).
   affiliate: boolean
   admin: boolean
-  // An org staff member (an active seat, role member): no buy buttons (Owner 2026-11-28).
+  // A staff member of an org whose workspace is on: no buy buttons (ORG_MEMBER_CHECKOUT, Owner
+  // 2026-11-28). With the workspace off they buy and spend their own credits (2034).
   orgStaff?: boolean
 }
 
