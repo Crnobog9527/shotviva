@@ -37,7 +37,7 @@ import { WishlistHintSlot } from './wishlist-hint-slot'
 // Every page inside still calls requireUser() itself.
 export const metadata: Metadata = appShellMetadata()
 
-// No `prefetch = 'partial'` here (it was on from #881 to 2026-11-28). With it, Next renders every app
+// No `prefetch = 'partial'` here (it was on from #236 to 2026-11-28). With it, Next renders every app
 // page a second time after the first and puts that copy inside the same response, for its client
 // cache (app-render.js, prefetchMode 2; there is no switch for the embedding alone). Each document
 // and each refresh then carried the page's flight data twice, and with it the inlined stylesheet
@@ -45,7 +45,8 @@ export const metadata: Metadata = appShellMetadata()
 // 774 KB (gzip 223 vs 144 KB), the first picture's markup at byte 936 KB instead of 652 KB, and on
 // slow 4G the document 1.1 s later. It bought nothing in return: every session read here sits
 // behind connection(), which a runtime prefetch leaves out, so a prefetched tab opened in the same
-// time with it and without it (taps to 作品 / 我的 / 创作: 569 / 593 / 99 ms vs 599 / 606 / 105 ms).
+// time with it and without it (taps to 作品 / 我的 / 创作 until the page settles, 300 ms latency:
+// 569 / 593 / 99 ms with, 670 / 440 / 92 ms without, within run-to-run spread).
 // Guarded by app-single-payload.test.ts.
 
 // Same cached session lookup the page's requireUser() makes, so no extra auth round trip.
