@@ -56,5 +56,6 @@ export async function buildOrgReport({ db, user, period, kind, labels, maskPhone
     })),
     labels.members, labels.total, org.affiliate_enabled && org.affiliate_levels === 2,
   )
-  return { filename: `performance-${period}.csv`, body }
+  // Without the affiliate program the table is the month's usage (Owner 2026-11-28).
+  return { filename: `${org.affiliate_enabled ? 'performance' : 'usage'}-${period}.csv`, body }
 }
