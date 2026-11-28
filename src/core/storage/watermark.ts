@@ -38,6 +38,13 @@ export async function galleryImage(image: Uint8Array, width: number, mark: FreeM
 // scaled to `shortEdge` (never up), so it still fills a 4:5 tile whatever the work's shape; a
 // cut-out sits on white, as everywhere the app shows one small; protected when the work was made
 // with free credits, like the full file. WebP.
+// The tile copy cut from a list copy that already exists: the same picture, smaller. No mark is
+// added: a free work's list copy carries its protection already.
+export async function workTileFromThumb(thumb: Uint8Array, shortEdge: number): Promise<Uint8Array> {
+  const scaled = sharp(thumb).resize({ width: shortEdge, height: shortEdge, fit: 'outside', withoutEnlargement: true })
+  return new Uint8Array(await scaled.webp({ quality: 78 }).toBuffer())
+}
+
 export async function workThumbImage(image: Uint8Array, shortEdge: number, mark: FreeMark | null): Promise<Uint8Array> {
   if (mark) return protectImage(image, { jobId: mark.jobId, size: { kind: 'short-edge', shortEdge }, format: 'webp', background: 'white' })
   const scaled = sharp(image).resize({ width: shortEdge, height: shortEdge, fit: 'outside', withoutEnlargement: true }).flatten({ background: WHITE })
