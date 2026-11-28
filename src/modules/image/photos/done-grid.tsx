@@ -30,9 +30,10 @@ import type { CreateShareAction } from '../work-share/share-types'
 // an empty filter says, and the org owner's delete for colleagues' works (null for staff).
 export type CompanyGrid = { filter: ReactNode; emptyNote: string; remove: DeleteCompanyWork | null }
 // running: the photos still developing (the server's, the tab adds its own) and the covers that
-// stand in for them; they are the first tiles of Today.
+// stand in for them; they are the first tiles of Today. null: none are shown at all, this tab's
+// own included (the company view under a filter that leaves the reader out).
 export type Running = { server: PhotoItem[]; covers: Record<string, string | null> }
-type Props = { items: PhotoItem[]; now: Date; timeZone: string; running: Running; liveTemplates: string[]; share?: CreateShareAction; more?: string | null; total?: number; company?: CompanyGrid }
+type Props = { items: PhotoItem[]; now: Date; timeZone: string; running: Running | null; liveTemplates: string[]; share?: CreateShareAction; more?: string | null; total?: number; company?: CompanyGrid }
 
 export function DoneGrid({ items, now, timeZone, running, liveTemplates, share, more = null, total = items.length, company }: Props) {
   const t = useTranslations('app')
@@ -74,7 +75,7 @@ export function DoneGrid({ items, now, timeZone, running, liveTemplates, share, 
 
 // How the grid draws: a photo's tile, a day or batch's date, and the cell a photo or a stack takes.
 type Draw = { card(item: PhotoItem): ReactNode; when(iso: string): string; slot(id: string): number }
-type DaysProps = { entries: DoneEntry[]; zone: { now: Date; timeZone: string }; running: Running; today: string; whole: boolean; draw: Draw }
+type DaysProps = { entries: DoneEntry[]; zone: { now: Date; timeZone: string }; running: Running | null; today: string; whole: boolean; draw: Draw }
 
 // The list cut into days. Developing photos lead Today's grid; with no finished work today they
 // bring their own Today section. whole: no older page remains, so the last day's count is right
@@ -82,7 +83,7 @@ type DaysProps = { entries: DoneEntry[]; zone: { now: Date; timeZone: string }; 
 function Days({ entries, zone, running, today, whole, draw }: DaysProps) {
   const days = groupByDay(entries, zone.timeZone)
   const todayListed = days[0]?.key === dayKeyIn(zone.timeZone)(zone.now)
-  const developing = <RunningList server={running.server} covers={running.covers} today={todayListed ? undefined : today} />
+  const developing = running ? <RunningList server={running.server} covers={running.covers} today={todayListed ? undefined : today} /> : null
   return (
     <>
       {todayListed ? null : developing}
@@ -95,10 +96,10 @@ function Days({ entries, zone, running, today, whole, draw }: DaysProps) {
 
 // No finished work: the developing ones alone under Today, or the empty state (which hides itself
 // while this tab has a photo developing the server did not list).
-function Nothing({ company, running, today }: { company?: CompanyGrid; running: Running; today: string }) {
-  const developing = <RunningList server={running.server} covers={running.covers} today={today} />
+function Nothing({ company, running, today }: { company?: CompanyGrid; running: Running | null; today: string }) {
+  const developing = running ? <RunningList server={running.server} covers={running.covers} today={today} /> : null
   if (company) return <>{developing}<CompanyEmpty company={company} /></>
-  return <>{developing}{running.server.length > 0 ? null : <PhotosEmpty />}</>
+  return <>{developing}{running && running.server.length > 0 ? null : <PhotosEmpty />}</>
 }
 
 // The company view with nothing under the chosen filter: the rail stays, so the way back is there.

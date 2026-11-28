@@ -59,9 +59,11 @@ export async function CompanyPhotos({ db, userId, seat, now, timeZone, filter, u
   const signed = new Map([...theirTiles, ...myTiles])
   const fallback = tp('fallbackName')
   const items = toCompanyItems(page.works, { me: userId, own: new Map(own.map((job) => [job.id, job])), templates: lookup, labels, fallbackName: fallback, fileUrlFor, signed })
-  // The reader's own photos in flight belong with everyone's works or their own, not under a
-  // colleague's (or the archived, or the personal) filter.
-  const running = filter === null || filter === ME ? runningJobs.map((job) => toPhotoItem(job, lookup, null, fallback)) : []
+  // The reader's own photos in flight belong with everyone's works or their own. Under any other
+  // filter (a colleague, deleted accounts, personal) the grid shows none at all: not the server's
+  // and not the ones this tab started itself, which the client list would otherwise add.
+  const showRunning = filter === null || filter === ME
+  const running = runningJobs.map((job) => toPhotoItem(job, lookup, null, fallback))
   const rail = <Rail members={members.map((m) => ({ ...m, label: m.userId ? (labels.get(m.userId) ?? null) : null }))} me={userId} personal={personal} current={filter} />
   return (
     <>
@@ -70,7 +72,7 @@ export async function CompanyPhotos({ db, userId, seat, now, timeZone, filter, u
         items={items}
         now={now}
         timeZone={timeZone}
-        running={{ server: running, covers }}
+        running={showRunning ? { server: running, covers } : null}
         liveTemplates={liveTemplates}
         share={createWorkShareAction}
         total={page.total}
