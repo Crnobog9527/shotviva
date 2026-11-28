@@ -18634,7 +18634,7 @@ CREATE OR REPLACE FUNCTION "public"."own_photos_filtered"("p_user" "uuid", "p_ca
       and (p_category is null
            or case when j.parent_job_id is null then t.category_key
                    else public.own_photo_edit_root(p_user, j.template_id, j.parent_job_id) end = p_category)
-    order by j.created_at desc, j.id desc
+    order by j.created_at desc, (j.id::text collate "C") desc
     limit least(greatest(coalesce(p_limit, 49), 1), 1000))
   union all
   (select j.*
@@ -18649,7 +18649,7 @@ CREATE OR REPLACE FUNCTION "public"."own_photos_filtered"("p_user" "uuid", "p_ca
       and (p_category is null
            or case when j.parent_job_id is null then t.category_key
                    else public.own_photo_edit_root(p_user, j.template_id, j.parent_job_id) end = p_category)
-    order by j.created_at asc, j.id asc
+    order by j.created_at asc, (j.id::text collate "C") asc
     limit least(greatest(coalesce(p_limit, 49), 1), 1000))
   union all
   (select j.*
