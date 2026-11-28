@@ -94,8 +94,8 @@ function CardMeta({ template, series }: { template: CatalogueTemplate; series?: 
   return (
     <span className="block pt-2">
       {series ? <span data-series-label="" className="mb-1 block truncate text-caption leading-[1.35] font-medium text-bone-dim">{series}</span> : null}
-      <span className="block text-body leading-[1.25] font-semibold tracking-[-0.015em]">{template.name}</span>
-      <span className="mt-1 block text-caption leading-[1.35] text-muted-foreground">{kind}</span>
+      <span data-name="" className="block text-body leading-[1.25] font-semibold tracking-[-0.015em]">{template.name}</span>
+      <span data-kind="" className="mt-1 block text-caption leading-[1.35] text-muted-foreground">{kind}</span>
       {cost !== null ? <span className="mt-2 inline-block rounded-tag bg-wash px-2 py-1 font-mono text-caption leading-none text-bone-dim">{t(template.imagesPerSet ? 'fromCreditsSet' : 'fromCredits', { count: cost, images: template.imagesPerSet ?? 1 })}</span> : null}
     </span>
   )

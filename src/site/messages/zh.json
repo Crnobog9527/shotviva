@@ -688,6 +688,8 @@
       "shelfCount": "共 {count} 个",
       "shelfMore": "+{count} 个",
       "shelfMoreAria": "查看「{name}」全部 {total} 个模板",
+      "shelfExpand": "展开其余 {count} 个",
+      "shelfCollapse": "收起",
       "scrollBack": "向前滚动「{name}」",
       "scrollOn": "向后滚动「{name}」",
       "inSeries": "系列：{name}"
