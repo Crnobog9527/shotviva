@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { logger } from '@/core/logger'
 
-// Batch create with promotion credits (Owner 2026-11-28, migration 2034): only an active member of
+// Batch create with promotion credits (Owner 2026-11-28, migration 2036): only an active member of
 // an active org that runs the enterprise affiliate program may make 1K batch cells, paid from the
 // org's promotion share. Mirrors public._batch_promo_allowed, which reserve_batch_cell enforces;
 // this read only lets the preflight and the page say so first. Service role: org_members has no

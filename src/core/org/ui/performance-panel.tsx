@@ -12,13 +12,21 @@ import { Panel } from './parts'
 const CELL = 'px-2 py-2 text-right tabular-nums'
 const HEAD = 'px-2 py-2 text-right text-caption font-medium text-muted-foreground'
 
-export function PerformancePanel({ report }: { report: OwnerReport | null }) {
+// An org without the affiliate program brings no customers, so its table is the month's usage,
+// not performance (Owner 2026-11-28): its own title, hint, caption and footnote.
+const COPY = {
+  affiliate: { title: 'title', hint: 'hint', caption: 'caption', definition: 'definition' },
+  usage: { title: 'titleNoAffiliate', hint: 'hintNoAffiliate', caption: 'captionNoAffiliate', definition: 'definitionNoAffiliate' },
+} as const
+
+export function PerformancePanel({ report, affiliate }: { report: OwnerReport | null; affiliate: boolean }) {
   const t = useTranslations('app.org.performance')
+  const copy = COPY[affiliate ? 'affiliate' : 'usage']
   const format = useFormatter()
   const locale = useLocale()
   if (!report) {
     return (
-      <Panel title={t('title')} hint={t('hint')}>
+      <Panel title={t(copy.title)} hint={t(copy.hint)}>
         <p role="status" className="text-label text-muted-foreground">{t('unavailable')}</p>
       </Panel>
     )
@@ -29,7 +37,7 @@ export function PerformancePanel({ report }: { report: OwnerReport | null }) {
   const levels = [{ n: 1 as const, show: report.withAffiliate }, { n: 2 as const, show: report.withLevel2 }].filter((l) => l.show)
   const label = (row: ReportRow) => row.account ?? t('unknown')
   return (
-    <Panel title={t('title')} hint={t(report.withAffiliate ? 'hint' : 'hintNoAffiliate')}>
+    <Panel title={t(copy.title)} hint={t(copy.hint)}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <nav aria-label={t('month')} className="flex items-center gap-1">
           {report.previous ? <Link href={`/account/enterprise?month=${report.previous}`} aria-label={t('previous')} className={nav}>‹</Link> : <span aria-hidden className={`${nav} opacity-30`}>‹</span>}
@@ -43,7 +51,7 @@ export function PerformancePanel({ report }: { report: OwnerReport | null }) {
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[560px] border-collapse text-label">
-          <caption className="sr-only">{t('caption', { month: report.period })}</caption>
+          <caption className="sr-only">{t(copy.caption, { month: report.period })}</caption>
           <thead>
             <tr className="border-b border-hairline">
               <th scope="col" className="px-2 py-2 text-left text-caption font-medium text-muted-foreground">{t('member')}</th>
@@ -77,7 +85,7 @@ export function PerformancePanel({ report }: { report: OwnerReport | null }) {
           </tfoot>
         </table>
       </div>
-      <p className="text-caption text-muted-foreground">{t(report.withAffiliate ? 'definition' : 'definitionNoAffiliate')}</p>
+      <p className="text-caption text-muted-foreground">{t(copy.definition)}</p>
     </Panel>
   )
 }

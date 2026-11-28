@@ -19,7 +19,8 @@ import { useConsoleAction } from './use-console-action'
 
 // The staff-only link (Owner 2026-11-22), first thing in the workspace. It is a credential
 // that seats whoever opens it as staff, so it wears the caution surface and says plainly that
-// customers must get the affiliate's customer link instead. Built with /zh whatever the console's language (ENTERPRISE_LINK_LOCALE).
+// customers must get the affiliate's customer link instead (an org without the affiliate program
+// has no customers, so there it only says not to pass it on). Built with /zh whatever the console's language (ENTERPRISE_LINK_LOCALE).
 export function StaffLinkPanel({ data, actions, affiliate }: { data: OwnerConsole; actions: OwnerActions; affiliate: boolean }) {
   const t = useTranslations('app.org.invite')
   const [token, setToken] = useState(data.inviteToken)
@@ -32,7 +33,7 @@ export function StaffLinkPanel({ data, actions, affiliate }: { data: OwnerConsol
       <div role="note" className="flex gap-2.5 rounded-inner bg-background/60 p-3 shadow-[inset_0_0_0_1px_var(--caution-edge)]">
         <TriangleAlert aria-hidden strokeWidth={1.75} className="mt-0.5 size-[18px] shrink-0 text-[var(--caution)]" />
         <div className="min-w-0 space-y-1">
-          <p className="text-label font-medium text-[var(--caution)]">{t('warning')}</p>
+          <p className="text-label font-medium text-[var(--caution)]">{t(affiliate ? 'warning' : 'warningNoAffiliate')}</p>
           {affiliate ? (
             <Link href="/partners/enterprise" className="inline-flex min-h-11 items-center gap-0.5 text-label text-foreground underline underline-offset-4">
               {t('toAffiliate')}<ChevronRight aria-hidden strokeWidth={1.75} className="size-4 text-primary" />

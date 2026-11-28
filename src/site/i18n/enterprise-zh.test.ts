@@ -30,7 +30,7 @@ describe('the enterprise owner console in Chinese', () => {
   it('links to the three sections under /zh from the account row and the shared frame, in Chinese', async () => {
     const frame = (current: 'affiliate' | 'workspace' | 'purchasing') =>
       createElement(EnterpriseFrame, { orgName: 'Org', current, affiliate: true, intro: '' }, null)
-    const zh = await render(createElement('div', null, createElement(OwnerEntryRow, { name: 'Org', pool: '0', suspended: false, affiliate: false }), frame('workspace')), 'zh')
+    const zh = await render(createElement('div', null, createElement(OwnerEntryRow, { name: 'Org', pool: '0', setup: 'workspace', affiliate: false }), frame('workspace')), 'zh')
     expect(zh.match(/href="\/zh\/account\/enterprise"/g)).toHaveLength(2)
     expect(zh).toContain('href="/zh/partners/enterprise"')
     expect(zh).toContain('href="/zh/account/enterprise/purchasing"')

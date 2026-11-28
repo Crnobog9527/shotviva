@@ -25,10 +25,13 @@ export function offerOf(s: z.infer<typeof seat>, b: z.infer<typeof profile>, now
   return { paid: Math.min(s.held_credits, b.credits), promo: live ? Math.min(s.held_promo_credits, b.free_credits) : 0, last: b.org_pool_choice ?? 'paid' }
 }
 
+// A seat of an org whose workspace is off is not offered here (2034): the member then pays from the
+// org's share or their own credits, so the pages use their own balance and show no picker; the
+// database decides which pays.
 export async function readPoolChoiceOffer(db: SupabaseClient, user: string, now = new Date()): Promise<PoolChoiceOffer | null> {
   try {
     const [m, p] = await Promise.all([
-      db.from('org_members').select('held_credits,held_promo_credits,orgs!inner(promo_expires_at)').eq('user_id', user).eq('status', 'active').maybeSingle(),
+      db.from('org_members').select('held_credits,held_promo_credits,orgs!inner(promo_expires_at)').eq('user_id', user).eq('status', 'active').eq('orgs.status', 'active').maybeSingle(),
       db.from('profiles').select('credits,free_credits,org_pool_choice').eq('id', user).maybeSingle(),
     ])
     if (m.error || p.error || !m.data || !p.data) return null

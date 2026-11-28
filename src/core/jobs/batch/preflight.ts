@@ -34,7 +34,7 @@ function checkGrid(userId: string, cells: Selected[], promo: boolean) {
     throw new AppError('INVALID_INPUT', 'Use one aspect ratio across the batch')
   }
   // 1K is free credits only (1996), and a batch takes free credits only from an affiliate org's
-  // promotion share (2034): reserve_batch_cell would refuse anyone else's 1K cell, so say so first.
+  // promotion share (2036): reserve_batch_cell would refuse anyone else's 1K cell, so say so first.
   if (!promo && cells.some(c => tierPool(c.inputs.resolution ?? '1k') === 'free')) {
     throw new AppError('INVALID_INPUT', 'A batch is paid credits only: pick 2K or 4K')
   }
