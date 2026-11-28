@@ -6,7 +6,7 @@ import { noteGenerationFailure, noteSaleFloorCheck } from '../alerts'
 import { captureError } from '../analytics'
 import { logger } from '../logger'
 import { scheduleScreen } from '../moderation'
-import { keepJobInputs, opaquePng, writeWorkThumb, type ObjectStore } from '../storage'
+import { keepJobInputs, opaquePng, writeWorkCopies, type ObjectStore } from '../storage'
 import { classifyFailure, GenerationFailure, type FailureStage } from './generation-failure'
 import { keepsAlpha } from './job-background'
 import { estimatedRouterCost, jobCostUsd } from './job-cost'
@@ -107,14 +107,14 @@ function costOf(provider: GenerationProvider, usage: ProviderUsage | null, decis
 }
 
 // The output written, and alongside it the job's uploads copied next to it (T40, §8.3「输入图随
-// 作品保留」) and the small copy lists show (§8.3「作品小图」), marked like the work itself. Neither
+// 作品保留」) and the small copies lists show (§8.3「作品小图」: the list copy and Photos' tile), marked like the work itself. Neither
 // extra ever throws: a failed copy is just not kept, a missing small copy is made on first view.
 async function storeOutput(deps: SettleDeps, job: Job, output: { key: string; bytes: Uint8Array; contentType: string }, inputKeys: string[]) {
   const owner = { userId: job.userId, jobId: job.id }
   const [, kept] = await Promise.all([
     deps.store.put(output.key, output.bytes, output.contentType),
     keepJobInputs(deps.store, owner, inputKeys),
-    writeWorkThumb(deps.store, { ...owner, bytes: output.bytes, pool: job.creditPool }),
+    writeWorkCopies(deps.store, { ...owner, bytes: output.bytes, pool: job.creditPool }),
   ])
   return kept
 }

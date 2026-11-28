@@ -25,6 +25,8 @@ export const fileUrlFor = (jobId: string) => `/api/files/${jobId}`
 
 // The small copy lists show instead of the full file (job-thumb.ts); same owner-only rule.
 export const thumbUrlFor = (jobId: string) => `/api/files/${jobId}/thumb`
+// The smaller copy Photos' grid shows (work-thumb.ts WORK_TILE_PX); same route, same rule.
+export const tileUrlFor = (jobId: string) => `/api/files/${jobId}/thumb?size=tile`
 
 export function toJobView(job: Job): JobView {
   return {

@@ -36,7 +36,7 @@ describe('photo items', () => {
 
   // ARCHITECTURE §8.3「作品小图」: a finished work is listed by its small copy, never its full file.
   it('points a finished work at its small copy, or at the signed URL the page already holds', () => {
-    expect(toPhotoItem(job, new Map(), '/api/files/j1')).toMatchObject({ fileUrl: '/api/files/j1', thumbUrl: '/api/files/j1/thumb' })
+    expect(toPhotoItem(job, new Map(), '/api/files/j1')).toMatchObject({ fileUrl: '/api/files/j1', thumbUrl: '/api/files/j1/thumb?size=tile' })
     expect(toPhotoItem(job, new Map(), '/api/files/j1', '', 'https://r2.example/signed').thumbUrl).toBe('https://r2.example/signed')
     expect(toPhotoItem({ ...job, status: 'running' }, new Map(), null).thumbUrl).toBeNull()
   })
