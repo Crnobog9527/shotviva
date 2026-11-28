@@ -6,7 +6,7 @@
 -- the same shape. Running and paused experiments are untouched.
 
 alter table public.experiments add column retired_at timestamptz;
-alter table public.experiments add constraint experiments_retired_ended_check check (retired_at is null or status = 'ended');
+-- Only admin_experiment_restore_default writes it, and only for an ended experiment (no check constraint: expand-only).
 
 -- Per surface: the running or paused experiment, else the latest ended one unless it was retired.
 -- Retiring the latest ended one does not bring back an older ended one (the pick is made first).
