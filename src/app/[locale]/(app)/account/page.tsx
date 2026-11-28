@@ -97,8 +97,8 @@ function orgInvites(view: Awaited<ReturnType<typeof readOrgView>>) {
 }
 
 // The enterprise block (ARCHITECTURE §6.5, card E4): the owner gets a row into their console, a
-// member a row into their own org page with what is left of this month's credits, then their
-// promotion link (Owner 2026-11-23); everyone else sees nothing.
+// member this month's org credits, 企业作品 and (affiliate orgs) their customers, then their
+// promotion link (Owner 2026-11-28); everyone else sees nothing.
 function OrgBlock({ view, customerLink, memberLink }: { view: Awaited<ReturnType<typeof readOrgView>>; customerLink: ReactNode; memberLink: ReactNode }) {
   const t = useTranslations('app.org.entry')
   const format = useFormatter()
@@ -131,9 +131,11 @@ async function OwnerCustomerLink({ user }: { user: string }) {
 }
 
 // Only an org that runs the affiliate program gives its members a promotion link: one bought just as
-// a production tool has no customers to bring (Owner 2026-11-28).
+// a production tool has no customers to bring (Owner 2026-11-28). And only while its workspace is
+// on: a staff code binds customers to the org only then (_invite_code_org), so with it off the
+// code is a personal invite and the personal card below shows it.
 function memberLinkFor(view: Awaited<ReturnType<typeof readOrgView>>, user: string) {
-  return view.kind === 'member' && view.withAffiliate ? <Suspense fallback={null}><MemberLink user={user} /></Suspense> : null
+  return view.kind === 'member' && view.withAffiliate && view.status === 'active' ? <Suspense fallback={null}><MemberLink user={user} /></Suspense> : null
 }
 
 // Streams in too: a member's promotion link, their own invite code on the page's language.
