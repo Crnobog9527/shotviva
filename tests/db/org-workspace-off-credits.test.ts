@@ -40,11 +40,11 @@ async function idleSeat(paid: number, promo: number, own: { credits?: number; fr
 
 const PRICE = { '1k': 10, '2k': 20 } as const
 const seed = async () => (template ??= await seedTemplate(db, { visibleIn: ['web', 'partner'], credits: { '1k': 10, '2k': 20, '3k': 30 } }))
-async function generate(user: string, tier: keyof typeof PRICE, choice?: string) {
+async function generate(user: string, tier: keyof typeof PRICE, choice?: string, source = 'web') {
   await seed()
   const id = randomUUID()
   const inputs = { resolution: tier, attempt_id: randomUUID(), ...(choice ? { pool_choice: choice } : {}) }
-  const job = await row(db, "select id, credit_pool, org_id from reserve_credits($1,$2,'image',$3,$4,'web',$5,null,null,null)", [id, user, template, PRICE[tier], inputs])
+  const job = await row(db, "select id, credit_pool, org_id from reserve_credits($1,$2,'image',$3,$4,$5,$6,null,null,null)", [id, user, template, PRICE[tier], source, inputs])
   return job as { id: string; credit_pool: string; org_id: string | null }
 }
 const seat = (user: string) => row(db, `select p.credits, p.free_credits, m.held_credits, m.held_promo_credits
@@ -90,6 +90,21 @@ it('gives a failed own-paid job back to the member without touching the org shar
   const job = await generate(staff, '2k')
   await db.query("select public.refund_job($1, 'TEST_FAILED')", [job.id])
   expect(await seat(staff)).toMatchObject({ credits: 505, held_credits: 5 })
+})
+
+// Review on #989: where no tier picks the pool (_reserve_pool: edits, poster photo extraction,
+// partner calls), the org's shares still come first, this month's promotion share before own paid.
+it('without a tier, spends the org shares before the member’s own: paid, promotion, own paid, own free', async () => {
+  const { orgId, staff } = await idleSeat(5, 30, { credits: 500, free: 50 })
+  expect(await generate(staff, '1k', undefined, 'graylum')).toMatchObject({ credit_pool: 'free', org_id: orgId })
+  expect(await seat(staff)).toMatchObject({ credits: 505, free_credits: 70, held_credits: 5, held_promo_credits: 20 })
+  await db.query("insert into system_settings(key, value) values ('poster_photo_credits', '1'::jsonb) on conflict (key) do update set value = excluded.value")
+  expect(await row(db, "select credits from start_poster_photo($1,'test',10)", [staff])).toEqual({ credits: 1 })
+  // A 1-credit extraction: the org's paid share covers it, so it goes first.
+  expect(await seat(staff)).toMatchObject({ credits: 504, free_credits: 70, held_credits: 4, held_promo_credits: 20 })
+  await db.query('update org_members set held_promo_credits = 0 where user_id = $1', [staff])
+  expect(await generate(staff, '1k', undefined, 'graylum')).toMatchObject({ credit_pool: 'paid', org_id: null })
+  expect(await seat(staff)).toMatchObject({ credits: 494, held_credits: 4 })
 })
 
 it('keeps an active org’s seats on org shares only', async () => {

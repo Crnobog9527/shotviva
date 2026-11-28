@@ -10,6 +10,8 @@
 --    (as before: the org already gave those credits, the work is an org work), else by the
 --    member's own credits of that pool when they cover the whole price; a job is never split
 --    between the two, as in 1897. Neither covers it: CREDITS_INSUFFICIENT (the member can buy).
+--    Where no tier picks the pool (edits, poster photo extraction, partner calls: _reserve_pool),
+--    the org's shares come first too: org paid, org promotion, own paid, own free.
 --  - own = the balance minus the org's share (min(held, balance)); the promotion share counts only
 --    while the org's promotion month is live, as before. A pool_choice is not used: the member has
 --    no picker while the workspace is off (the web reads only offer it for an active org).
@@ -55,9 +57,12 @@ begin
     raise exception 'CREDITS_INSUFFICIENT';
   end if;
   if not s.active_org then
-    -- 2034: the workspace is off; paid first, then free, each wholly from the org or the member.
-    if s.org_paid >= p_cost or s.own_paid >= p_cost then return 'paid'; end if;
-    if s.org_promo >= p_cost or s.own_free >= p_cost then return 'free'; end if;
+    -- 2034: the workspace is off; the org's shares first (paid, then this month's promotion,
+    -- which expires), then the member's own (paid, then free); each wholly from one of them.
+    if s.org_paid >= p_cost then return 'paid'; end if;
+    if s.org_promo >= p_cost then return 'free'; end if;
+    if s.own_paid >= p_cost then return 'paid'; end if;
+    if s.own_free >= p_cost then return 'free'; end if;
     raise exception 'CREDITS_INSUFFICIENT';
   end if;
   if p_choice is not null and p_source = 'web' and s.org_paid > 0 and s.org_promo > 0 then
