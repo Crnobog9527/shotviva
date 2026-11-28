@@ -33,6 +33,10 @@ export type PhotoItem = {
   batchId: string | null
   // Its cell in that batch, 0 first (inputs.batch_position); null outside a batch.
   batchPosition: number | null
+  // Photos' company view (§6.5「作品页就是企业作品」) only. personal: one of the reader's own works
+  // that is not the company's. maker: a colleague's work (view and download; not the reader's).
+  personal?: boolean
+  maker?: { who: string | null; state: 'active' | 'removed' | 'deleted' }
 }
 
 export type TemplateLookup = Map<string, { name: string; cover: string | null }>

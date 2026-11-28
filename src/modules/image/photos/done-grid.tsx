@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 
 import { ZipButtonLazy as ZipButton } from '../batch/zip-button-lazy'
 import { groupByBatch, groupByDay, type DaySection, type DoneEntry } from './batch-groups'
+import { ColleagueCard, type DeleteCompanyWork } from './company/colleague-card'
 import { DoneCard, EAGER_TILES } from './done-card'
 import { LoadMore } from './load-more'
 import { PhotosEmpty } from './photos-empty'
@@ -20,27 +21,38 @@ import type { CreateShareAction } from '../work-share/share-types'
 // shows the work's small copy, never the full file (ARCHITECTURE §8.3「作品小图」). share: with it,
 // a Share button next to "Done" turns on picking works for one share link (§6.2「作品集分享」).
 // more: the next page's address while older works remain (LoadMore); total: every finished work.
-type Props = { items: PhotoItem[]; now: Date; timeZone: string; anyRunning: boolean; liveTemplates: string[]; share?: CreateShareAction; more?: string | null; total?: number }
+// company: Photos' company view (§6.5「作品页就是企业作品」): the filter rail under the heading, what
+// an empty filter says, and the org owner's delete for colleagues' works (null for staff).
+export type CompanyGrid = { filter: ReactNode; emptyNote: string; remove: DeleteCompanyWork | null }
+type Props = { items: PhotoItem[]; now: Date; timeZone: string; anyRunning: boolean; liveTemplates: string[]; share?: CreateShareAction; more?: string | null; total?: number; company?: CompanyGrid }
 
-export function DoneGrid({ items, now, timeZone, anyRunning, liveTemplates, share, more = null, total = items.length }: Props) {
+export function DoneGrid({ items, now, timeZone, anyRunning, liveTemplates, share, more = null, total = items.length, company }: Props) {
   const t = useTranslations('app')
   const format = useFormatter()
-  if (items.length === 0) return anyRunning ? null : <PhotosEmpty />
+  if (items.length === 0) return <Nothing company={company} anyRunning={anyRunning} />
   const entries = groupByBatch(items)
   // Display order: the viewer steps through it, and the first tiles load first.
   const ordered = entries.flatMap((entry) => (entry.kind === 'photo' ? [entry.item] : entry.items))
   const place = new Map(ordered.map((item, index) => [item.id, index]))
+  const at = (item: PhotoItem) => place.get(item.id) ?? EAGER_TILES
   const when = (iso: string) =>
     doneWhen(iso, now, timeZone, t, (date, sameYear) => format.dateTime(date, { year: sameYear ? undefined : 'numeric', month: 'long', day: 'numeric', timeZone }))
-  const card = (item: PhotoItem) => <DoneCard item={item} meta={tileMeta(item, t)} live={liveTemplates.includes(item.templateId)} place={place.get(item.id) ?? EAGER_TILES} />
+  // A colleague's work is not the reader's: its own tile and viewer, and never the reader's viewer.
+  const card = (item: PhotoItem) =>
+    item.maker ? (
+      <ColleagueCard item={item} eager={at(item) < EAGER_TILES} remove={company?.remove ?? null} />
+    ) : (
+      <DoneCard item={item} meta={tileMeta(item, t)} live={liveTemplates.includes(item.templateId)} place={at(item)} />
+    )
   const days = groupByDay(entries, timeZone)
   const grid = (
     <section aria-labelledby="done-h">
-      <WorksIndex items={ordered} />
+      <WorksIndex items={ordered.filter((item) => !item.maker)} />
       <div className="mx-(--gutter) mt-6 flex items-center justify-between gap-3 md:mt-8">
         <h2 id="done-h" className="text-headline leading-[1.2] font-semibold tracking-[-0.01em]">{t('photos.done')}</h2>
         {share ? <ShareToggle /> : null}
       </div>
+      {company?.filter}
       {days.map((day, index) => (
         // The oldest day shown may go on into the next page: its count would be short.
         <Day key={day.key} day={day} title={when(day.first)} counted={more === null || index < days.length - 1} card={card} when={when} />
@@ -51,6 +63,23 @@ export function DoneGrid({ items, now, timeZone, anyRunning, liveTemplates, shar
     </section>
   )
   return share ? <ShareSelectProvider>{grid}</ShareSelectProvider> : grid
+}
+
+function Nothing({ company, anyRunning }: { company?: CompanyGrid; anyRunning: boolean }) {
+  if (company) return <CompanyEmpty company={company} />
+  return anyRunning ? null : <PhotosEmpty />
+}
+
+// The company view with nothing under the chosen filter: the rail stays, so the way back is there.
+function CompanyEmpty({ company }: { company: CompanyGrid }) {
+  const t = useTranslations('app.photos')
+  return (
+    <section aria-labelledby="done-h">
+      <h2 id="done-h" className="mx-(--gutter) mt-6 text-headline leading-[1.2] font-semibold tracking-[-0.01em] md:mt-8">{t('done')}</h2>
+      {company.filter}
+      <p className="hairline-lit mx-(--gutter) mt-4 rounded-panel bg-card p-4 text-label text-muted-foreground">{company.emptyNote}</p>
+    </section>
+  )
 }
 
 const GRID = 'grid grid-cols-3 gap-1 px-(--gutter) sm:grid-cols-4 md:gap-2 lg:grid-cols-6'
