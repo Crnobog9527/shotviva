@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { describe, expect, it } from 'vitest'
 
 import { createMemoryStore } from '../../../../tests/fakes/memory-store'
-import { resolveOrgWorkFile } from './file'
+import { resolveOrgWorkFile, signedOrgTiles } from './file'
 
 const OWNER = '00000000-0000-4000-8000-0000000000a1'
 const STAFF = '00000000-0000-4000-8000-0000000000b2'
@@ -48,5 +48,46 @@ describe('企业作品 file route', () => {
       .rejects.toMatchObject({ code: 'NOT_FOUND' })
     await expect(resolveOrgWorkFile({ db: db({ credit_pool: 'paid' }), store: createMemoryStore().store }, { user: OWNER, jobId: 'not-a-uuid', size: 'full', download: false }))
       .rejects.toMatchObject({ code: 'NOT_FOUND' })
+  })
+
+  // Photos' company view (§8.3 格子图): the smaller tile, cut from the small copy when missing.
+  it('signs the tile, cutting it from the small copy when there is none yet', async () => {
+    const sharp = (await import('sharp')).default
+    const { store } = createMemoryStore()
+    const ask = { user: OWNER, jobId: JOB, size: 'tile' as const, download: false }
+    // Neither copy: the original, as for a list.
+    expect(keyOf(await resolveOrgWorkFile({ db: db({ credit_pool: 'paid' }), store }, ask))).toBe(`outputs/${STAFF}/${JOB}.png`)
+    const thumb = await sharp({ create: { width: 480, height: 600, channels: 3, background: '#888' } }).webp().toBuffer()
+    await store.put(`outputs/${STAFF}/${JOB}-thumb.webp`, new Uint8Array(thumb), 'image/webp')
+    expect(keyOf(await resolveOrgWorkFile({ db: db({ credit_pool: 'paid' }), store }, ask))).toBe(`outputs/${STAFF}/${JOB}-tile.webp`)
+    expect(await store.head(`outputs/${STAFF}/${JOB}-tile.webp`)).not.toBeNull()
+  })
+
+  it('a free work\'s tile comes from its protected small copy, under its own key', async () => {
+    const sharp = (await import('sharp')).default
+    const { store } = createMemoryStore()
+    const thumb = await sharp({ create: { width: 480, height: 600, channels: 3, background: '#888' } }).webp().toBuffer()
+    await store.put(`outputs/${STAFF}/${JOB}-thumb-p1.webp`, new Uint8Array(thumb), 'image/webp')
+    const url = await resolveOrgWorkFile({ db: db({ credit_pool: 'free' }), store }, { user: OWNER, jobId: JOB, size: 'tile', download: false })
+    expect(keyOf(url)).toBe(`outputs/${STAFF}/${JOB}-tile-p1.webp`)
+  })
+})
+
+describe('signedOrgTiles', () => {
+  it('signs only tiles that exist, of works the member check lets the user read', async () => {
+    const { store } = createMemoryStore()
+    expect((await signedOrgTiles({ db: db({ credit_pool: 'paid' }), store: () => store }, OWNER, [JOB])).size).toBe(0)
+    await store.put(`outputs/${STAFF}/${JOB}-tile.webp`, new Uint8Array([1]), 'image/webp')
+    const signed = await signedOrgTiles({ db: db({ credit_pool: 'paid' }), store: () => store }, OWNER, [JOB])
+    expect(keyOf(signed.get(JOB)!)).toBe(`outputs/${STAFF}/${JOB}-tile.webp`)
+    // Not a work of the user's org: nothing, whatever is in storage.
+    expect((await signedOrgTiles({ db: db(null), store: () => store }, OWNER, [JOB])).size).toBe(0)
+  })
+
+  it('answers nothing, never throws, when storage is not configured', async () => {
+    const unset = () => {
+      throw new Error('R2 storage is not configured')
+    }
+    expect((await signedOrgTiles({ db: db({ credit_pool: 'paid' }), store: unset }, OWNER, [JOB])).size).toBe(0)
   })
 })

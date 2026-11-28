@@ -40,6 +40,14 @@ function batchOrder(a: PhotoItem, b: PhotoItem): number {
   return a.createdAt.localeCompare(b.createdAt)
 }
 
+// Where each visible cell comes in the grid, 0 first: a photo outside a batch has its own cell and
+// a batch has one (its stack), however many photos it holds. The first screen's pictures are
+// picked by this order (done-card.tsx): a closed batch's photos are not on screen and must not
+// take those slots. Keyed by the photo's id, or the batch's id for a stack.
+export function cellPlaces(entries: readonly DoneEntry[]): Map<string, number> {
+  return new Map(entries.map((entry, index) => [entry.kind === 'photo' ? entry.item.id : entry.batchId, index]))
+}
+
 // The Done list cut into calendar days in the viewer's time zone, newest first (2026-11-28; it
 // was cut by month, which told nothing while every work was a few weeks old): a batch sits in
 // the day of its newest photo, where it stands in the list. key is "2026-11-28"; count is the

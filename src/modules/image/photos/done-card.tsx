@@ -18,6 +18,9 @@ import { WorkLink } from './viewer/work-link'
 export const EAGER_TILES = 9
 const FIRST_ROW = 6
 
+// How the picture of the cell at `place` is fetched (0 is the first cell of the grid).
+export const tileLoading = (place: number) => ({ loading: place < EAGER_TILES ? 'eager' : 'lazy', fetchPriority: place < FIRST_ROW ? 'high' : 'auto' }) as const
+
 // One finished work on Photos' grid (2026-11-28): the picture alone, so a phone shows a dozen
 // works where it showed two. Its name and settings are the viewer's to tell; with a pointer they
 // also rise over the tile on hover or focus, with "Make again" when the template is still in the
@@ -37,8 +40,7 @@ export function DoneCard({ item, meta, live, place }: { item: PhotoItem; meta: s
               alt={t('photos.photoAlt', { name: item.templateName })}
               width={320}
               height={400}
-              loading={place < EAGER_TILES ? 'eager' : 'lazy'}
-              fetchPriority={place < FIRST_ROW ? 'high' : 'auto'}
+              {...tileLoading(place)}
               decoding="async"
               className={`${REPLAY_BLOCK_CLASS} absolute inset-0 size-full object-cover transition-transform duration-600 ease-house group-hover:scale-[1.03]`}
             />
