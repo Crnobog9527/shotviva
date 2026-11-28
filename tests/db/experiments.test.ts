@@ -148,6 +148,48 @@ describe('experiment lifecycle', () => {
     await expect(actOnExperiment(service, admin, { id, action: 'start' })).rejects.toThrow(/状态已经变了/)
   })
 
+  it('restoring the default retires an ended experiment: the live list drops it, results stay, and it is audited', async () => {
+    const id = await saveExperiment(service, admin, draft(), experimentRegistry)
+    await actOnExperiment(service, admin, { id, action: 'start' })
+    await expect(actOnExperiment(service, admin, { id, action: 'restore' })).rejects.toThrow(/状态已经变了/)
+    const [, art] = await variantsOf(id)
+    await actOnExperiment(service, admin, { id, action: 'end', variant: art!.id })
+    expect((await live()).find((row) => row.surface === 'hero')).toMatchObject({ id, status: 'ended' })
+    await actOnExperiment(service, admin, { id, action: 'restore' })
+    expect((await live()).find((row) => row.surface === 'hero')).toBeUndefined()
+    const view = (await loadExperimentViews(service, false)).find((candidate) => candidate.row.id === id)
+    expect(view?.row).toMatchObject({ status: 'ended', winner_variant_id: art!.id })
+    expect(view?.row.retired_at).not.toBeNull()
+    expect(view?.results).toHaveLength(2)
+    await expect(actOnExperiment(service, admin, { id, action: 'restore' })).rejects.toThrow(/状态已经变了/)
+    const audit = await db.query('select action from public.admin_audit_log where target_id = $1 and user_id = $2 order by id', [String(id), admin])
+    expect(audit.rows.map((row) => row.action)).toEqual(['experiment_save', 'experiment_start', 'experiment_end', 'experiment_restore_default'])
+  })
+
+  it('retiring the latest ended experiment does not bring back an older ended one, and a new experiment still starts', async () => {
+    const older = await saveExperiment(service, admin, draft({ name: 'older' }), experimentRegistry)
+    await actOnExperiment(service, admin, { id: older, action: 'start' })
+    await actOnExperiment(service, admin, { id: older, action: 'end' })
+    const newer = await saveExperiment(service, admin, draft({ name: 'newer' }), experimentRegistry)
+    await actOnExperiment(service, admin, { id: newer, action: 'start' })
+    await actOnExperiment(service, admin, { id: newer, action: 'end' })
+    await actOnExperiment(service, admin, { id: newer, action: 'restore' })
+    expect((await live()).find((row) => row.surface === 'hero')).toBeUndefined()
+    const next = await saveExperiment(service, admin, draft({ name: 'next' }), experimentRegistry)
+    await actOnExperiment(service, admin, { id: next, action: 'start' })
+    expect((await live()).find((row) => row.surface === 'hero')).toMatchObject({ id: next, status: 'running' })
+  })
+
+  it('refuses restoring the default to anyone who is not an admin', async () => {
+    const id = await saveExperiment(service, admin, draft(), experimentRegistry)
+    await actOnExperiment(service, admin, { id, action: 'start' })
+    await actOnExperiment(service, admin, { id, action: 'end' })
+    const stranger = await createUser(db)
+    const { error } = await service.rpc('admin_experiment_restore_default', { p_actor: stranger, p_id: id })
+    expect(error?.message).toBe('ADMIN_REQUIRED')
+    expect((await live()).find((row) => row.surface === 'hero')).toMatchObject({ id })
+  })
+
   it('deletes drafts only, and writes every change to the audit log', async () => {
     const id = await saveExperiment(service, admin, draft(), experimentRegistry)
     await actOnExperiment(service, admin, { id, action: 'delete' })

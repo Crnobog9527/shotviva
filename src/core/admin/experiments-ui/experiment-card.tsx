@@ -12,12 +12,12 @@ import { VerdictNote } from './verdict-note'
 
 const COPY = EXPERIMENTS_COPY
 
-// Which buttons each state offers; ended experiments are history.
+// Which buttons each state offers; an ended one can be sent back to the default page (once).
 const ACTIONS_BY_STATUS: Record<ExperimentRow['status'], readonly ExperimentAction[]> = {
   draft: ['start', 'delete'],
   running: ['pause', 'archive', 'end'],
   paused: ['resume', 'archive', 'end'],
-  ended: [],
+  ended: ['restore'],
 }
 
 type Props = {
@@ -35,7 +35,8 @@ function Facts({ row }: { row: ExperimentRow }) {
     `${COPY.card.goal}：${COPY.goals[row.goal]}`,
     row.started_at ? `${COPY.card.started}：${formatBeijing(row.started_at)}` : null,
     row.ended_at ? `${COPY.card.ended}：${formatBeijing(row.ended_at)}` : null,
-    winner ? `${COPY.card.winner}：${winner.label}` : null,
+    row.retired_at ? `${COPY.card.retired}：${formatBeijing(row.retired_at)}` : null,
+    winner && !row.retired_at ? `${COPY.card.winner}：${winner.label}` : null,
   ]
   return <p className="text-sm text-muted-foreground">{parts.filter(Boolean).join(' · ')}</p>
 }
@@ -63,7 +64,7 @@ function Previews({ row, previewPath }: { row: ExperimentRow; previewPath: strin
 export function ExperimentCard({ view, previewPath, pending, onEdit, onAct }: Props) {
   const { row } = view
   const archivable = row.experiment_variants.some((variant) => !variant.is_control && variant.archived_at === null)
-  const actions = ACTIONS_BY_STATUS[row.status].filter((action) => action !== 'archive' || archivable)
+  const actions = ACTIONS_BY_STATUS[row.status].filter((action) => (action !== 'archive' || archivable) && (action !== 'restore' || !row.retired_at))
   return (
     <section className="grid gap-3 rounded-lg border p-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -77,7 +78,7 @@ export function ExperimentCard({ view, previewPath, pending, onEdit, onAct }: Pr
             </Button>
           ) : null}
           {actions.map((action) => (
-            <Button key={action} size="sm" variant={action === 'end' || action === 'delete' ? 'destructive' : 'outline'} disabled={pending} onClick={() => onAct(view, action)}>
+            <Button key={action} size="sm" variant={action === 'end' || action === 'delete' || action === 'restore' ? 'destructive' : 'outline'} disabled={pending} onClick={() => onAct(view, action)}>
               {COPY.actions[action]}
             </Button>
           ))}
