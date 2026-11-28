@@ -4061,6 +4061,20 @@ $$;
 ALTER FUNCTION "public"."_apply_credit_change"("p_user_id" "uuid", "p_pool" "text", "p_kind" "text", "p_delta" integer, "p_reason" "text", "p_idempotency_key" "text", "p_job_id" "uuid", "p_product_id" "text", "p_paid_days" integer) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."_batch_promo_allowed"("p_user_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select exists (
+    select 1 from public.org_members m join public.orgs o on o.id = m.org_id
+     where m.user_id = p_user_id and m.status = 'active' and o.status = 'active' and o.affiliate_enabled
+  );
+$$;
+
+
+ALTER FUNCTION "public"."_batch_promo_allowed"("p_user_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."_end_membership_after_refund"("p_user_id" "uuid", "p_payment" "public"."payments") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -19899,7 +19913,8 @@ begin
   job := public.reserve_credits(p_job_id,p_user_id,p_module,p_template_id,p_credits_cost,'web',
     p_inputs,p_provider,null,p_visibility,null);
   if job.inputs->>'attempt_id' is distinct from p_inputs->>'attempt_id' then return job; end if;
-  if job.credit_pool <> 'paid' then raise exception 'CREDITS_INSUFFICIENT'; end if;
+  -- The raise rolls back the reservation made above, so a refused free cell charges nothing.
+  if job.credit_pool <> 'paid' and not public._batch_promo_allowed(p_user_id) then raise exception 'CREDITS_INSUFFICIENT'; end if;
   -- Legacy single-template batch clients do not have a preflight ID.
   if batch is null then return job; end if;
   if position_in_batch is null then raise exception 'INVALID_INPUT'; end if;
@@ -29281,6 +29296,10 @@ REVOKE ALL ON FUNCTION "public"."_affiliate_write_commission"("p_payment" "publi
 
 
 REVOKE ALL ON FUNCTION "public"."_apply_credit_change"("p_user_id" "uuid", "p_pool" "text", "p_kind" "text", "p_delta" integer, "p_reason" "text", "p_idempotency_key" "text", "p_job_id" "uuid", "p_product_id" "text", "p_paid_days" integer) FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."_batch_promo_allowed"("p_user_id" "uuid") FROM PUBLIC;
 
 
 
