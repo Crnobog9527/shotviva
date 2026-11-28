@@ -18423,12 +18423,11 @@ CREATE OR REPLACE FUNCTION "public"."own_photos_filtered"("p_user" "uuid", "p_ca
   (select j.*
      from public.generation_jobs j
      join public.templates t on t.id = j.template_id
-    where p_from_at is null
+    where p_from_at is null and p_batches is null
       and j.user_id = p_user and j.status = 'succeeded'
       and j.deleted_at is null and j.org_access_ended_at is null
       and j.created_at <= coalesce(p_before_at, 'infinity'::timestamptz)
       and (p_before_at is null or (j.created_at, j.id) < (p_before_at, p_before_id))
-      and (p_batches is null or j.batch_id = any (p_batches))
       and (not coalesce(p_watermarked, false) or j.credit_pool = 'free')
       and (p_category is null
            or case when j.parent_job_id is null then t.category_key
@@ -18439,17 +18438,29 @@ CREATE OR REPLACE FUNCTION "public"."own_photos_filtered"("p_user" "uuid", "p_ca
   (select j.*
      from public.generation_jobs j
      join public.templates t on t.id = j.template_id
-    where p_from_at is not null
+    where p_from_at is not null and p_batches is null
       and j.user_id = p_user and j.status = 'succeeded'
       and j.deleted_at is null and j.org_access_ended_at is null
       and j.created_at >= p_from_at
       and (j.created_at, j.id) >= (p_from_at, p_from_id)
-      and (p_batches is null or j.batch_id = any (p_batches))
       and (not coalesce(p_watermarked, false) or j.credit_pool = 'free')
       and (p_category is null
            or case when j.parent_job_id is null then t.category_key
                    else public.own_photo_edit_root(p_user, j.template_id, j.parent_job_id) end = p_category)
     order by j.created_at asc, j.id asc
+    limit least(greatest(coalesce(p_limit, 49), 1), 1000))
+  union all
+  (select j.*
+     from public.generation_jobs j
+     join public.templates t on t.id = j.template_id
+    where p_batches is not null
+      and j.user_id = p_user and j.batch_id = any (p_batches) and j.status = 'succeeded'
+      and j.deleted_at is null and j.org_access_ended_at is null
+      and (not coalesce(p_watermarked, false) or j.credit_pool = 'free')
+      and (p_category is null
+           or case when j.parent_job_id is null then t.category_key
+                   else public.own_photo_edit_root(p_user, j.template_id, j.parent_job_id) end = p_category)
+    order by j.created_at desc, j.id desc
     limit least(greatest(coalesce(p_limit, 49), 1), 1000));
 $$;
 
