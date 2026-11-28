@@ -18,8 +18,8 @@ export type ConfirmChoice = { id: number; action: ExperimentAction; variant: num
 type Props = { target: ConfirmTarget; pending: boolean; error: string | null; onCancel: () => void; onConfirm: (choice: ConfirmChoice) => void }
 
 const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3'
-// Ending and archiving cannot be undone: red button, and the people on each variant shown first.
-const HEAVY: ReadonlySet<ExperimentAction> = new Set(['end', 'archive', 'delete'])
+// Ending, archiving and restoring cannot be undone: red button, and the people on each variant shown first.
+const HEAVY: ReadonlySet<ExperimentAction> = new Set(['end', 'archive', 'delete', 'restore'])
 
 function VariantSelect({ label, variants, value, onChange }: { label: string; variants: VariantRow[]; value: number | null; onChange: (id: number) => void }) {
   return (

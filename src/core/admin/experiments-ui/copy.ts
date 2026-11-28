@@ -18,6 +18,7 @@ export const EXPERIMENTS_COPY = {
     winner: '现在所有人看',
     control: '对照组',
     archived: '已归档',
+    retired: '已恢复默认页面',
     preview: '预览',
   },
   columns: {
@@ -54,6 +55,7 @@ export const EXPERIMENTS_COPY = {
     end: '结束实验',
     archive: '归档版本',
     delete: '删除',
+    restore: '恢复默认页面',
   },
   done: {
     save: '已保存。',
@@ -63,6 +65,7 @@ export const EXPERIMENTS_COPY = {
     end: '实验已结束，约 10 秒内所有人都会看到选定的版本。',
     archive: '版本已归档，原来在这个版本的人下次打开页面时换到新版本。',
     delete: '已删除。',
+    restore: '已恢复默认页面，约 10 秒内所有人都会看到默认版本。',
   },
   confirm: {
     cancel: '取消',
@@ -81,6 +84,10 @@ export const EXPERIMENTS_COPY = {
       body: '归档后这个版本不再分给新访客。原来在这个版本的人下次打开页面时换到你选的版本，记为「中途换走」，他们的结果仍然算在原来的版本上。归档不能撤销。',
       pick: '归档哪个版本',
       fallback: '原来的人换到',
+    },
+    restore: {
+      title: '恢复默认页面？',
+      body: '这个实验已经结束，现在所有人看到的是它选定的版本。恢复后这个位置不再被它接管，所有人（包括已经分过组的人）都回到代码里的默认页面。实验的结果和记录都保留，可以继续查看，但不能撤销、也不能重新开始。',
     },
     delete: { title: '删除草稿？', body: '草稿还没开始过，删除后不可恢复。' },
   },
