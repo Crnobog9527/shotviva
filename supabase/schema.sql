@@ -17617,6 +17617,55 @@ $_$;
 ALTER FUNCTION "public"."org_member_customers"("p_owner" "uuid", "p_period" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."org_member_photo_categories"("p_user" "uuid", "p_scope" "text" DEFAULT 'all'::"text", "p_member" "uuid" DEFAULT NULL::"uuid") RETURNS TABLE("category_key" "text", "name_en" "text", "name_zh" "text", "sort_order" integer, "is_system" boolean, "works" integer)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  with seat as (
+    select o.id as org_id
+      from public.org_members m
+      join public.orgs o on o.id = m.org_id
+     where m.user_id = p_user and m.status = 'active' and o.status = 'active'
+     limit 1
+  ),
+  works as (
+    select case when j.parent_job_id is null then t.category_key
+                      else public.own_photo_edit_root(j.user_id, j.template_id, j.parent_job_id) end as category_key
+      from public.generation_jobs j
+      join public.templates t on t.id = j.template_id
+     where j.org_id = (select org_id from seat)
+       and j.status = 'succeeded' and j.deleted_at is null
+       and (p_scope = 'all'
+            or (p_scope = 'mine' and j.user_id = p_user)
+            or (p_scope = 'member' and p_member is not null and j.user_id = p_member))
+    union all
+    select t.category_key
+      from public.org_work_archive a
+      join public.templates t on t.id = a.template_id
+     where a.org_id = (select org_id from seat)
+       and a.deleted_at is null and p_scope in ('all', 'archived')
+       and not exists (select 1 from public.generation_jobs j where j.id = a.job_id)
+    union all
+    select case when j.parent_job_id is null then t.category_key
+                      else public.own_photo_edit_root(j.user_id, j.template_id, j.parent_job_id) end
+      from public.generation_jobs j
+      join public.templates t on t.id = j.template_id
+     where exists (select 1 from seat)
+       and j.user_id = p_user and j.org_id is null
+       and j.status = 'succeeded' and j.deleted_at is null
+       and p_scope in ('all', 'personal')
+  )
+  select c.key, c.name_en, c.name_zh, c.sort_order, c.is_system, count(*)::integer
+    from works w
+    join public.template_categories c on c.key = w.category_key
+   group by c.key, c.name_en, c.name_zh, c.sort_order, c.is_system
+   order by c.sort_order, c.key;
+$$;
+
+
+ALTER FUNCTION "public"."org_member_photo_categories"("p_user" "uuid", "p_scope" "text", "p_member" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."org_member_photos"("p_user" "uuid", "p_scope" "text" DEFAULT 'all'::"text", "p_member" "uuid" DEFAULT NULL::"uuid", "p_limit" integer DEFAULT 48, "p_before_at" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_before_id" "uuid" DEFAULT NULL::"uuid", "p_from_at" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_from_id" "uuid" DEFAULT NULL::"uuid") RETURNS TABLE("id" "uuid", "user_id" "uuid", "org_work" boolean, "archived" boolean, "template_id" "text", "template_name" "text", "created_at" timestamp with time zone, "aspect_ratio" "text", "member_active" boolean)
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -17698,6 +17747,159 @@ $$;
 
 
 ALTER FUNCTION "public"."org_member_photos_count"("p_user" "uuid", "p_scope" "text", "p_member" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."org_member_photos_in_category"("p_user" "uuid", "p_category" "text", "p_scope" "text" DEFAULT 'all'::"text", "p_member" "uuid" DEFAULT NULL::"uuid", "p_limit" integer DEFAULT 48, "p_before_at" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_before_id" "uuid" DEFAULT NULL::"uuid", "p_from_at" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_from_id" "uuid" DEFAULT NULL::"uuid") RETURNS TABLE("id" "uuid", "user_id" "uuid", "org_work" boolean, "archived" boolean, "template_id" "text", "template_name" "text", "created_at" timestamp with time zone, "aspect_ratio" "text", "member_active" boolean)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  with seat as (
+    select o.id as org_id
+      from public.org_members m
+      join public.orgs o on o.id = m.org_id
+     where m.user_id = p_user and m.status = 'active' and o.status = 'active'
+     limit 1
+  ),
+  -- The page below the cursor (or the first page), newest first.
+  down as (
+    select w.* from (
+    -- the org's works, everyone's (generation_jobs_org_works_idx)
+    (select j.id, j.user_id, true as org_work, false as archived, j.template_id, j.created_at,
+            j.inputs ->> 'aspect_ratio' as aspect_ratio, j.org_access_ended_at is null as member_active
+       from public.generation_jobs j
+       join public.templates t on t.id = j.template_id
+      where p_scope = 'all'
+        and j.org_id = (select org_id from seat)
+        and j.status = 'succeeded' and j.deleted_at is null
+        and case when j.parent_job_id is null then t.category_key
+                      else public.own_photo_edit_root(j.user_id, j.template_id, j.parent_job_id) end = p_category
+        and j.created_at <= coalesce(p_before_at, 'infinity'::timestamptz)
+        and (p_before_at is null or (j.created_at, j.id) < (p_before_at, p_before_id))
+      order by j.created_at desc, j.id desc
+      limit least(greatest(coalesce(p_limit, 48), 1), 1000))
+    union all
+    -- the org's works of one maker (generation_jobs_org_member_works_idx)
+    (select j.id, j.user_id, true, false, j.template_id, j.created_at, j.inputs ->> 'aspect_ratio', j.org_access_ended_at is null
+       from public.generation_jobs j
+       join public.templates t on t.id = j.template_id
+      where p_scope in ('mine', 'member')
+        and j.org_id = (select org_id from seat)
+        and j.user_id = case p_scope when 'mine' then p_user else p_member end
+        and j.status = 'succeeded' and j.deleted_at is null
+        and case when j.parent_job_id is null then t.category_key
+                      else public.own_photo_edit_root(j.user_id, j.template_id, j.parent_job_id) end = p_category
+        and j.created_at <= coalesce(p_before_at, 'infinity'::timestamptz)
+        and (p_before_at is null or (j.created_at, j.id) < (p_before_at, p_before_id))
+      order by j.created_at desc, j.id desc
+      limit least(greatest(coalesce(p_limit, 48), 1), 1000))
+    union all
+    -- deleted accounts' archived works (org_work_archive_org_idx)
+    (select a.job_id, null::uuid, true, true, a.template_id, a.made_at, a.aspect_ratio, false
+       from public.org_work_archive a
+       join public.templates t on t.id = a.template_id
+      where p_scope in ('all', 'archived')
+        and a.org_id = (select org_id from seat)
+        and a.deleted_at is null
+        and not exists (select 1 from public.generation_jobs j where j.id = a.job_id)
+        and t.category_key = p_category
+        and a.made_at <= coalesce(p_before_at, 'infinity'::timestamptz)
+        and (p_before_at is null or (a.made_at, a.job_id) < (p_before_at, p_before_id))
+      order by a.made_at desc, a.job_id desc
+      limit least(greatest(coalesce(p_limit, 48), 1), 1000))
+    union all
+    -- p_user's own personal works (generation_jobs_user_id_created_at_idx)
+    (select j.id, j.user_id, false, false, j.template_id, j.created_at, j.inputs ->> 'aspect_ratio', true
+       from public.generation_jobs j
+       join public.templates t on t.id = j.template_id
+      where p_scope in ('all', 'personal')
+        and exists (select 1 from seat)
+        and j.user_id = p_user and j.org_id is null
+        and j.status = 'succeeded' and j.deleted_at is null
+        and case when j.parent_job_id is null then t.category_key
+                      else public.own_photo_edit_root(j.user_id, j.template_id, j.parent_job_id) end = p_category
+        and j.created_at <= coalesce(p_before_at, 'infinity'::timestamptz)
+        and (p_before_at is null or (j.created_at, j.id) < (p_before_at, p_before_id))
+      order by j.created_at desc, (j.id::text collate "C") desc
+      limit least(greatest(coalesce(p_limit, 48), 1), 1000))
+    ) w (id, user_id, org_work, archived, template_id, created_at, aspect_ratio, member_active)
+    where p_from_at is null
+    order by w.created_at desc, w.id desc
+    limit least(greatest(coalesce(p_limit, 48), 1), 1000)
+  ),
+  -- The window from the cursor up to the newest, nearest the cursor first.
+  up as (
+    select w.* from (
+    -- the org's works, everyone's (generation_jobs_org_works_idx)
+    (select j.id, j.user_id, true as org_work, false as archived, j.template_id, j.created_at,
+            j.inputs ->> 'aspect_ratio' as aspect_ratio, j.org_access_ended_at is null as member_active
+       from public.generation_jobs j
+       join public.templates t on t.id = j.template_id
+      where p_scope = 'all'
+        and j.org_id = (select org_id from seat)
+        and j.status = 'succeeded' and j.deleted_at is null
+        and case when j.parent_job_id is null then t.category_key
+                      else public.own_photo_edit_root(j.user_id, j.template_id, j.parent_job_id) end = p_category
+        and j.created_at >= p_from_at
+        and (j.created_at, j.id) >= (p_from_at, p_from_id)
+      order by j.created_at asc, j.id asc
+      limit least(greatest(coalesce(p_limit, 48), 1), 1000))
+    union all
+    -- the org's works of one maker (generation_jobs_org_member_works_idx)
+    (select j.id, j.user_id, true, false, j.template_id, j.created_at, j.inputs ->> 'aspect_ratio', j.org_access_ended_at is null
+       from public.generation_jobs j
+       join public.templates t on t.id = j.template_id
+      where p_scope in ('mine', 'member')
+        and j.org_id = (select org_id from seat)
+        and j.user_id = case p_scope when 'mine' then p_user else p_member end
+        and j.status = 'succeeded' and j.deleted_at is null
+        and case when j.parent_job_id is null then t.category_key
+                      else public.own_photo_edit_root(j.user_id, j.template_id, j.parent_job_id) end = p_category
+        and j.created_at >= p_from_at
+        and (j.created_at, j.id) >= (p_from_at, p_from_id)
+      order by j.created_at asc, j.id asc
+      limit least(greatest(coalesce(p_limit, 48), 1), 1000))
+    union all
+    -- deleted accounts' archived works (org_work_archive_org_idx)
+    (select a.job_id, null::uuid, true, true, a.template_id, a.made_at, a.aspect_ratio, false
+       from public.org_work_archive a
+       join public.templates t on t.id = a.template_id
+      where p_scope in ('all', 'archived')
+        and a.org_id = (select org_id from seat)
+        and a.deleted_at is null
+        and not exists (select 1 from public.generation_jobs j where j.id = a.job_id)
+        and t.category_key = p_category
+        and a.made_at >= p_from_at
+        and (a.made_at, a.job_id) >= (p_from_at, p_from_id)
+      order by a.made_at asc, a.job_id asc
+      limit least(greatest(coalesce(p_limit, 48), 1), 1000))
+    union all
+    -- p_user's own personal works (generation_jobs_user_id_created_at_idx)
+    (select j.id, j.user_id, false, false, j.template_id, j.created_at, j.inputs ->> 'aspect_ratio', true
+       from public.generation_jobs j
+       join public.templates t on t.id = j.template_id
+      where p_scope in ('all', 'personal')
+        and exists (select 1 from seat)
+        and j.user_id = p_user and j.org_id is null
+        and j.status = 'succeeded' and j.deleted_at is null
+        and case when j.parent_job_id is null then t.category_key
+                      else public.own_photo_edit_root(j.user_id, j.template_id, j.parent_job_id) end = p_category
+        and j.created_at >= p_from_at
+        and (j.created_at, j.id) >= (p_from_at, p_from_id)
+      order by j.created_at asc, (j.id::text collate "C") asc
+      limit least(greatest(coalesce(p_limit, 48), 1), 1000))
+    ) w (id, user_id, org_work, archived, template_id, created_at, aspect_ratio, member_active)
+    where p_from_at is not null
+    order by w.created_at asc, w.id asc
+    limit least(greatest(coalesce(p_limit, 48), 1), 1000)
+  )
+  select p.id, p.user_id, p.org_work, p.archived, p.template_id, t.name, p.created_at, p.aspect_ratio, p.member_active
+    from (select * from down union all select * from up) p
+    left join public.templates t on t.id = p.template_id
+   order by p.created_at desc, p.id desc;
+$$;
+
+
+ALTER FUNCTION "public"."org_member_photos_in_category"("p_user" "uuid", "p_category" "text", "p_scope" "text", "p_member" "uuid", "p_limit" integer, "p_before_at" timestamp with time zone, "p_before_id" "uuid", "p_from_at" timestamp with time zone, "p_from_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."org_member_promo_stats"("p_caller" "uuid", "p_org_id" "uuid", "p_period" "text") RETURNS TABLE("member_user_id" "uuid", "promo_allowance" integer, "held_promo" integer, "promo_allocated" bigint, "promo_used" bigint)
@@ -31404,6 +31606,11 @@ GRANT ALL ON FUNCTION "public"."org_member_customers"("p_owner" "uuid", "p_perio
 
 
 
+REVOKE ALL ON FUNCTION "public"."org_member_photo_categories"("p_user" "uuid", "p_scope" "text", "p_member" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_member_photo_categories"("p_user" "uuid", "p_scope" "text", "p_member" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."org_member_photos"("p_user" "uuid", "p_scope" "text", "p_member" "uuid", "p_limit" integer, "p_before_at" timestamp with time zone, "p_before_id" "uuid", "p_from_at" timestamp with time zone, "p_from_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."org_member_photos"("p_user" "uuid", "p_scope" "text", "p_member" "uuid", "p_limit" integer, "p_before_at" timestamp with time zone, "p_before_id" "uuid", "p_from_at" timestamp with time zone, "p_from_id" "uuid") TO "service_role";
 
@@ -31411,6 +31618,11 @@ GRANT ALL ON FUNCTION "public"."org_member_photos"("p_user" "uuid", "p_scope" "t
 
 REVOKE ALL ON FUNCTION "public"."org_member_photos_count"("p_user" "uuid", "p_scope" "text", "p_member" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."org_member_photos_count"("p_user" "uuid", "p_scope" "text", "p_member" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."org_member_photos_in_category"("p_user" "uuid", "p_category" "text", "p_scope" "text", "p_member" "uuid", "p_limit" integer, "p_before_at" timestamp with time zone, "p_before_id" "uuid", "p_from_at" timestamp with time zone, "p_from_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."org_member_photos_in_category"("p_user" "uuid", "p_category" "text", "p_scope" "text", "p_member" "uuid", "p_limit" integer, "p_before_at" timestamp with time zone, "p_before_id" "uuid", "p_from_at" timestamp with time zone, "p_from_id" "uuid") TO "service_role";
 
 
 
