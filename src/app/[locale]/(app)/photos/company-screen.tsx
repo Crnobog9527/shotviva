@@ -4,7 +4,7 @@ import { TabRootHeader } from '@/core/app-shell'
 import { maskPhone } from '@/core/auth/phone'
 import { encodeOwnJobsCursor, fileUrlFor, listOwnRunning, ownJobsByIds, type OwnJobsCursor } from '@/core/jobs'
 import { accountLabels } from '@/core/org/console'
-import { listCompanyPhotos, orgWorkMakers, PERSONAL, type CompanyFilter, type CompanySeat } from '@/core/org/works'
+import { listCompanyPhotos, ME, orgWorkMakers, PERSONAL, type CompanyFilter, type CompanySeat } from '@/core/org/works'
 import { CompanyFilterRail, DoneGrid, PhotosCount, companyHref, toCompanyItems, toPhotoItem, useCompanyChips, type TemplateLookup } from '@/modules/image'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -50,7 +50,9 @@ export async function CompanyPhotos({ db, userId, seat, now, timeZone, filter, u
   ])
   const fallback = tp('fallbackName')
   const items = toCompanyItems(page.works, { me: userId, own: new Map(own.map((job) => [job.id, job])), templates: lookup, labels, fallbackName: fallback, fileUrlFor })
-  const running = runningJobs.map((job) => toPhotoItem(job, lookup, null, fallback))
+  // The reader's own photos in flight belong with everyone's works or their own, not under a
+  // colleague's (or the archived, or the personal) filter.
+  const running = filter === null || filter === ME ? runningJobs.map((job) => toPhotoItem(job, lookup, null, fallback)) : []
   const rail = <Rail members={members.map((m) => ({ ...m, label: m.userId ? (labels.get(m.userId) ?? null) : null }))} me={userId} personal={personal} current={filter} />
   return (
     <>
