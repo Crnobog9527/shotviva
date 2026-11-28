@@ -9,12 +9,13 @@ import { SelectTile } from '../work-share/select-tile'
 import type { PhotoItem } from './photo-item'
 import { WorkLink } from './viewer/work-link'
 
-// The first screen is fetched at once (three rows of six on a desktop, five of three on a phone)
-// and its first row ahead of everything else, because one of those tiles is the page's largest
-// paint; the rest wait until they are scrolled near. FIRST_SCREEN_THUMBS (core/jobs) signs the
+// The first screen is fetched at once (two rows of six on a desktop, four of three on a phone);
+// the rest wait until they are scrolled near. Only a phone's first row goes ahead of everything
+// else: one of those tiles is the page's largest paint, and on a slow connection every picture
+// asked for at high priority shares the line with it. FIRST_SCREEN_THUMBS (core/jobs) signs the
 // same number.
-export const EAGER_TILES = 18
-const FIRST_ROW = 6
+export const EAGER_TILES = 12
+const FIRST_ROW = 3
 
 // One finished work on Photos' grid (2026-11-28): the picture alone, so a phone shows a dozen
 // works where it showed two. Its name and settings are the viewer's to tell; with a pointer they
