@@ -1,6 +1,7 @@
 export { Link } from './localized-link'
 export { NoLinkPrefetch } from './link-prefetch'
 export { HoldLinkPrefetch } from './prefetch-hold'
+export { BOOT_HOLD_SCRIPT } from './prefetch-hold-boot'
 export { FooterLocales, FooterLocalesFallback } from './footer-locales'
 export { LanguageOptions } from './language-options'
 export { LocaleMenu } from './locale-menu'

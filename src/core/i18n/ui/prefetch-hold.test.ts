@@ -35,6 +35,13 @@ describe('link prefetch hold', () => {
     expect(read('src/app/[locale]/(app)/app-shell/generate/shell-client.tsx')).toMatch(/<HoldLinkPrefetch until=\{never\} \/>/)
   })
 
+  it('both pages set the hold in their HTML, ahead of hydration', () => {
+    for (const page of ['src/app/[locale]/(app)/generate/page.tsx', 'src/app/[locale]/(app)/app-shell/generate/page.tsx']) {
+      expect(read(page)).toMatch(/<script dangerouslySetInnerHTML=\{\{ __html: BOOT_HOLD_SCRIPT \}\} \/>/)
+    }
+    expect(read('src/core/i18n/ui/prefetch-hold-boot.ts')).toMatch(/setTimeout\(function\(\)\{window\.__svHoldPrefetch=false\},\$\{HOLD_MAX_MS\}\)/)
+  })
+
   it('never holds longer than its limit', () => {
     expect(read('src/core/i18n/ui/prefetch-hold.tsx')).toMatch(/const timer = setTimeout\(release, HOLD_MAX_MS\)/)
   })
