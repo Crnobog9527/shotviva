@@ -1,6 +1,10 @@
 'use client'
 
 /* eslint-disable @next/next/no-img-element -- a motion member's poster through the optimiser's srcset (coverImage) */
+import { ChevronDown } from 'lucide-react'
+import { useTranslations } from 'next-intl'
+import { useState } from 'react'
+
 import { cn } from '@/core/ui/cn'
 import { coverAvif, coverImage } from '@/core/ui/cover-image'
 import { Picture } from '@/core/ui/picture'
@@ -18,27 +22,44 @@ type Props = { label: string; badge?: 'series' | 'bundle'; members: readonly Cat
 // panel): each one's before / after as a small split with its name; choosing one swaps the
 // sample and the form beside it, with no second step. A native radio per member keeps it a
 // keyboard and screen-reader choice. Four across under the sample from 768px; on phones one
-// row that scrolls sideways, so the form stays close under it.
+// row that scrolls sideways, so the form stays close under it. That row shows three, so a larger
+// set gets 「展开全部」 beside its name (Owner 2026-11-28): the row becomes a three-column grid of
+// every member, and 「收起」 puts the row back. From 768px the grid already shows them all.
 export function MemberPicker({ label, badge = 'series', members, value, onChange }: Props) {
+  const t = useTranslations('app.series')
+  const [all, setAll] = useState(false)
   return (
     <div>
-      <p className="mb-2 flex items-center gap-2 text-label leading-[1.3] font-medium">
-        <SeriesBadge onPhoto={false} bundle={badge === 'bundle'} />
-        <span id="series-members">{label}</span>
-      </p>
-      <div role="radiogroup" aria-labelledby="series-members"
-        className="no-scrollbar -mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:grid md:grid-cols-4 md:overflow-visible md:px-0 md:pb-0">
+      <div className="mb-2 flex items-center gap-2">
+        <p className="flex min-w-0 flex-1 items-center gap-2 text-label leading-[1.3] font-medium">
+          <SeriesBadge onPhoto={false} bundle={badge === 'bundle'} />
+          <span id="series-members">{label}</span>
+        </p>
+        {members.length > ROW_SHOWS ? (
+          <button type="button" aria-expanded={all} aria-controls="series-member-list" onClick={() => setAll(!all)}
+            className="press -my-2 inline-flex min-h-11 shrink-0 items-center gap-1 rounded-inner ps-2 text-caption font-medium md:hidden">
+            {t(all ? 'shelfCollapse' : 'membersExpand')}
+            <ChevronDown aria-hidden className={cn('size-3.5 text-muted-foreground transition-transform duration-250 ease-house', all && 'rotate-180')} />
+          </button>
+        ) : null}
+      </div>
+      <div role="radiogroup" id="series-member-list" aria-labelledby="series-members" className={cn(all ? GRID : ROW, 'md:grid md:grid-cols-4')}>
         {members.map((member, index) => (
-          <MemberChoice key={member.id} member={member} chosen={member.id === value} eager={index < 4} onChoose={() => onChange(member.id)} />
+          <MemberChoice key={member.id} member={member} chosen={member.id === value} eager={index < 4} fill={all} onChoose={() => onChange(member.id)} />
         ))}
       </div>
     </div>
   )
 }
 
-function MemberChoice({ member, chosen, eager, onChoose }: { member: CatalogueTemplate; chosen: boolean; eager: boolean; onChoose(): void }) {
+// A phone's row shows three members and part of the fourth.
+const ROW_SHOWS = 3
+const ROW = 'no-scrollbar -mx-4 flex snap-x scroll-px-4 gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:overflow-visible md:px-0 md:pb-0'
+const GRID = 'grid grid-cols-3 gap-2'
+
+function MemberChoice({ member, chosen, eager, fill, onChoose }: { member: CatalogueTemplate; chosen: boolean; eager: boolean; fill: boolean; onChoose(): void }) {
   return (
-    <label className="relative w-[112px] flex-none cursor-pointer snap-start md:w-auto">
+    <label className={cn('relative cursor-pointer md:w-auto', fill ? 'min-w-0' : 'w-[112px] flex-none snap-start')}>
       <input type="radio" name="series-member" value={member.id} checked={chosen} onChange={onChoose} className="peer sr-only" />
       <span className={cn('press block rounded-[12px] p-1 transition-[box-shadow,background] duration-250 ease-house',
         'peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring', chosen ? 'chosen' : 'hover:bg-wash-faint')}>

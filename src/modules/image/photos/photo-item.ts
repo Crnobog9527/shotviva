@@ -6,6 +6,7 @@ import { OUTPUT_ASPECTS, RESOLUTIONS, type OutputAspect, type Resolution } from 
 import type { Translate } from '@/core/translate'
 
 import { sizeLabel, tierName } from '../workspace/workspace-options'
+import { dayKeyIn } from './batch-groups'
 
 // One row of Photos, plain data for client components. Built from the job row plus its
 // template's name and cover (a running job has no output to show yet).
@@ -68,26 +69,25 @@ function batchPosition(value: unknown): number | null {
   return typeof position === 'number' && Number.isInteger(position) && position >= 0 ? position : null
 }
 
+// "Banner 16:9 · HD": what a tile says under its name (the day is its section's heading).
+// `t` is scoped to `app`.
+export function tileMeta(item: Pick<PhotoItem, 'aspect' | 'resolution'>, t: Translate): string {
+  return t('photos.tileMeta', { size: sizeLabel(item.aspect, t), tier: tierName(item.resolution, t) })
+}
+
+// "Today", "Yesterday" or the date, by the calendar day in the viewer's time zone: a day
+// section's heading and a batch group's line on Photos (T107). formatDay writes an older date
+// (the locale's month and day, with the year when it is not this year's).
+export function doneWhen(iso: string, now: Date, timeZone: string, t: Translate, formatDay: (date: Date, sameYear: boolean) => string): string {
+  const dayOf = dayKeyIn(timeZone)
+  const created = new Date(iso)
+  const [day, today] = [dayOf(created), dayOf(now)]
+  if (day >= today) return t('photos.today')
+  if (day === dayOf(new Date(now.getTime() - DAY_MS))) return t('photos.yesterday')
+  return formatDay(created, day.slice(0, 4) === today.slice(0, 4))
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000
-const dayKey = (date: Date) => Math.floor(date.getTime() / DAY_MS)
-
-// "Today · Banner 16:9 · HD" (B comp photos.html). Days are counted in UTC on the server; older
-// dates come from formatDay (the locale's short month and day). `t` is scoped to `app`.
-export function doneMeta(
-  item: Pick<PhotoItem, 'createdAt' | 'aspect' | 'resolution'>,
-  now: Date,
-  t: Translate,
-  formatDay: (date: Date) => string,
-): string {
-  return t('photos.doneMeta', { when: doneWhen(item, now, t, formatDay), size: sizeLabel(item.aspect, t), tier: tierName(item.resolution, t) })
-}
-
-// "Today", "Yesterday" or the short date: a batch group's line on Photos (T107).
-export function doneWhen(item: Pick<PhotoItem, 'createdAt'>, now: Date, t: Translate, formatDay: (date: Date) => string): string {
-  const created = new Date(item.createdAt)
-  const days = dayKey(now) - dayKey(created)
-  return days <= 0 ? t('photos.today') : days === 1 ? t('photos.yesterday') : formatDay(created)
-}
 
 // "1:1 · Standard · 2 credits" for a photo still developing.
 export function runningMeta(item: Pick<PhotoItem, 'aspect' | 'resolution' | 'credits'>, t: Translate): string {

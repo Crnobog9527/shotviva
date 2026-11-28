@@ -762,6 +762,7 @@
       "shelfMoreAria": "查看「{name}」全部 {total} 个模板",
       "shelfExpand": "展开其余 {count} 个",
       "shelfCollapse": "收起",
+      "membersExpand": "展开全部",
       "scrollBack": "向前滚动「{name}」",
       "scrollOn": "向后滚动「{name}」",
       "inSeries": "系列：{name}"
@@ -1200,7 +1201,6 @@
       "generating": "生成中",
       "generatingAria": "正在生成 {name}",
       "done": "已完成",
-      "newest": "最新的在前",
       "count": "{running, plural, =0 {} other {# 张生成中 · }}{done} 张已完成",
       "footnote": "免费积分生成的图公开并带水印（海报类作品仅自己可见）；付费积分生成的图私密、无水印。",
       "photoAlt": "{name} 作品",
@@ -1212,7 +1212,8 @@
       "editedName": "改过的照片",
       "badgeAria": "{count} 张生成中",
       "pill": "{count, plural, =1 {生成中…} other {# 张生成中…}}",
-      "doneMeta": "{when} · {size} · {tier}",
+      "tileMeta": "{size} · {tier}",
+      "dayCount": "{count} 张",
       "runningMeta": "{size} · {tier} · {count} 积分",
       "waiting": "排队中，等空位",
       "loadMore": "加载更多",
@@ -1239,6 +1240,7 @@
     "work": {
       "freePublic": "公开 · 带水印",
       "freePrivate": "私密 · 带水印",
+      "watermark": "带水印",
       "private": "私密",
       "public": "公开"
     },
