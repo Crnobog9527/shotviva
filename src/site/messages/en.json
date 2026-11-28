@@ -1191,13 +1191,13 @@
     },
     "photos": {
       "batch": {
+        "open": "Open {title}",
+        "close": "Collapse",
         "title": "Batch · {count, plural, one {# photo} other {# photos}}{templates, plural, =1 {} other { · # templates}}"
       },
       "title": "Photos",
       "metaTitle": "Photos",
-      "inProgress": "In progress",
       "usually": "Usually about 30 seconds each",
-      "closeApp": "You can close the app. Finished photos land here.",
       "generating": "Generating",
       "generatingAria": "Generating {name}",
       "done": "Done",
@@ -1213,9 +1213,9 @@
       "badgeAria": "{count} in progress",
       "pill": "{count, plural, one {Generating…} other {Generating #…}}",
       "tileMeta": "{size} · {tier}",
+      "developing": "{count, plural, one {# photo} other {# photos}} developing",
       "company": {"close": "Close", "all": "Everyone", "mine": "Mine", "personal": "Personal", "owner": "Main admin", "deleted": "Deleted member", "unknown": "Account", "left": "{who} (left)", "leftMark": "left", "filterLabel": "Whose photos", "madeBy": "{who} · {date}", "download": "Download original", "viewOnly": "A colleague's photo: you can view and download it.", "empty": "Nobody in the company has made a photo yet.", "emptyFilter": "No photos here yet."},
       "dayCount": "{count, plural, one {# photo} other {# photos}}",
-      "runningMeta": "{size} · {tier} · {count, plural, one {# credit} other {# credits}}",
       "waiting": "Waiting for a free slot",
       "loadMore": "Load more",
       "loadingMore": "Loading…",

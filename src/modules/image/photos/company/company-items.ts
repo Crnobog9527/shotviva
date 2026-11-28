@@ -46,9 +46,13 @@ export function toCompanyItems(rows: readonly CompanyPhoto[], deps: Deps): Photo
   return [...items, ...rest.map((job) => mine(job, batchPersonal.get(job.batchId!) ?? false))]
 }
 
+function makerOf(row: CompanyPhoto, labels: Deps['labels']): Maker {
+  if (row.archived || !row.userId) return { who: null, state: 'deleted' }
+  return { who: labels.get(row.userId) ?? null, state: row.memberActive ? 'active' : 'removed' }
+}
+
 function colleagueItem(row: CompanyPhoto, deps: Deps): PhotoItem {
   const aspect = OUTPUT_ASPECTS.find((value) => value === row.aspectRatio) ?? 'original'
-  const state = row.archived || !row.userId ? 'deleted' : row.memberActive ? 'active' : 'removed'
   return {
     id: row.id,
     templateId: row.templateId,
@@ -62,9 +66,10 @@ function colleagueItem(row: CompanyPhoto, deps: Deps): PhotoItem {
     creditPool: 'paid',
     visibility: 'private',
     fileUrl: orgFileUrl(row.id),
-    thumbUrl: orgFileUrl(row.id, '?size=thumb'),
+    // Photos' tile copy: signed straight to storage for the first screen, else through the route.
+    thumbUrl: deps.signed?.get(row.id) ?? orgFileUrl(row.id, '?size=tile'),
     batchId: null,
     batchPosition: null,
-    maker: { who: row.userId ? (deps.labels.get(row.userId) ?? null) : null, state },
+    maker: makerOf(row, deps.labels),
   }
 }

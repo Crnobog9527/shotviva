@@ -60,3 +60,20 @@ describe('groupByDay', () => {
     expect(groupByDay(groupByBatch(list), 'Asia/Shanghai').map((d) => [d.key, d.count])).toEqual([['2026-11-01', 2], ['2026-10-31', 1]])
   })
 })
+
+describe('cellPlaces', () => {
+  it('gives a batch one cell, so the photos after it keep their place on the first screen', async () => {
+    const { cellPlaces } = await import('./batch-groups')
+    const list = [
+      item('a', '2026-11-11T10:09:00Z', null),
+      item('b3', '2026-11-11T10:08:00Z', 'B', 'x', 2),
+      item('b2', '2026-11-11T10:07:00Z', 'B', 'x', 1),
+      item('b1', '2026-11-11T10:06:00Z', 'B', 'x', 0),
+      item('c', '2026-11-11T10:05:00Z', null),
+    ]
+    const places = cellPlaces(groupByBatch(list))
+    expect([...places]).toEqual([['a', 0], ['B', 1], ['c', 2]])
+    // A batch's photos have no cell of their own while it is closed.
+    expect(places.has('b1')).toBe(false)
+  })
+})

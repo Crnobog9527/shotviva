@@ -4,7 +4,9 @@ import { useFormatter, useTranslations } from 'next-intl'
 import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
 import { buttonVariants } from '@/core/ui/button'
 import { cn } from '@/core/ui/cn'
+import { ThumbImg } from '@/core/ui/thumb-img'
 
+import { tileLoading } from '../done-card'
 import type { PhotoItem } from '../photo-item'
 import { orgFileUrl } from './company-items'
 
@@ -22,23 +24,26 @@ const WITHOUT_POPOVER = 'supports-[selector(:popover-open)]:hidden'
 // Make again or share, and it is never picked for a share link.
 // Server-rendered on purpose, with the browser's own popover and a plain form: nothing here is
 // script, so the personal page (the same route) ships no code for it (scripts/js-budget.json).
-// remove: the owner's delete action, null for staff.
-export function ColleagueCard({ item, eager, remove }: { item: PhotoItem; eager: boolean; remove: DeleteCompanyWork | null }) {
+// place: the cell it takes in the grid, 0 first. remove: the owner's delete action, null for staff.
+export function ColleagueCard({ item, place, remove }: { item: PhotoItem; place: number; remove: DeleteCompanyWork | null }) {
   const t = useTranslations('app.photos')
   const panel = `colleague-${item.id}`
   const tile = (
     <span className="relative block aspect-[4/5] overflow-hidden rounded-inner bg-muted">
-      {/* A signed R2 redirect per request, member-checked by the route: not a static asset. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={item.thumbUrl ?? undefined}
-        alt={t('photoAlt', { name: item.templateName })}
-        width={480}
-        height={600}
-        loading={eager ? 'eager' : 'lazy'}
-        decoding="async"
-        className={`${REPLAY_BLOCK_CLASS} absolute inset-0 size-full object-cover transition-transform duration-600 ease-house group-hover:scale-[1.03]`}
-      />
+      {/* The tile copy: signed for the first screen, else the member-checked route (which the
+          picture is asked from again when a signed address has expired). */}
+      {item.thumbUrl ? (
+        <ThumbImg
+          src={item.thumbUrl}
+          fallback={orgFileUrl(item.id, '?size=tile')}
+          alt={t('photoAlt', { name: item.templateName })}
+          width={320}
+          height={400}
+          {...tileLoading(place)}
+          decoding="async"
+          className={`${REPLAY_BLOCK_CLASS} absolute inset-0 size-full object-cover transition-transform duration-600 ease-house group-hover:scale-[1.03]`}
+        />
+      ) : null}
       <span
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 bottom-0 hidden bg-linear-to-t from-(--photo-fade) to-transparent px-2.5 pt-10 pb-2 opacity-0 transition-opacity duration-250 ease-house group-focus-within:opacity-100 group-hover:opacity-100 [@media(hover:hover)]:block"

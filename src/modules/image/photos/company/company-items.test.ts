@@ -33,10 +33,16 @@ describe('toCompanyItems', () => {
     const [item] = toCompanyItems([row('c', PEER)], deps([]))
     expect(item).toMatchObject({
       id: 'c', templateName: 'Pure White', aspect: '4:5', visibility: 'private', batchId: null,
-      fileUrl: '/api/account/enterprise/works/c', thumbUrl: '/api/account/enterprise/works/c?size=thumb',
+      fileUrl: '/api/account/enterprise/works/c', thumbUrl: '/api/account/enterprise/works/c?size=tile',
       maker: { who: 'peer@example.com', state: 'active' },
     })
     expect(item?.createdAt).toBe('2026-11-28T06:00:00.123Z')
+  })
+
+  it('uses the signed tile address the page already holds, for own and colleagues\' works alike', () => {
+    const signed = new Map([['a', 'https://r2.example/a-tile'], ['c', 'https://r2.example/c-tile']])
+    const items = toCompanyItems([row('a', ME), row('c', PEER)], { ...deps([job('a')]), signed })
+    expect(items.map((i) => i.thumbUrl)).toEqual(['https://r2.example/a-tile', 'https://r2.example/c-tile'])
   })
 
   it('says when the maker has left or deleted their account', () => {
