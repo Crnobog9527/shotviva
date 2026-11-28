@@ -66,6 +66,27 @@ it('a staff code: no personal invitee credits, org_l1 binding and the org bonus,
   expect(await ledger(staff, 'invite_reward')).toEqual([])
 })
 
+// 2035 (Owner 2026-11-28, A2): the affiliate program, not the workspace, decides; an org with only
+// the affiliate program on (workspace off) still binds its staff's customers and gives its bonus.
+it('a staff code of an org with the workspace off still binds the customer to the org, with the bonus and no personal reward', async () => {
+  const { orgId, staff } = await orgTeam(300)
+  await db.query("update orgs set status='suspended' where id=$1", [orgId])
+  const code = await codeOf(staff)
+  expect(await preview(code)).toEqual({ credits: 300, org: true })
+  const { customer, result } = await invitedBy(staff)
+  expect(result).toMatchObject({ status: 'ok', credits_granted: 0 })
+  expect(await row(db, 'select org_invite from code_redemptions where user_id=$1', [customer])).toEqual({ org_invite: true })
+  const account = (await row(db, 'select user_id from affiliates where org_id=$1', [orgId])).user_id
+  expect(await row(db, 'select referred_by,referred_source,referred_member from profiles where id=$1', [customer]))
+    .toEqual({ referred_by: account, referred_source: 'org_l1', referred_member: staff })
+  expect(await ledger(customer, 'org_signup_bonus')).toEqual([300])
+  expect(await firstPayment(customer)).toMatchObject({ rewarded: false })
+  expect(await ledger(staff, 'invite_reward')).toEqual([])
+  // With the affiliate switch off as well, it is a personal code again.
+  await db.query('update orgs set affiliate_enabled=false where id=$1', [orgId])
+  expect(await preview(code)).toMatchObject({ org: false })
+})
+
 it('a personal code keeps both rewards', async () => {
   const friend = await createUser(db)
   const { customer, result } = await invitedBy(friend)

@@ -100,10 +100,11 @@ it('gives each org its own amount', async () => {
   expect((await bonusLedger((await invitedBy(b.staff)).customer))[0].delta).toBe(500)
 })
 
-it('gives nothing while the org is suspended, its affiliate switch is off or its account is suspended', async () => {
+// 2035 (Owner 2026-11-28, A2): the bonus follows the affiliate switch, not the workspace switch.
+it('gives nothing while its affiliate switch is off or its account is suspended, and still gives it with the workspace off', async () => {
   const { orgId, staff, owner } = await orgTeam(300)
   await setOrg(orgId, { status: 'suspended' })
-  expect(await bonusLedger((await invitedBy(staff)).customer)).toEqual([])
+  expect(await bonusLedger((await invitedBy(staff)).customer)).toHaveLength(1)
   await setOrg(orgId, { status: 'active', affiliate_enabled: false })
   expect(await bonusLedger((await invitedBy(staff)).customer)).toEqual([])
   await setOrg(orgId, { affiliate_enabled: true })
