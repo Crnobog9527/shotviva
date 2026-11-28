@@ -2,7 +2,9 @@
 -- runs the enterprise affiliate program may make 1K batch cells, paid from the org's promotion
 -- share (the tier still decides the pool, 1996: 1K = free pool = promotion share for a member).
 -- Everyone else keeps the paid-only batch (ARCHITECTURE §批量上传的语义): a free cell is refused,
--- so a plain account's free credits never reach a batch.
+-- so a plain account's free credits never reach a batch. The org must have its workspace on
+-- (orgs.status = 'active'): only then does a seat's 1K draw the org's promotion share alone; with
+-- the workspace off a seat's 1K may draw the member's own free credits (2034), so it stays refused.
 --
 -- Expand-only: one new private helper, and reserve_batch_cell re-created from its 1625 body with
 -- only the free-cell check widened (same signature, grants and return type). Code already in

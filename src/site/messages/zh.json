@@ -1872,10 +1872,10 @@
     "org": {
       "metaTitle": "企业",
       "back": "返回账号",
-      "suspendedBanner": "企业账号已暂停：成员的积分不受影响，但积分池相关操作暂时关闭。请联系我们恢复。",
+      "suspendedBanner": "企业已停用：企业工作台和企业联盟都没有开启。成员已有的积分不变，积分池、额度和员工链接暂不可用。需要恢复请联系我们。",
       "errors": {
         "NOT_OWNER": "只有企业主管理员可以执行这个操作。",
-        "SUSPENDED": "企业账号已暂停，暂时不能划拨积分。请联系我们恢复。",
+        "SUSPENDED": "企业工作台未开启，暂时不能划拨积分。需要开启请联系我们。",
         "POOL_INSUFFICIENT": "企业积分池里的积分不够。",
         "CREDITS_INSUFFICIENT": "你自己的积分不够。企业划给你的积分不能再存回池里。",
         "MEMBER_NOT_FOUND": "这位成员已经不在企业里了。",
@@ -1900,19 +1900,20 @@
           "console": "工作台",
           "works": "企业作品",
           "purchasing": "集采信息",
-          "mine": "我的"
+          "mine": "我的客户"
         },
-        "mine": "我的企业"
+        "mine": "我的客户"
       },
       "entry": {
         "title": "企业",
         "pool": "积分池 {pool} 积分",
-        "suspended": "账号已暂停",
         "open": "管理",
         "customerTitle": "客户推广链接",
         "customerHint": "用来邀请和发展客户。客户通过这个链接注册和付费，佣金记在企业联盟名下。这不是员工链接。",
         "copy": "复制链接",
-        "copied": "已复制"
+        "copied": "已复制",
+        "workspaceOff": "企业工作台未开启",
+        "inactive": "企业已停用"
       },
       "pool": {
         "title": "积分池",
@@ -1921,7 +1922,7 @@
         "unit": "积分",
         "yours": "你可转入",
         "yoursNote": "你账号里已有的付费积分",
-        "suspended": "企业已暂停，暂时不能转入。",
+        "suspended": "企业工作台未开启，暂时不能转入。",
         "depositLabel": "转入你账号里已有的付费积分",
         "depositPlaceholder": "积分数量",
         "depositHint": "只能转入付费积分。转入后不能退款，也不能再取回。",
@@ -1947,7 +1948,7 @@
       "invite": {
         "title": "员工专用链接",
         "hint": "只发给你自己的员工。员工打开后注册或登录，就会加入企业，使用企业划给他的积分。",
-        "suspended": "企业已暂停，暂时不能通过链接加入。",
+        "suspended": "企业工作台未开启，暂时不能通过链接加入。",
         "copy": "复制链接",
         "copied": "链接已复制。",
         "copyFailed": "请选中上面的链接手动复制。",
@@ -1958,6 +1959,7 @@
         "resetDone": "新链接已生成。",
         "cancel": "取消",
         "warning": "不要发给客户。客户打开这个链接会作为员工加入你的企业，不会记为你推荐的客户。",
+        "warningNoAffiliate": "不要外传。任何人打开这个链接都会作为员工加入你的企业，可以分到企业的积分。",
         "toAffiliate": "邀请客户请用企业联盟里的客户推广链接"
       },
       "members": {
@@ -2024,14 +2026,15 @@
         "downloadMembers": "下载 CSV",
         "downloadCustomers": "下载客户明细 CSV",
         "definition": "分到：企业分给成员的积分（含月额度补发和手动划拨）。用掉：成员消耗的企业积分，按扣除退款后的净值计。注册：本月通过该成员注册的客户。付费人数：本月付过款的客户。实付：这些客户本月的实付金额（美元，不含税，已扣除退款）。已离开成员带来的客户仍归企业。客户只显示脱敏后的邮箱或手机号。",
-        "hintNoAffiliate": "每个人当月分到、用掉的积分（按 UTC 自然月）。",
-        "definitionNoAffiliate": "分到：企业分给成员的积分（含月额度补发和手动划拨）。用掉：成员消耗的企业积分，按扣除退款后的净值计。"
+        "hintNoAffiliate": "每位成员当月分到和用掉的积分（按 UTC 自然月）。",
+        "definitionNoAffiliate": "分到：企业分给成员的积分（含月额度补发和手动划拨）。用掉：成员消耗的企业积分，按扣除退款后的净值计。",
+        "titleNoAffiliate": "月度使用量",
+        "captionNoAffiliate": "{month} 各成员积分使用量"
       },
       "staff": {
-        "suspended": "企业账号已暂停，你自己的积分不受影响。",
+        "suspended": "企业工作台已关闭，不再按月补发积分。企业已分给你的积分仍可使用。",
         "allowance": "月额度",
         "allocated": "本月已分到",
-        "remaining": "企业积分剩余",
         "promoTitle": "我的推广链接",
         "promoHint": "用你的链接注册的客户，都算作企业的客户。",
         "customers": "客户数",
@@ -2046,24 +2049,19 @@
         "paidCredits": "付费积分",
         "promoCredits": "推广积分",
         "promoCreditsHint": "企业分给你的推广积分：生成的图带水印、公开展示且不可商用；仅在付费积分不足时使用，优先于你自己的免费积分扣除，每月底（UTC）未用完的部分清零。",
-        "used": "本月已用",
-        "promoLeft": "剩余",
-        "metaTitle": "我的企业",
-        "open": "查看",
-        "entryHint": "我的客户和本月明细",
-        "paidLeft": "付费积分剩余",
-        "promoLeftLabel": "推广积分剩余",
-        "monthly": "月额度 {count}",
-        "pageIntro": "企业每月分给你的积分，以及通过你的链接注册的客户。这里只显示你自己的数据。",
-        "pageIntroNoAffiliate": "企业每月分给你的积分。这里只显示你自己的数据。",
-        "entryHintNoAffiliate": "本月积分明细"
+        "metaTitle": "我的客户",
+        "pageIntro": "通过你的推广链接注册的客户，以及他们本月的付费情况。这里只显示你自己的数据。",
+        "entryNote": "企业每月分给你的积分，用于你自己的出图。",
+        "works": "企业作品",
+        "worksNote": "全公司的作品",
+        "left": "剩余"
       },
       "join": {
         "metaTitle": "加入企业",
         "invalidTitle": "链接无效",
         "invalidBody": "邀请链接有误，或已被重置。请向企业管理员要新的链接。",
-        "suspendedTitle": "企业已暂停",
-        "suspendedBody": "{org} 暂时不接受新成员。",
+        "suspendedTitle": "暂时不能加入",
+        "suspendedBody": "{org} 的企业工作台未开启，暂时不接受新成员。",
         "alreadyTitle": "你已经在 {org} 里了",
         "alreadyBody": "你的账号已经是这家企业的成员。",
         "otherTitle": "你已属于另一家企业",
@@ -2245,7 +2243,8 @@
         "give": "划拨",
         "given": "已给 {count} 人共划拨 {total}。",
         "allowanceConfirmPaidOnly": "会覆盖这些人的月额度。"
-      }
+      },
+      "workspaceOffBanner": "企业工作台未开启：积分池、成员额度和员工链接暂不可用，已加入的成员和他们手里的积分保持不变。已绑定客户的佣金照常计算，新客户通过企业联盟里的客户推广链接注册照常绑定到企业。需要开启工作台请联系我们。"
     },
     "templateShare": {
       "modeOff": "分享模板",

@@ -29,7 +29,7 @@ async function Works({ searchParams }: { searchParams: Search }) {
     <EnterpriseFrame
       orgName={owner ? area.view.org.name : area.view.orgName}
       current="works"
-      affiliate={owner && area.affiliate}
+      affiliate={owner ? area.affiliate : area.view.withAffiliate}
       role={area.kind}
       intro={t(owner ? 'worksIntro' : 'worksIntroMember')}
       subnav={<WorksMemberFilter page={page} />}
