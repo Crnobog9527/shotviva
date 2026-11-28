@@ -71,7 +71,7 @@ async function Account() {
   const more = payments.length >= PICKER_LIMIT
   // Each line with its receipt / invoice links (T80); the support picker keeps the plain labels.
   const lines = purchaseLines(payments, purchases, locale)
-  const data = { email: user.email, phone: maskPhone(user.phone) || null, balance, giftRefused: signupGift.reason, subscription, since, lastMembership: last, works, purchases: lines, morePurchases: more, helpUnread, graylum, graylumLinks: graylumIntroLinks(serverEnv().VERCEL_ENV), affiliate, admin: user.role === 'admin' }
+  const data = { email: user.email, phone: maskPhone(user.phone) || null, balance, giftRefused: signupGift.reason, subscription, since, lastMembership: last, works, purchases: lines, morePurchases: more, helpUnread, graylum, graylumLinks: graylumIntroLinks(serverEnv().VERCEL_ENV), affiliate, admin: user.role === 'admin', orgStaff: org.kind === 'member' }
   // Help & feedback opens over the page (?help=…, T68); its payments picker is the Purchases list.
   return (
     <>
@@ -81,7 +81,7 @@ async function Account() {
         <StoreCard actions={storeActions} />
         {/* 2032: an org staff code earns no personal invite rewards; members promote with the org link above. */}
         {!orgInvites(org) && <InviteCard load={loadMyInvites} />}
-        <RedeemCard pending={discount} />
+        {usesCodes(org) && <RedeemCard pending={discount} />}
       </AccountView>
       <AccountHelp actions={helpActions} payments={purchases} replyTime={<ReplyTime userId={user.id} />} brand={site.brand.name} unread={helpUnread} />
     </>
@@ -94,6 +94,15 @@ async function Account() {
 function orgInvites(view: Awaited<ReturnType<typeof readOrgView>>) {
   if (view.kind === 'member') return view.status === 'active'
   return view.kind === 'owner' && view.org.status === 'active'
+}
+
+// Codes (Owner 2026-11-28): the redeem route refuses every code for an active member of an active
+// org, the main admin included (2032). A staff seat of an org whose workspace is off is hidden
+// too: while the seat is active the member spends only the org's shares, so a code's credits
+// could not be used (and staff buy nothing for themselves).
+function usesCodes(view: Awaited<ReturnType<typeof readOrgView>>) {
+  if (view.kind === 'member') return false
+  return !(view.kind === 'owner' && view.org.status === 'active')
 }
 
 // The enterprise block (ARCHITECTURE §6.5, card E4): the owner gets a row into their console, a

@@ -1410,7 +1410,8 @@
         "paidRingOf": "{count} of {total} paid credits left",
         "paidRing": "{count, plural, one {# paid credit} other {# paid credits}} left",
         "freeRingOf": "{count} of {total} free credits left",
-        "freeRing": "{count, plural, one {# free credit} other {# free credits}} left"
+        "freeRing": "{count, plural, one {# free credit} other {# free credits}} left",
+        "fromOrg": "Your company gives you your credits. For more, ask your company admin."
       },
       "settings": {
         "title": "Settings",

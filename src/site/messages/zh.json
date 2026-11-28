@@ -1410,7 +1410,8 @@
         "paidRingOf": "付费积分剩余 {count}，共 {total}",
         "paidRing": "付费积分剩余 {count}",
         "freeRingOf": "免费积分剩余 {count}，共 {total}",
-        "freeRing": "免费积分剩余 {count}"
+        "freeRing": "免费积分剩余 {count}",
+        "fromOrg": "积分由企业分配。需要更多积分，请联系企业管理员。"
       },
       "settings": {
         "title": "设置",
