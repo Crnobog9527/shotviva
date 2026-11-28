@@ -18367,6 +18367,65 @@ $$;
 ALTER FUNCTION "public"."org_set_promo_allowance"("p_owner" "uuid", "p_member" "uuid", "p_allowance" integer) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."own_photo_categories"("p_user" "uuid") RETURNS TABLE("category_key" "text", "name_en" "text", "name_zh" "text", "sort_order" integer, "is_system" boolean, "works" integer, "watermarked" integer)
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select c.key, c.name_en, c.name_zh, c.sort_order, c.is_system,
+         count(*)::integer, (count(*) filter (where j.credit_pool = 'free'))::integer
+    from public.own_photo_roots(p_user) r
+    join public.generation_jobs j on j.id = r.job_id
+    join public.template_categories c on c.key = r.category_key
+   group by c.key, c.name_en, c.name_zh, c.sort_order, c.is_system
+   order by c.sort_order, c.key;
+$$;
+
+
+ALTER FUNCTION "public"."own_photo_categories"("p_user" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."own_photo_roots"("p_user" "uuid") RETURNS TABLE("job_id" "uuid", "category_key" "text")
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  with recursive walk as (
+    select j.id, j.template_id, j.parent_job_id, 0 as depth
+      from public.generation_jobs j
+     where j.user_id = p_user and j.status = 'succeeded'
+       and j.deleted_at is null and j.org_access_ended_at is null
+    union all
+    select w.id, p.template_id, p.parent_job_id, w.depth + 1
+      from walk w
+      join public.templates t on t.id = w.template_id
+      join public.template_categories c on c.key = t.category_key and c.is_system
+      join public.generation_jobs p on p.id = w.parent_job_id and p.user_id = p_user
+     where w.depth < 30
+  )
+  select distinct on (w.id) w.id, t.category_key
+    from walk w
+    join public.templates t on t.id = w.template_id
+   order by w.id, w.depth desc;
+$$;
+
+
+ALTER FUNCTION "public"."own_photo_roots"("p_user" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."own_photos_filtered"("p_user" "uuid", "p_category" "text" DEFAULT NULL::"text", "p_watermarked" boolean DEFAULT false) RETURNS SETOF "public"."generation_jobs"
+    LANGUAGE "sql" STABLE
+    SET "search_path" TO ''
+    AS $$
+  select j.*
+    from public.own_photo_roots(p_user) r
+    join public.generation_jobs j on j.id = r.job_id
+   where (p_category is null or r.category_key = p_category)
+     and (not coalesce(p_watermarked, false) or j.credit_pool = 'free');
+$$;
+
+
+ALTER FUNCTION "public"."own_photos_filtered"("p_user" "uuid", "p_category" "text", "p_watermarked" boolean) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."partner_image_aspects"("public"."templates") RETURNS "text"[]
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
@@ -31420,6 +31479,21 @@ GRANT ALL ON FUNCTION "public"."org_set_default_allowances"("p_owner" "uuid", "p
 
 REVOKE ALL ON FUNCTION "public"."org_set_promo_allowance"("p_owner" "uuid", "p_member" "uuid", "p_allowance" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."org_set_promo_allowance"("p_owner" "uuid", "p_member" "uuid", "p_allowance" integer) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."own_photo_categories"("p_user" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."own_photo_categories"("p_user" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."own_photo_roots"("p_user" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."own_photo_roots"("p_user" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."own_photos_filtered"("p_user" "uuid", "p_category" "text", "p_watermarked" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."own_photos_filtered"("p_user" "uuid", "p_category" "text", "p_watermarked" boolean) TO "service_role";
 
 
 
