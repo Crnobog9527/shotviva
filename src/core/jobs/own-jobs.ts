@@ -116,7 +116,9 @@ async function withWholeBatches(client: SupabaseClient, userId: string, jobs: Jo
 // The company view of Photos (core/org/works/photos.ts) lists other people's works too; the
 // reader's own ones among them are read here in full, so they behave as on the personal page
 // (batch groups, the viewer, Make again). Owner-scoped like every read in this file: an id that is
-// not the user's finished, undeleted, still-accessible work is simply not returned.
+// not the user's finished, undeleted, still-accessible work is simply not returned. A batch of
+// theirs cut by the page (or by the window above the cursor) comes whole, as on the personal page
+// (T107): its other finished photos are returned too, after the ones asked for.
 export async function ownJobsByIds(client: SupabaseClient, userId: string, ids: readonly string[]): Promise<Job[]> {
   if (ids.length === 0) return []
   const { data, error } = await client
@@ -127,7 +129,7 @@ export async function ownJobsByIds(client: SupabaseClient, userId: string, ids: 
     .eq('status', 'succeeded')
     .is('deleted_at', null).is('org_access_ended_at', null)
   if (error) throw new AppError('INTERNAL', `ownJobsByIds failed: ${error.message}`)
-  return data.map((row) => jobRowSchema.parse(row))
+  return withWholeBatches(client, userId, data.map((row) => jobRowSchema.parse(row)))
 }
 
 // The user's photos in flight, as rows (the company view's "In progress"; the personal page gets

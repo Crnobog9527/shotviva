@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import type { Client } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { listOwnJobs, reserveJob } from '@/core/jobs'
+import { listOwnJobs, ownJobsByIds, reserveJob } from '@/core/jobs'
 import { allocateOrgCredits, joinOrg, removeOrgMember } from '@/core/org'
 import { archiveOrgWorksOf, DELETED_MAKERS, listCompanyPhotos, ME, PERSONAL, readCompanySeat } from '@/core/org/works'
 
@@ -171,6 +171,27 @@ describe('pages', () => {
     expect(second.next).toBeNull()
     expect(orgId).toBeTruthy()
   }, 120_000)
+})
+
+describe('the reader\'s own batches', () => {
+  // T107: Photos shows a batch whole. The company view reads the reader's own works by the ids on
+  // the page; a batch the page cut must still come whole (its ZIP button counts its photos).
+  it('reads the rest of a batch the page cut, the reader\'s own only', async () => {
+    const { owner, token } = await orgWith(db, service, actor, { pool: cost * 40 })
+    const staff = await member(db, service, token)
+    const peer = await member(db, service, token)
+    for (const who of [staff, peer]) await allocateOrgCredits(service, owner, who, cost * 6, randomUUID())
+    const batch = randomUUID()
+    const mine = [await made(staff), await made(staff), await made(staff)]
+    const theirs = await made(peer)
+    await db.query("update public.generation_jobs set batch_id = $1::uuid, inputs = inputs || jsonb_build_object('batch_id', $3::text) where id = any($2)", [batch, [...mine, theirs], batch])
+    // Only the newest of the three is "on the page".
+    const read = await ownJobsByIds(rest, staff, [mine[2]!])
+    expect(read.map((j) => j.id).sort()).toEqual([...mine].sort())
+    expect(read.every((j) => j.batchId === batch)).toBe(true)
+    // Asking for someone else's id, or their batch, returns nothing of theirs.
+    expect(await ownJobsByIds(rest, staff, [theirs])).toEqual([])
+  })
 })
 
 describe('grants', () => {

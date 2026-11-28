@@ -16,7 +16,8 @@ export const orgFileUrl = (id: string, query = '') => `/api/account/enterprise/w
 
 type Deps = {
   me: string
-  // The reader's own works among the rows, read in full (ownJobsByIds).
+  // The reader's own works among the rows, read in full (ownJobsByIds), and with them the rest
+  // of any batch of theirs the page cut (T107): those are not among the rows.
   own: ReadonlyMap<string, Job>
   templates: TemplateLookup
   labels: ReadonlyMap<string, string | null>
@@ -26,15 +27,23 @@ type Deps = {
 }
 
 export function toCompanyItems(rows: readonly CompanyPhoto[], deps: Deps): PhotoItem[] {
-  return rows.flatMap((row) => {
-    if (row.userId === deps.me) {
-      const job = deps.own.get(row.id)
-      // Deleted or lost between the two reads: nothing to show.
-      if (!job) return []
-      return [{ ...toPhotoItem(job, deps.templates, deps.fileUrlFor(job.id), deps.fallbackName, deps.signed?.get(job.id)), personal: !row.orgWork }]
-    }
-    return [colleagueItem(row, deps)]
+  const mine = (job: Job, personal: boolean): PhotoItem => ({ ...toPhotoItem(job, deps.templates, deps.fileUrlFor(job.id), deps.fallbackName, deps.signed?.get(job.id)), personal })
+  const listed = new Set<string>()
+  // A batch is paid one way: its photos off the page are personal when the ones on it are.
+  const batchPersonal = new Map<string, boolean>()
+  const items = rows.flatMap((row) => {
+    if (row.userId !== deps.me) return [colleagueItem(row, deps)]
+    const job = deps.own.get(row.id)
+    // Deleted or lost between the two reads: nothing to show.
+    if (!job) return []
+    listed.add(job.id)
+    if (job.batchId) batchPersonal.set(job.batchId, !row.orgWork)
+    return [mine(job, !row.orgWork)]
   })
+  // The rest of a cut batch: Photos gathers a batch where its first listed photo stands
+  // (batch-groups.ts), so where these come in the list does not matter.
+  const rest = [...deps.own.values()].filter((job) => !listed.has(job.id) && job.batchId && batchPersonal.has(job.batchId))
+  return [...items, ...rest.map((job) => mine(job, batchPersonal.get(job.batchId!) ?? false))]
 }
 
 function colleagueItem(row: CompanyPhoto, deps: Deps): PhotoItem {

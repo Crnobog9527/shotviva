@@ -44,6 +44,16 @@ describe('toCompanyItems', () => {
     expect(items.map((i) => i.maker)).toEqual([{ who: 'peer@example.com', state: 'removed' }, { who: null, state: 'deleted' }])
   })
 
+  // T107 on the company view: a batch cut by the page is shown whole, with its ZIP count.
+  it('adds the rest of the reader\'s batch the page cut, marked like the batch', () => {
+    const inBatch = (id: string): Job => ({ ...job(id), batchId: 'batch-1' })
+    const own = [inBatch('on-page'), inBatch('cut-1'), inBatch('cut-2'), { ...job('stray'), batchId: 'other-batch' }]
+    const items = toCompanyItems([row('on-page', ME), row('c', PEER)], deps(own))
+    expect(items.map((i) => [i.id, i.batchId, i.personal])).toEqual([['on-page', 'batch-1', false], ['c', null, undefined], ['cut-1', 'batch-1', false], ['cut-2', 'batch-1', false]])
+    const personal = toCompanyItems([row('on-page', ME, { orgWork: false })], deps(own))
+    expect(personal.map((i) => i.personal)).toEqual([true, true, true])
+  })
+
   it('drops an own row whose job is gone between the two reads', () => {
     expect(toCompanyItems([row('gone', ME)], deps([]))).toEqual([])
   })
