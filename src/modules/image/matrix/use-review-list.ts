@@ -8,7 +8,7 @@ import type { NoteMode } from './cell-choices'
 import { withBatchTier, withNote, withNotes, withRemoved, withTiers } from './cell-edits'
 import type { CellKey } from './matrix-state'
 import type { ReviewActions } from './review-actions'
-import { initiallyOpen, reviewGroups, samePhoto, sameTemplate, type GroupBy } from './review-groups'
+import { initiallyOpen, reviewGroups, samePhoto, sameTemplate, tierTargets, type GroupBy } from './review-groups'
 import { useBulk } from './use-bulk'
 import type { MatrixDraft } from './use-matrix-draft'
 
@@ -36,7 +36,7 @@ export function useReviewList(draft: MatrixDraft) {
     editing,
     setEditing,
     setNote: (key, note) => change((v) => withNote(v, key, note)),
-    copyNote: (from, to) => bulk.apply('doneCopy', to, (v) => withNotes(v, to, v.notes[from] ?? '', 'replace')),
+    copyNote: (from, to) => bulk.apply('doneCopy', to, 'notes', (v) => withNotes(v, to, v.notes[from] ?? '', 'replace')),
     openTier: setTierFor,
     openZoom: (key) => setZoomAt(rows.findIndex((row) => row.cell.key === key)),
     siblings: (key) => ({ template: sameTemplate(draft.cells, key), photo: samePhoto(draft.cells, key) }),
@@ -53,13 +53,13 @@ export function useReviewList(draft: MatrixDraft) {
     foldAll: () => setFolds({ by, open: open.size > 0 ? new Set() : new Set(groups.map((group) => group.id)) }),
     pickTier: (key: CellKey | 'batch' | 'selection', tier: Resolution, alsoOthers: boolean) => {
       if (key === 'batch') return change((v) => withBatchTier(v, tier))
-      if (key === 'selection') return bulk.apply('doneTier', chosen, (v) => withTiers(v, chosen, tier))
-      change((v) => withTiers(v, alsoOthers ? sameTemplate(draft.cells, key) : [key], tier))
+      if (key === 'selection') return bulk.apply('doneTier', chosen, 'tiers', (v) => withTiers(v, chosen, tier))
+      change((v) => withTiers(v, tierTargets(draft.cells, key, alsoOthers), tier))
     },
     skip: (key: CellKey, skip: boolean) => change((v) => withRemoved(v, [key], skip)),
     // The selection's changes, each one step to undo.
-    noteSelected: (note: string, mode: NoteMode) => bulk.apply('doneNote', chosen, (v) => withNotes(v, chosen, note, mode)),
-    skipSelected: (skip: boolean) => bulk.apply(skip ? 'doneSkip' : 'doneRestore', chosen, (v) => withRemoved(v, chosen, skip)),
+    noteSelected: (note: string, mode: NoteMode) => bulk.apply('doneNote', chosen, 'notes', (v) => withNotes(v, chosen, note, mode)),
+    skipSelected: (skip: boolean) => bulk.apply(skip ? 'doneSkip' : 'doneRestore', chosen, 'removed', (v) => withRemoved(v, chosen, skip)),
   }
 }
 

@@ -5,7 +5,7 @@ import type { BatchPhoto } from '../workspace/photo-batch'
 import { mergedNote, cellTier, batchTiers } from './cell-choices'
 import { withBatchTier, withNote, withNotes, withRemoved, withTiers } from './cell-edits'
 import { cellKey, EMPTY_MATRIX, matrixCells } from './matrix-state'
-import { groupSummary, initiallyOpen, reviewGroups, samePhoto, sameTemplate } from './review-groups'
+import { groupSummary, initiallyOpen, reviewGroups, samePhoto, sameTemplate, tierTargets } from './review-groups'
 
 const template = (id: string, resolutions: CatalogueTemplate['imageOptions'] extends infer O ? O extends { resolutions: infer R } ? R : never : never = ['1k', '2k', '4k']): CatalogueTemplate => ({
   id, name: id.toUpperCase(), category: 'c', categoryName: 'C', categoryOrder: 0, compare: false, description: null, photoInput: 'required',
@@ -78,5 +78,9 @@ describe('the review list', () => {
   it('finds the results that share a template or a photo, leaving out skipped ones', () => {
     expect(sameTemplate(cells, cellKey('b', 'p1'))).toEqual(['b|p1', 'b|p2'])
     expect(samePhoto(cells, cellKey('a', 'p3'))).toEqual(['a|p3'])
+  })
+  it('applies a row\'s tier to the row itself even while it is skipped, plus its template\'s others when asked', () => {
+    expect(tierTargets(cells, cellKey('b', 'p3'), true)).toEqual(['b|p3', 'b|p1', 'b|p2'])
+    expect(tierTargets(cells, cellKey('b', 'p3'), false)).toEqual(['b|p3'])
   })
 })
