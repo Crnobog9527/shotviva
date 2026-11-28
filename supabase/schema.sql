@@ -18372,9 +18372,16 @@ CREATE OR REPLACE FUNCTION "public"."own_photo_categories"("p_user" "uuid") RETU
     SET "search_path" TO ''
     AS $$
   select c.key, c.name_en, c.name_zh, c.sort_order, c.is_system,
-         count(*)::integer, (count(*) filter (where j.credit_pool = 'free'))::integer
-    from public.own_photo_roots(p_user) r
-    join public.generation_jobs j on j.id = r.job_id
+         count(*)::integer, (count(*) filter (where r.credit_pool = 'free'))::integer
+    from (
+      select j.credit_pool,
+             case when j.parent_job_id is null then t.category_key
+                  else public.own_photo_edit_root(p_user, j.template_id, j.parent_job_id) end as category_key
+        from public.generation_jobs j
+        join public.templates t on t.id = j.template_id
+       where j.user_id = p_user and j.status = 'succeeded'
+         and j.deleted_at is null and j.org_access_ended_at is null
+    ) r
     join public.template_categories c on c.key = r.category_key
    group by c.key, c.name_en, c.name_zh, c.sort_order, c.is_system
    order by c.sort_order, c.key;
@@ -18384,46 +18391,70 @@ $$;
 ALTER FUNCTION "public"."own_photo_categories"("p_user" "uuid") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."own_photo_roots"("p_user" "uuid") RETURNS TABLE("job_id" "uuid", "category_key" "text")
+CREATE OR REPLACE FUNCTION "public"."own_photo_edit_root"("p_user" "uuid", "p_template" "text", "p_parent" "uuid") RETURNS "text"
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
     AS $$
-  with recursive walk as (
-    select j.id, j.template_id, j.parent_job_id, 0 as depth
-      from public.generation_jobs j
-     where j.user_id = p_user and j.status = 'succeeded'
-       and j.deleted_at is null and j.org_access_ended_at is null
+  with recursive up as (
+    select p_template as template_id, p_parent as parent_job_id, 0 as depth
     union all
-    select w.id, p.template_id, p.parent_job_id, w.depth + 1
-      from walk w
-      join public.templates t on t.id = w.template_id
+    select p.template_id, p.parent_job_id, u.depth + 1
+      from up u
+      join public.templates t on t.id = u.template_id
       join public.template_categories c on c.key = t.category_key and c.is_system
-      join public.generation_jobs p on p.id = w.parent_job_id and p.user_id = p_user
-     where w.depth < 30
+      join public.generation_jobs p on p.id = u.parent_job_id and p.user_id = p_user
+     where u.depth < 30
   )
-  select distinct on (w.id) w.id, t.category_key
-    from walk w
-    join public.templates t on t.id = w.template_id
-   order by w.id, w.depth desc;
+  select t.category_key
+    from up u
+    join public.templates t on t.id = u.template_id
+   order by u.depth desc
+   limit 1;
 $$;
 
 
-ALTER FUNCTION "public"."own_photo_roots"("p_user" "uuid") OWNER TO "postgres";
+ALTER FUNCTION "public"."own_photo_edit_root"("p_user" "uuid", "p_template" "text", "p_parent" "uuid") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."own_photos_filtered"("p_user" "uuid", "p_category" "text" DEFAULT NULL::"text", "p_watermarked" boolean DEFAULT false) RETURNS SETOF "public"."generation_jobs"
+CREATE OR REPLACE FUNCTION "public"."own_photos_filtered"("p_user" "uuid", "p_category" "text" DEFAULT NULL::"text", "p_watermarked" boolean DEFAULT false, "p_limit" integer DEFAULT 49, "p_before_at" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_before_id" "uuid" DEFAULT NULL::"uuid", "p_from_at" timestamp with time zone DEFAULT NULL::timestamp with time zone, "p_from_id" "uuid" DEFAULT NULL::"uuid", "p_batches" "uuid"[] DEFAULT NULL::"uuid"[]) RETURNS SETOF "public"."generation_jobs"
     LANGUAGE "sql" STABLE
     SET "search_path" TO ''
     AS $$
-  select j.*
-    from public.own_photo_roots(p_user) r
-    join public.generation_jobs j on j.id = r.job_id
-   where (p_category is null or r.category_key = p_category)
-     and (not coalesce(p_watermarked, false) or j.credit_pool = 'free');
+  (select j.*
+     from public.generation_jobs j
+     join public.templates t on t.id = j.template_id
+    where p_from_at is null
+      and j.user_id = p_user and j.status = 'succeeded'
+      and j.deleted_at is null and j.org_access_ended_at is null
+      and j.created_at <= coalesce(p_before_at, 'infinity'::timestamptz)
+      and (p_before_at is null or (j.created_at, j.id) < (p_before_at, p_before_id))
+      and (p_batches is null or j.batch_id = any (p_batches))
+      and (not coalesce(p_watermarked, false) or j.credit_pool = 'free')
+      and (p_category is null
+           or case when j.parent_job_id is null then t.category_key
+                   else public.own_photo_edit_root(p_user, j.template_id, j.parent_job_id) end = p_category)
+    order by j.created_at desc, j.id desc
+    limit least(greatest(coalesce(p_limit, 49), 1), 1000))
+  union all
+  (select j.*
+     from public.generation_jobs j
+     join public.templates t on t.id = j.template_id
+    where p_from_at is not null
+      and j.user_id = p_user and j.status = 'succeeded'
+      and j.deleted_at is null and j.org_access_ended_at is null
+      and j.created_at >= p_from_at
+      and (j.created_at, j.id) >= (p_from_at, p_from_id)
+      and (p_batches is null or j.batch_id = any (p_batches))
+      and (not coalesce(p_watermarked, false) or j.credit_pool = 'free')
+      and (p_category is null
+           or case when j.parent_job_id is null then t.category_key
+                   else public.own_photo_edit_root(p_user, j.template_id, j.parent_job_id) end = p_category)
+    order by j.created_at asc, j.id asc
+    limit least(greatest(coalesce(p_limit, 49), 1), 1000));
 $$;
 
 
-ALTER FUNCTION "public"."own_photos_filtered"("p_user" "uuid", "p_category" "text", "p_watermarked" boolean) OWNER TO "postgres";
+ALTER FUNCTION "public"."own_photos_filtered"("p_user" "uuid", "p_category" "text", "p_watermarked" boolean, "p_limit" integer, "p_before_at" timestamp with time zone, "p_before_id" "uuid", "p_from_at" timestamp with time zone, "p_from_id" "uuid", "p_batches" "uuid"[]) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."partner_image_aspects"("public"."templates") RETURNS "text"[]
@@ -31487,13 +31518,13 @@ GRANT ALL ON FUNCTION "public"."own_photo_categories"("p_user" "uuid") TO "servi
 
 
 
-REVOKE ALL ON FUNCTION "public"."own_photo_roots"("p_user" "uuid") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."own_photo_roots"("p_user" "uuid") TO "service_role";
+REVOKE ALL ON FUNCTION "public"."own_photo_edit_root"("p_user" "uuid", "p_template" "text", "p_parent" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."own_photo_edit_root"("p_user" "uuid", "p_template" "text", "p_parent" "uuid") TO "service_role";
 
 
 
-REVOKE ALL ON FUNCTION "public"."own_photos_filtered"("p_user" "uuid", "p_category" "text", "p_watermarked" boolean) FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."own_photos_filtered"("p_user" "uuid", "p_category" "text", "p_watermarked" boolean) TO "service_role";
+REVOKE ALL ON FUNCTION "public"."own_photos_filtered"("p_user" "uuid", "p_category" "text", "p_watermarked" boolean, "p_limit" integer, "p_before_at" timestamp with time zone, "p_before_id" "uuid", "p_from_at" timestamp with time zone, "p_from_id" "uuid", "p_batches" "uuid"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."own_photos_filtered"("p_user" "uuid", "p_category" "text", "p_watermarked" boolean, "p_limit" integer, "p_before_at" timestamp with time zone, "p_before_id" "uuid", "p_from_at" timestamp with time zone, "p_from_id" "uuid", "p_batches" "uuid"[]) TO "service_role";
 
 
 
