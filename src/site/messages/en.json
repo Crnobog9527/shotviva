@@ -1126,7 +1126,6 @@
       "generating": "Generating",
       "generatingAria": "Generating {name}",
       "done": "Done",
-      "newest": "Newest first",
       "count": "{running, plural, =0 {} other {# in progress · }}{done} done",
       "footnote": "Photos made with free credits are public with a watermark; poster photos stay private. Photos made with paid credits are private and watermark-free.",
       "photoAlt": "{name} photo",
@@ -1138,7 +1137,8 @@
       "editedName": "Edited photo",
       "badgeAria": "{count} in progress",
       "pill": "{count, plural, one {Generating…} other {Generating #…}}",
-      "doneMeta": "{when} · {size} · {tier}",
+      "tileMeta": "{size} · {tier}",
+      "dayCount": "{count, plural, one {# photo} other {# photos}}",
       "runningMeta": "{size} · {tier} · {count, plural, one {# credit} other {# credits}}",
       "waiting": "Waiting for a free slot",
       "loadMore": "Load more",
@@ -1165,6 +1165,7 @@
     "work": {
       "freePublic": "Public · watermark",
       "freePrivate": "Private · watermark",
+      "watermark": "Watermark",
       "private": "Private",
       "public": "Public"
     },

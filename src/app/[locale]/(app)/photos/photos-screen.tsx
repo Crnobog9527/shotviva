@@ -13,6 +13,10 @@ import { DoneGrid, PhotosCount, RunningList, toPhotoItem, type TemplateLookup } 
 
 import { createWorkShareAction } from './share-actions'
 
+// Photos counts days where its readers are: the server cannot know the browser's zone, so the
+// Chinese site reads Beijing time and the English one UTC, as before.
+const PHOTOS_ZONE: Record<string, string> = { zh: 'Asia/Shanghai' }
+
 function Header({ aside }: { aside?: ReactNode }) {
   return <TabRootHeader title={useTranslations('app.photos')('title')} aside={aside} />
 }
@@ -44,6 +48,7 @@ async function Photos({ back, until }: { back: string | Promise<string>; until?:
       <DoneGrid
         items={done}
         now={now}
+        timeZone={PHOTOS_ZONE[locale] ?? 'UTC'}
         anyRunning={running.length > 0}
         liveTemplates={templates.map((template) => template.id)}
         share={createWorkShareAction}

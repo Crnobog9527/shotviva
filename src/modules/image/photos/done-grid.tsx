@@ -1,131 +1,90 @@
-import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
-import { thumbUrlFor } from '@/core/jobs/job-view'
 import { Reveal } from '@/core/ui/reveal-item'
-import { ThumbImg } from '@/core/ui/thumb-img'
 import { useFormatter, useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 
-import { makeAgainHref } from '../again/again-start'
-import { WorkTag } from '../result/work-tag'
 import { ZipButtonLazy as ZipButton } from '../batch/zip-button-lazy'
-import { groupByBatch, groupByMonth, type DoneEntry } from './batch-groups'
+import { groupByBatch, groupByDay, type DaySection, type DoneEntry } from './batch-groups'
+import { DoneCard, EAGER_TILES } from './done-card'
 import { LoadMore } from './load-more'
 import { PhotosEmpty } from './photos-empty'
-import { doneMeta, doneWhen, type PhotoItem } from './photo-item'
-import { WorkLink } from './viewer/work-link'
+import { doneWhen, tileMeta, type PhotoItem } from './photo-item'
 import { WorksIndex } from './viewer/works-index'
 import { ShareSelectProvider } from '../work-share/select-context'
-import { SelectTile } from '../work-share/select-tile'
 import { ShareBar } from '../work-share/share-bar'
 import { ShareToggle } from '../work-share/share-toggle'
 import type { CreateShareAction } from '../work-share/share-types'
 
-// "Done", newest first (B comp photos.html): finished photos with their pool's tag, two columns
-// on phones, three from md, four from lg. Each opens the viewer over the grid (2026-11-12);
-// below it a quiet "Make again" opens the viewer on the creation form when the template is still
-// in the catalogue (an edit or a retired template has none). Empty state per DESIGN §4.6. Every tile shows the
-// work's small copy, never the full file (ARCHITECTURE §8.3「作品小图」). share: with it, a Share
-// button next to "Done" turns on picking works for one share link (§6.2「作品集分享」).
+// "Done", newest first: finished photos as a dense grid of pictures (2026-11-28; three columns
+// on a phone, four from sm, six from lg), cut under a heading per day in the viewer's time zone.
+// Each tile opens the viewer over the grid (2026-11-12). Empty state per DESIGN §4.6. Every tile
+// shows the work's small copy, never the full file (ARCHITECTURE §8.3「作品小图」). share: with it,
+// a Share button next to "Done" turns on picking works for one share link (§6.2「作品集分享」).
 // more: the next page's address while older works remain (LoadMore); total: every finished work.
-// Once the list spans more than one month (or has more to come) it is cut under month headings.
-type Props = { items: PhotoItem[]; now: Date; anyRunning: boolean; liveTemplates: string[]; share?: CreateShareAction; more?: string | null; total?: number }
+type Props = { items: PhotoItem[]; now: Date; timeZone: string; anyRunning: boolean; liveTemplates: string[]; share?: CreateShareAction; more?: string | null; total?: number }
 
-export function DoneGrid({ items, now, anyRunning, liveTemplates, share, more = null, total = items.length }: Props) {
+export function DoneGrid({ items, now, timeZone, anyRunning, liveTemplates, share, more = null, total = items.length }: Props) {
   const t = useTranslations('app')
   const format = useFormatter()
-  const day = (date: Date) => format.dateTime(date, { month: 'short', day: 'numeric', timeZone: 'UTC' })
   if (items.length === 0) return anyRunning ? null : <PhotosEmpty />
   const entries = groupByBatch(items)
   // Display order: the viewer steps through it, and the first tiles load first.
   const ordered = entries.flatMap((entry) => (entry.kind === 'photo' ? [entry.item] : entry.items))
   const place = new Map(ordered.map((item, index) => [item.id, index]))
-  const monthName = (iso: string) => format.dateTime(new Date(iso), { year: 'numeric', month: 'long', timeZone: 'UTC' })
-  const card = (item: PhotoItem) => <DoneCard item={item} meta={doneMeta(item, now, t, day)} live={liveTemplates.includes(item.templateId)} place={place.get(item.id) ?? EAGER_TILES} />
-  const tiles = (list: DoneEntry[]) => (
-    <ul className={GRID}>
-      {list.map((entry) =>
-        entry.kind === 'photo' ? (
-          <Reveal as="li" key={entry.item.id}>
-            {card(entry.item)}
-          </Reveal>
-        ) : (
-          <li key={entry.batchId} className="col-span-full">
-            <BatchGroup entry={entry} when={doneWhen(entry.items[0]!, now, t, day)} card={card} />
-          </li>
-        ),
-      )}
-    </ul>
-  )
+  const when = (iso: string) =>
+    doneWhen(iso, now, timeZone, t, (date, sameYear) => format.dateTime(date, { year: sameYear ? undefined : 'numeric', month: 'long', day: 'numeric', timeZone }))
+  const card = (item: PhotoItem) => <DoneCard item={item} meta={tileMeta(item, t)} live={liveTemplates.includes(item.templateId)} place={place.get(item.id) ?? EAGER_TILES} />
+  const days = groupByDay(entries, timeZone)
   const grid = (
     <section aria-labelledby="done-h">
       <WorksIndex items={ordered} />
-      <div className="mx-(--gutter) mt-6 mb-3 flex items-center justify-between gap-3 md:mt-8">
+      <div className="mx-(--gutter) mt-6 flex items-center justify-between gap-3 md:mt-8">
         <h2 id="done-h" className="text-headline leading-[1.2] font-semibold tracking-[-0.01em]">{t('photos.done')}</h2>
-        <span className="flex items-center gap-3">
-          <span className="text-caption text-muted-foreground">{t('photos.newest')}</span>
-          {share ? <ShareToggle /> : null}
-        </span>
+        {share ? <ShareToggle /> : null}
       </div>
-      <Months entries={entries} always={more !== null} name={monthName} tiles={tiles} />
+      {days.map((day, index) => (
+        // The oldest day shown may go on into the next page: its count would be short.
+        <Day key={day.key} day={day} title={when(day.first)} counted={more === null || index < days.length - 1} card={card} when={when} />
+      ))}
       {more ? <LoadMore href={more} shown={items.length} total={total} /> : null}
-      <p className="mx-(--gutter) mt-4 max-w-[72ch] text-caption leading-[1.4] text-muted-foreground">{t('photos.footnote')}</p>
+      <p className="mx-(--gutter) mt-6 max-w-[72ch] text-caption leading-[1.4] text-muted-foreground">{t('photos.footnote')}</p>
       {share ? <ShareBar create={share} /> : null}
     </section>
   )
   return share ? <ShareSelectProvider>{grid}</ShareSelectProvider> : grid
 }
 
-// Month headings once the list spans more than one month (or more pages are to come): each
-// month its own grid, so a heading never sits mid-row. One month stays one plain grid.
-function Months({ entries, always, name, tiles }: { entries: DoneEntry[]; always: boolean; name(iso: string): string; tiles(list: DoneEntry[]): ReactNode }) {
-  const months = groupByMonth(entries)
-  if (months.length < 2 && !always) return tiles(entries)
-  return months.map((month) => (
-    <section key={month.key} aria-labelledby={`month-${month.key}`} className="mt-6 first-of-type:mt-0">
-      <h3 id={`month-${month.key}`} className="mx-(--gutter) mb-3 text-body leading-[1.25] font-semibold text-muted-foreground">
-        {name(month.first)}
-      </h3>
-      {tiles(month.entries)}
-    </section>
-  ))
-}
+const GRID = 'grid grid-cols-3 gap-1 px-(--gutter) sm:grid-cols-4 md:gap-2 lg:grid-cols-6'
 
-const GRID = 'grid grid-cols-2 gap-x-2 gap-y-4 px-(--gutter) md:grid-cols-3 md:gap-x-4 md:gap-y-6 lg:grid-cols-4'
+type DayProps = { day: DaySection; title: string; counted: boolean; card(item: PhotoItem): ReactNode; when(iso: string): string }
 
-// The first screen is fetched at once (two rows of four on a desktop, three of two on a phone)
-// and its first row ahead of everything else, because one of those tiles is the page's largest
-// paint; the rest wait until they are scrolled near.
-const EAGER_TILES = 8
-const FIRST_ROW = 4
-
-// place: where the tile comes in the grid, 0 first.
-function DoneCard({ item, meta, live, place }: { item: PhotoItem; meta: string; live: boolean; place: number }) {
-  const t = useTranslations('app')
+// One day: its heading is a frosted label that stays under the top of the screen while the day
+// scrolls by (below the desktop tab bar), so a long day never loses its date. A label, not a
+// band: the page's ground is not flat, and a band would show its edges at rest.
+function Day({ day, title, counted, card, when }: DayProps) {
+  const t = useTranslations('app.photos')
+  const id = `day-${day.key}`
   return (
-    <div className="relative flex h-full flex-col transition-transform duration-250 ease-house hover:-translate-y-0.5">
-      <SelectTile jobId={item.id} name={item.templateName} />
-      <WorkLink workId={item.id} className="group press block rounded-control">
-        <span className="hairline relative block aspect-[4/5] overflow-hidden rounded-control bg-muted transition-shadow group-hover:shadow-[inset_0_0_0_1px_var(--input)]">
-          {item.thumbUrl ? (
-            <ThumbImg
-              src={item.thumbUrl}
-              fallback={thumbUrlFor(item.id)}
-              alt={t('photos.photoAlt', { name: item.templateName })}
-              width={480}
-              height={600}
-              loading={place < EAGER_TILES ? 'eager' : 'lazy'}
-              fetchPriority={place < FIRST_ROW ? 'high' : 'auto'}
-              decoding="async"
-              className={`${REPLAY_BLOCK_CLASS} absolute inset-0 size-full object-cover transition-transform duration-600 ease-house group-hover:scale-[1.02]`}
-            />
-          ) : null}
-          <WorkTag pool={item.creditPool} visibility={item.visibility} className="absolute bottom-2 left-2" />
-        </span>
-        <b className="mt-2 block text-body font-semibold">{item.templateName}</b>
-        <small className="mt-1 block text-caption leading-[1.35] text-muted-foreground">{meta}</small>
-      </WorkLink>
-      {live ? <MakeAgain templateId={item.templateId} jobId={item.id} /> : null}
-    </div>
+    <section aria-labelledby={id}>
+      <div className="pointer-events-none sticky top-[calc(var(--sat)+8px)] z-10 px-(--gutter) pt-5 pb-2 md:top-16">
+        <div className="frost hairline inline-flex min-h-8 items-baseline gap-2 rounded-full px-3 py-1.5">
+          <h3 id={id} className="text-body leading-[1.25] font-semibold">{title}</h3>
+          {counted ? <span className="text-caption text-bone-dim tabular-nums">{t('dayCount', { count: day.count })}</span> : null}
+        </div>
+      </div>
+      <ul className={GRID}>
+        {day.entries.map((entry) =>
+          entry.kind === 'photo' ? (
+            <Reveal as="li" key={entry.item.id}>
+              {card(entry.item)}
+            </Reveal>
+          ) : (
+            <li key={entry.batchId} className="col-span-full">
+              <BatchGroup entry={entry} when={when(entry.items[0]!.createdAt)} card={card} />
+            </li>
+          ),
+        )}
+      </ul>
+    </section>
   )
 }
 
@@ -135,10 +94,10 @@ function BatchGroup({ entry, when, card }: { entry: Extract<DoneEntry, { kind: '
   const t = useTranslations('app.photos.batch')
   const id = `batch-${entry.batchId}`
   return (
-    <section aria-labelledby={id} className="-mx-(--gutter) border-y border-hairline py-4">
+    <section aria-labelledby={id} className="-mx-(--gutter) my-2 border-y border-hairline py-4">
       <div className="mx-(--gutter) mb-3 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
-          <h3 id={id} className="text-body leading-[1.25] font-semibold">{t('title', { count: entry.items.length, templates: entry.templates })}</h3>
+          <h4 id={id} className="text-body leading-[1.25] font-semibold">{t('title', { count: entry.items.length, templates: entry.templates })}</h4>
           <p className="mt-1 text-caption text-muted-foreground">{when}</p>
         </div>
         {entry.paid > 0 ? <ZipButton batchId={entry.batchId} count={entry.paid} className="max-w-full" /> : null}
@@ -149,19 +108,5 @@ function BatchGroup({ entry, when, card }: { entry: Extract<DoneEntry, { kind: '
         ))}
       </ul>
     </section>
-  )
-}
-
-// "Make again ›": the viewer on the creation form, opened from this work like the viewer's Make
-// again: its settings and its kept photo (T40). The href stays the workspace page, for a new tab.
-function MakeAgain({ templateId, jobId }: { templateId: string; jobId: string }) {
-  const t = useTranslations('app.photos')
-  return (
-    <WorkLink workId={jobId} mode="again" href={makeAgainHref(templateId, jobId)} className="mt-1 inline-flex min-h-9 items-center gap-0.5 self-start text-caption font-medium text-foreground hover:underline hover:underline-offset-3">
-      {t('makeAgain')}
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 text-primary" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M9 6l6 6-6 6" />
-      </svg>
-    </WorkLink>
   )
 }
