@@ -1926,7 +1926,9 @@
         "isDefault": "（默认）",
         "useDefault": "恢复默认",
         "defaultRestored": "已恢复默认。",
-        "pick": "选择 {who}"
+        "pick": "选择 {who}",
+        "hintPaidOnly": "月额度会在每月 1 日（UTC）补足到设定值。手动补充积分会立即从积分池划给成员。",
+        "removeBodyPaidOnly": "企业没用完的积分回到积分池；他自己的积分仍归他。"
       },
       "performance": {
         "title": "月度业绩",
@@ -2123,7 +2125,8 @@
         "clawedBack": "退款扣回",
         "restored": "拒付胜诉还回",
         "held": "成员手里还剩",
-        "expired": "月底清零"
+        "expired": "月底清零",
+        "hintPaidOnly": "按 UTC 月统计。"
       },
       "defaults": {
         "title": "默认月额度",
@@ -2169,7 +2172,8 @@
         "total": "{count} 人 × {each} = {total}，从{kind}池扣（池里 {pool}）",
         "short": "{kind}池当前仅有 {pool}，不足以给每人划拨，本次不会向任何人划拨。",
         "give": "划拨",
-        "given": "已给 {count} 人共划拨 {total}。"
+        "given": "已给 {count} 人共划拨 {total}。",
+        "allowanceConfirmPaidOnly": "会覆盖这些人的月额度。"
       }
     },
     "templateShare": {

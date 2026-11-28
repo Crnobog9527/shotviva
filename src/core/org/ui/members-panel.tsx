@@ -16,6 +16,7 @@ import { DefaultsForm } from './defaults-panel'
 import { KeptContext, createKept, newRequestId, useKeptState, type Kept } from './kept-state'
 import { PAGE_SIZE, useMemberSelection } from './member-selection'
 import { FIELD, Panel, Result } from './parts'
+import { memberShowsCustomers, memberShowsPromo, orgShowsPromo } from './promo-visibility'
 import { useConsoleAction } from './use-console-action'
 
 const digits = (raw: string) => raw.replace(/\D/g, '').slice(0, 10)
@@ -107,7 +108,7 @@ function GiveForm({ member, actions, suspended, label, kind }: FormProps) {
   )
 }
 
-function RemoveControl({ member, actions, label }: Omit<RowProps, 'suspended'>) {
+function RemoveControl({ member, actions, label, promo }: Omit<RowProps, 'suspended'> & { promo: boolean }) {
   const t = useTranslations('app.org.members')
   const [requestId, setRequestId] = useKeptState(`${member.userId}:remove:id`, newRequestId)
   const [open, setOpen] = useState(false)
@@ -120,7 +121,7 @@ function RemoveControl({ member, actions, label }: Omit<RowProps, 'suspended'>) 
         open={open}
         onOpenChange={setOpen}
         title={t('removeTitle', { who: label })}
-        description={t('removeBody')}
+        description={t(promo ? 'removeBody' : 'removeBodyPaidOnly')}
         confirm={t('removeConfirm')}
         cancel={t('cancel')}
         busy={pending}
@@ -149,7 +150,7 @@ function KindForms(props: FormProps) {
 
 // One person: a compact row (account, role, what they hold, customers); tapping it opens the editor
 // (allowances, "top up manually", removal) in place.
-type MemberRowProps = { member: ConsoleMember; actions: OwnerActions; suspended: boolean; pick: { checked: boolean; toggle(): void } | null; open: boolean; onToggle(): void }
+type MemberRowProps = { member: ConsoleMember; org: OwnerConsole['org']; actions: OwnerActions; pick: { checked: boolean; toggle(): void } | null; open: boolean; onToggle(): void }
 
 // Scroll the list container (the row's parent) just enough to show the whole row.
 export function revealInList(row: HTMLElement | null) {
@@ -160,7 +161,10 @@ export function revealInList(row: HTMLElement | null) {
   else if (top + row.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = top + row.offsetHeight - list.clientHeight
 }
 
-function MemberSummary({ member, label }: { member: ConsoleMember; label: string }) {
+// What the row shows besides paid credits (see promo-visibility.ts).
+type Shows = { promo: boolean; customers: boolean }
+
+function MemberSummary({ member, label, shows }: { member: ConsoleMember; label: string; shows: Shows }) {
   const t = useTranslations('app.org.members')
   return (
     <>
@@ -170,8 +174,8 @@ function MemberSummary({ member, label }: { member: ConsoleMember; label: string
       </span>
       <span className="flex flex-wrap gap-x-2 text-caption text-muted-foreground tabular-nums">
         <span className="whitespace-nowrap">{t('held', { count: member.heldCredits })}</span>
-        <span className="whitespace-nowrap">{t('heldPromo', { count: member.heldPromoCredits })}</span>
-        <span className="whitespace-nowrap">{t('customers', { count: member.customers })}</span>
+        {shows.promo ? <span className="whitespace-nowrap">{t('heldPromo', { count: member.heldPromoCredits })}</span> : null}
+        {shows.customers ? <span className="whitespace-nowrap">{t('customers', { count: member.customers })}</span> : null}
       </span>
     </>
   )
@@ -181,19 +185,21 @@ function Chevron({ show, open }: { show: boolean; open: boolean }) {
   return show ? <ChevronDown aria-hidden className={`size-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} /> : null
 }
 
-function MemberEditor({ id, hidden, ...props }: RowProps & { id: string; hidden: boolean }) {
+function MemberEditor({ id, hidden, promo, ...props }: RowProps & { id: string; hidden: boolean; promo: boolean }) {
   return (
     <div id={id} hidden={hidden} className="space-y-3 pb-4 pt-2">
       <KindForms {...props} kind="paid" />
-      <KindForms {...props} kind="promo" />
-      {props.member.role === 'owner' ? null : <RemoveControl {...props} />}
+      {promo ? <KindForms {...props} kind="promo" /> : null}
+      {props.member.role === 'owner' ? null : <RemoveControl {...props} promo={promo} />}
     </div>
   )
 }
 
-function MemberRow({ member, actions, suspended, pick, open, onToggle }: MemberRowProps) {
+function MemberRow({ member, org, actions, pick, open, onToggle }: MemberRowProps) {
   const t = useTranslations('app.org.members')
   const label = member.account ?? t('unknown')
+  const suspended = org.status === 'suspended'
+  const shows = { promo: memberShowsPromo(org, member), customers: memberShowsCustomers(org, member) }
   const panelId = `member-editor-${member.userId}`
   // Once opened, the editor stays mounted (hidden when closed) so a request id, a typed amount or an
   // answer still on its way survives collapsing the row: a retry is the same request.
@@ -213,16 +219,16 @@ function MemberRow({ member, actions, suspended, pick, open, onToggle }: MemberR
       <div className="flex items-center gap-3">
         {pick ? <Checkbox checked={pick.checked} onCheckedChange={pick.toggle} aria-label={t('pick', { who: label })} className="size-5 shrink-0" /> : null}
         {pick ? (
-          <div className="grid min-h-14 min-w-0 flex-1 content-center gap-0.5"><MemberSummary member={member} label={label} /></div>
+          <div className="grid min-h-14 min-w-0 flex-1 content-center gap-0.5"><MemberSummary member={member} label={label} shows={shows} /></div>
         ) : (
           <button type="button" aria-expanded={open} aria-controls={opened ? panelId : undefined} onClick={onToggle}
             className="grid min-h-14 min-w-0 flex-1 content-center gap-0.5 text-left">
-            <MemberSummary member={member} label={label} />
+            <MemberSummary member={member} label={label} shows={shows} />
           </button>
         )}
         <Chevron show={!pick} open={open} />
       </div>
-      {!pick && opened ? <MemberEditor id={panelId} hidden={!open} member={member} actions={actions} suspended={suspended} label={label} /> : null}
+      {!pick && opened ? <MemberEditor id={panelId} hidden={!open} promo={shows.promo} member={member} actions={actions} suspended={suspended} label={label} /> : null}
     </li>
   )
 }
@@ -236,14 +242,14 @@ export function MembersPanel({ data, actions, initialOpen = null }: { data: Owne
   const [kept] = useState<Kept>(createKept)
   return (
     <KeptContext.Provider value={kept}>
-    <Panel title={t('title')} hint={t('hint')}>
+    <Panel title={t('title')} hint={t(orgShowsPromo(data.org) ? 'hint' : 'hintPaidOnly')}>
       <DefaultsForm data={data} actions={actions} />
       <BulkToolbar selection={selection} disabled={suspended} />
       <section aria-label={t('listTitle', { count: data.memberTotal })} className="overflow-hidden rounded-xl border border-hairline bg-wash">
         <h3 className="border-b border-hairline px-3 py-2 text-label font-medium">{t('listTitle', { count: data.memberTotal })}</h3>
         <ul className="relative max-h-[60vh] divide-y divide-hairline overflow-y-auto overscroll-contain sm:max-h-[28rem]">
           {selection.visible.map((member) => (
-            <MemberRow key={member.userId} member={member} actions={actions} suspended={suspended}
+            <MemberRow key={member.userId} member={member} org={data.org} actions={actions}
               open={selection.open === member.userId} onToggle={() => selection.toggleOpen(member.userId)}
               pick={selection.selecting ? { checked: selection.selected.includes(member.userId), toggle: () => selection.toggle(member.userId) } : null} />
           ))}
