@@ -88,17 +88,18 @@ async function Account() {
   )
 }
 
-// An active member's (and the owner's) own invite code earns no personal invitee or inviter reward
-// while the org is active (2032), so the personal invite card would promise rewards that do not
-// come. They promote with the org's links instead.
+// An org member's (and the owner's) own invite code earns no personal invitee or inviter reward
+// while the org is active (2032) or runs the affiliate program (2035, A2: then the code is the
+// org's), so the personal invite card would promise rewards that do not come. They promote with
+// the org's links instead.
 function orgInvites(view: Awaited<ReturnType<typeof readOrgView>>) {
-  if (view.kind === 'member') return view.status === 'active'
-  return view.kind === 'owner' && view.org.status === 'active'
+  if (view.kind === 'member') return view.status === 'active' || view.withAffiliate
+  return view.kind === 'owner' && (view.org.status === 'active' || view.org.affiliateEnabled)
 }
 
 // The enterprise block (ARCHITECTURE §6.5, card E4): the owner gets a row into their console, a
-// member a row into their own org page with what is left of this month's credits, then their
-// promotion link (Owner 2026-11-23); everyone else sees nothing.
+// member this month's org credits, 企业作品 and (affiliate orgs) their customers, then their
+// promotion link (Owner 2026-11-28); everyone else sees nothing.
 function OrgBlock({ view, customerLink, memberLink }: { view: Awaited<ReturnType<typeof readOrgView>>; customerLink: ReactNode; memberLink: ReactNode }) {
   const t = useTranslations('app.org.entry')
   const format = useFormatter()
@@ -131,7 +132,8 @@ async function OwnerCustomerLink({ user }: { user: string }) {
 }
 
 // Only an org that runs the affiliate program gives its members a promotion link: one bought just as
-// a production tool has no customers to bring (Owner 2026-11-28).
+// a production tool has no customers to bring (Owner 2026-11-28). Workspace on or off: a staff code
+// binds customers to the org whenever the affiliate program is on (2035, A2).
 function memberLinkFor(view: Awaited<ReturnType<typeof readOrgView>>, user: string) {
   return view.kind === 'member' && view.withAffiliate ? <Suspense fallback={null}><MemberLink user={user} /></Suspense> : null
 }
