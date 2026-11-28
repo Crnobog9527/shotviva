@@ -14,6 +14,7 @@ import { readCompanySeat } from '@/core/org/works'
 import { DoneGrid, heldBy, offersFilter, PhotoFilterRail, PhotosCount, photosHref, toPhotoItem, type TemplateLookup } from '@/modules/image'
 
 import { CompanyPhotos } from './company-screen'
+import { deleteWorksAction } from './actions'
 import { createWorkShareAction } from './share-actions'
 
 // Photos counts days where its readers are: the server cannot know the browser's zone, so the
@@ -91,6 +92,7 @@ async function Photos({ back, until, member, category, mark, cc }: Asked) {
         running={filter ? null : { server: running, covers }}
         liveTemplates={liveTemplates}
         share={createWorkShareAction}
+        removeMany={deleteWorksAction}
         total={held}
         more={own.next ? photosHref(filter, encodeOwnJobsCursor(own.next)) : null}
         rail={offersFilter(categories, filter) ? { filter: <PhotoFilterRail categories={categories} current={filter} />, emptyNote: tp('filter.empty') } : undefined}
