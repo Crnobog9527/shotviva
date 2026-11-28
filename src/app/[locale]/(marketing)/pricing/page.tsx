@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 import { photoPrices } from '@/core/billing'
 import { CheckoutCancelToast, PaywallProvider, PricingPlans } from '@/core/billing/paywall'
 import { walletOffersWechat } from '@/core/billing/wallet'
-import { StandingSlot } from '@/core/billing/standing'
+import { StandingFetch } from '@/core/billing/paywall/standing-fetch'
 import { paymentChannel } from '@/core/billing/waffo'
 import { CreditBuys, FaqSection, PricingHero } from '@/core/content'
 import { BusinessSection } from '@/core/content/business'
@@ -28,8 +28,8 @@ import { inquiryPrefillAction, submitInquiryAction } from './actions'
 // Everything renders into the static HTML, in US dollars in both languages (建站规格 §6.1, R5).
 // Indexable: /pricing and /zh/pricing are in their keyword map CSVs and in site.indexing.
 // Buying opens the same paywall as the app; signed-out buyers sign in first. A signed-in member's
-// plans (T66: lower ones locked, higher ones Upgrade) come from a request-time hole, after the
-// static HTML.
+// plans (T66: lower ones locked, higher ones Upgrade) are asked for from the browser once it finds
+// a session cookie (StandingFetch), so this page is fully static.
 // PAYMENT_CHANNEL is read when the page renders (at build): switching channel is an env change
 // plus a redeploy, which re-renders this page with the matching payment copy.
 export async function generateMetadata(): Promise<Metadata> {
@@ -69,7 +69,7 @@ export default async function PricingPage() {
       <PricingHero text={page} />
       <PaywallProvider products={products} perkFacts={{ wishlistLive, photoPrices: photoPrices(catalogue) }} channel={channel} wechatPay={wechatPay}>
         <PricingPlans products={products} />
-        <StandingSlot />
+        <StandingFetch />
       </PaywallProvider>
       <BusinessSection
         block={page.business}

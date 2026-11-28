@@ -4,3 +4,4 @@ export { ORG_WORKS_PAGE, findOrgWork, orgWorkMakers, orgWorks, type OrgWork, typ
 export { orgOwnerDeleteWork } from './delete'
 export { resolveOrgWorkFile, type OrgWorkSize } from './file'
 export { cursorOf, readOrgWorksPage, type OrgWorksPage } from './page'
+export { COMPANY_PHOTOS_PAGE, ME, PERSONAL, companyScope, listCompanyPhotos, readCompanySeat, type CompanyFilter, type CompanyPhoto, type CompanyPhotos, type CompanySeat } from './photos'

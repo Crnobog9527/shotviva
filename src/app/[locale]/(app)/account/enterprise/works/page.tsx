@@ -1,10 +1,12 @@
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import { getTranslations } from 'next-intl/server'
+import { redirect } from 'next/navigation'
 
 import { AppPage } from '@/core/app-shell'
 import { maskPhone } from '@/core/auth/phone'
-import { readOrgWorksPage } from '@/core/org/works'
+import { localized } from '@/core/i18n/server'
+import { readCompanySeat, readOrgWorksPage } from '@/core/org/works'
 import { EnterpriseFrame, OrgWorksView, WorksMemberFilter } from '@/core/org/ui'
 
 import { readEnterpriseArea } from '../owner-area'
@@ -20,9 +22,15 @@ const one = (value: string | string[] | undefined) => (Array.isArray(value) ? va
 // /account/enterprise/works: 「企业作品」, everything the org's credits paid for, by member,
 // removed members included (Owner 2026-11-22). Every active member of the org sees it, the owner
 // and the staff alike (Owner 2026-11-23); only the owner gets the delete button, and the delete
-// action checks ownership again. Anyone outside an org gets the 404.
+// action checks ownership again. Anyone outside an org gets the 404. Shown as its own page only
+// while the workspace is off (the members' Photos pages are personal then).
 async function Works({ searchParams }: { searchParams: Search }) {
   const [area, t, query] = await Promise.all([readEnterpriseArea('/account/enterprise/works'), getTranslations('app.org.area'), searchParams])
+  // With the workspace on, Photos is this list (ARCHITECTURE §6.5「作品页就是企业作品」): one place, not two.
+  if (await readCompanySeat(area.db, area.user.id)) {
+    const member = one(query.member)
+    redirect(await localized(member ? `/photos?${new URLSearchParams({ member })}` : '/photos'))
+  }
   const page = await readOrgWorksPage(area.db, area.user.id, { member: one(query.member), before: one(query.before) }, maskPhone)
   const owner = area.kind === 'owner'
   return (

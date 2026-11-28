@@ -1,31 +1,12 @@
-import { unstable_rethrow } from 'next/navigation'
-import { Suspense } from 'react'
-
-import { getSessionUser } from '@/core/auth'
 import { NavAccount } from '@/core/content'
-import { logger } from '@/core/logger'
 
-// Request-time: is someone signed in? Only this small hole reads the session, so the marketing
-// pages stay statically cached with the signed-out bar as the fallback (DESIGN §6.9 item 4).
-// An unverified account is treated as signed out (the app would send it back to log in).
-export async function signedIn(): Promise<boolean> {
-  try {
-    return (await getSessionUser())?.verified === true
-  } catch (error) {
-    unstable_rethrow(error)
-    logger.error('nav.session_read_failed', { error })
-    return false
-  }
-}
+import { MemberSwitch } from './member-switch'
 
-async function Resolved() {
-  return <NavAccount signedIn={await signedIn()} />
-}
-
+// The right end of the marketing top bar (DESIGN §6.9 item 4): signed out in the static HTML, and
+// the member's bar once the browser finds a session cookie (core/auth/session-hint.ts). Both are
+// rendered here on the server, so their labels stay out of the client messages; the browser only
+// picks one. No request-time read: marketing pages are fully static and hydrate without waiting
+// for a function. A lapsed cookie still shows Open app; /generate then sends them to sign in.
 export function NavAccountSlot() {
-  return (
-    <Suspense fallback={<NavAccount signedIn={false} />}>
-      <Resolved />
-    </Suspense>
-  )
+  return <MemberSwitch guest={<NavAccount signedIn={false} />} member={<NavAccount signedIn />} />
 }
