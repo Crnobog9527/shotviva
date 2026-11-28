@@ -33,10 +33,12 @@ type Props = {
   // Cancels the signed-in user's Waffo card subscription at period end (T50).
   cancelWaffo: CancelWaffoAction
   facts: PassFacts
+  // false for org staff (Owner 2026-11-28): they buy nothing for themselves, so no buy button.
+  buy?: boolean
 }
 
 type Subscribed = Extract<SubscriptionSummary, { kind: 'subscription' }>
-type Ctx = { manage: Props['manage']; cancelWaffo: CancelWaffoAction; facts: PassFacts; products: Props['products']; paid: number }
+type Ctx = { manage: Props['manage']; cancelWaffo: CancelWaffoAction; facts: PassFacts; products: Props['products']; paid: number; buy: boolean }
 
 function useNames() {
   const tiers = useTranslations('paywall.tiers')
@@ -159,12 +161,17 @@ function WalletPass({ summary, ctx }: { summary: Extract<SubscriptionSummary, { 
   const options = summary.tier ? { tier: summary.tier, period: last?.product.interval, planId: offer?.id } : undefined
   const renew = offer ? t.rich('renewPrice', { ...richTags, price: names.usd(offer.priceUsd) }) : t('renew')
   return (
-    <Pass state="wallet" tier={summary.tier} brand={ctx.facts.brand} head={<><span>{t('member')}</span><Status>{t('endsPlain', { date })}</Status></>} foot={<SinceFoot facts={ctx.facts}><PaywallPill main options={options}>{renew}</PaywallPill><StillBillsAct other={summary.stillBills} ctx={ctx} /></SinceFoot>}>
+    <Pass state="wallet" tier={summary.tier} brand={ctx.facts.brand} head={<><span>{t('member')}</span><Status>{t('endsPlain', { date })}</Status></>} foot={<SinceFoot facts={ctx.facts}><BuyOnly ctx={ctx}><PaywallPill main options={options}>{renew}</PaywallPill></BuyOnly><StillBillsAct other={summary.stillBills} ctx={ctx} /></SinceFoot>}>
       <PassName>{names.tier(summary.tier)}</PassName>
       <Why>{why}</Why>
       <StillBillsLine other={summary.stillBills} />
     </Pass>
   )
+}
+
+// Buy buttons, left out for org staff (ctx.buy false).
+function BuyOnly({ ctx, children }: { ctx: Ctx; children: ReactNode }) {
+  return ctx.buy ? <>{children}</> : null
 }
 
 function NoPlanPass({ summary, ctx }: { summary: Extract<SubscriptionSummary, { kind: 'expired' | 'free' }>; ctx: Ctx }) {
@@ -174,10 +181,10 @@ function NoPlanPass({ summary, ctx }: { summary: Extract<SubscriptionSummary, { 
   const lead = ctx.facts.last ? t('endedTier', { tier: names.tier(ctx.facts.last.product.tier) }) : t('endedPlain')
   const status = expired ? <Flag>{t('ended', { date: summary.paidUntil })}</Flag> : null
   const acts = (
-    <>
+    <BuyOnly ctx={ctx}>
       <PaywallPill main>{t('choosePlan')}</PaywallPill>
       {expired ? <PaywallPill options={{ step: 'packs' }}>{t('buyCredits')}</PaywallPill> : null}
-    </>
+    </BuyOnly>
   )
   return (
     <Pass state={expired ? 'expired' : 'free'} tier={null} brand={ctx.facts.brand} head={<><span>{t('member')}</span>{status}</>} foot={<SinceFoot facts={ctx.facts}>{acts}</SinceFoot>}>
@@ -187,8 +194,8 @@ function NoPlanPass({ summary, ctx }: { summary: Extract<SubscriptionSummary, { 
   )
 }
 
-export function PlanCard({ summary, products, paid, manage, cancelWaffo, facts }: Props) {
-  const ctx: Ctx = { manage, cancelWaffo, facts, products, paid }
+export function PlanCard({ summary, products, paid, manage, cancelWaffo, facts, buy = true }: Props) {
+  const ctx: Ctx = { manage, cancelWaffo, facts, products, paid, buy }
   if (summary.kind === 'subscription') return summary.provider === 'waffo' ? <WaffoPass summary={summary} ctx={ctx} /> : <SubscribedPass summary={summary} ctx={ctx} />
   if (summary.kind === 'paid_until') return <WalletPass summary={summary} ctx={ctx} />
   return <NoPlanPass summary={summary} ctx={ctx} />

@@ -13,6 +13,7 @@ import { batchLimitsOf, effectiveLimits, featureTierOf } from '@/core/billing'
 import { featureAllowed } from '@/core/features'
 import { sharedCreateFeatureAccess } from '@/core/features/read'
 import { currentLocale } from '@/core/i18n/server'
+import { BOOT_HOLD_SCRIPT, HoldLinkPrefetch } from '@/core/i18n/ui'
 import { listRunningJobIds } from '@/core/jobs'
 import { POSTER_FEATURE } from '@/core/poster/sets'
 import { isWishlistEnabled } from '@/core/wishlist'
@@ -111,6 +112,9 @@ export default function CreatePage({ searchParams }: { searchParams: Search }) {
   const entitled = entitledCatalogue(personal).catch(() => null)
   return (
     <AppPage wide>
+      {/* No route prefetch competes with the account's read: until it lands nothing here answers a tap. */}
+      <script dangerouslySetInnerHTML={{ __html: BOOT_HOLD_SCRIPT }} />
+      <HoldLinkPrefetch until={personal.then(() => null, () => null)} />
       <Header
         aside={
           <>

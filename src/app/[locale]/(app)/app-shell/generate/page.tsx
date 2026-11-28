@@ -5,6 +5,7 @@ import { getTranslations } from 'next-intl/server'
 import { AppPage, TabRootHeader } from '@/core/app-shell'
 import { shellBootScript } from '@/core/offline/shell-fallback'
 import { BalanceChipSlot } from '@/core/app-shell/balance-chip-slot'
+import { BOOT_HOLD_SCRIPT } from '@/core/i18n/ui'
 import { GatedFeaturesPending, GeneratingPill } from '@/modules/image/create-page'
 
 import { ShellCatalogue, ShellFrame } from './shell-client'
@@ -32,6 +33,8 @@ export default function CreateShell() {
           foreground, the worker starts that refresh's request now (shell-worker.ts). Answered with the
           shell again before the last one was replaced, the tab leaves for the network page. */}
       <script dangerouslySetInnerHTML={{ __html: SHELL_BOOT }} />
+      {/* No link prefetches beside the refresh that replaces the shell (core/i18n/ui/prefetch-hold.tsx). */}
+      <script dangerouslySetInnerHTML={{ __html: BOOT_HOLD_SCRIPT }} />
       <ShellFrame>
         <TabRootHeader title={t('title')} lede={t('lede')} aside={<><GeneratingPill /><BalanceChipSlot /></>} />
         <div className="px-(--gutter) pb-2 md:max-w-[880px]">
