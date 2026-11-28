@@ -45,30 +45,56 @@ export function ownJobsFilterFrom(category: unknown, mark: unknown): OwnJobsFilt
   return mark === 'watermark' ? { watermarked: true } : null
 }
 
-// Where the user's listed works are read: the table, or under a filter own_photos_filtered
-// (migration 2039), which returns the same rows narrowed, so every query below reads either.
-function ownWorks(client: SupabaseClient, userId: string, filter: OwnJobsFilter | null, columns: string, count?: { count: 'exact' }) {
-  if (!filter) return client.from('generation_jobs').select(columns, count).eq('user_id', userId).is('deleted_at', null).is('org_access_ended_at', null)
-  const args = 'category' in filter ? { p_user: userId, p_category: filter.category } : { p_user: userId, p_watermarked: true }
-  return client.rpc('own_photos_filtered', args, count).select(columns)
+// Under a filter the rows come from own_photos_filtered (migration 2039), which takes the cursor
+// and the limit itself and reads one page through the same index; it returns generation_jobs rows.
+const filterArgs = (userId: string, filter: OwnJobsFilter) =>
+  'category' in filter ? { p_user: userId, p_category: filter.category } : { p_user: userId, p_watermarked: true }
+
+type Read = PromiseLike<{ data: unknown; error: { message: string } | null }>
+const rowsOf = async (query: Read, what: string): Promise<Row[]> => {
+  const { data, error } = await query
+  if (error) throw new AppError('INTERNAL', `${what} failed: ${error.message}`)
+  return data as Row[]
 }
 
-export async function listOwnJobs(client: SupabaseClient, userId: string, now: Date, until: OwnJobsCursor | null = null, window = MAX_WINDOW, filter: OwnJobsFilter | null = null): Promise<OwnJobs> {
+// The two reads of a list: the window from the cursor up to the newest (oldest first), and the
+// page below the cursor (newest first), one row more than a page to know whether more remain.
+function pageReads(client: SupabaseClient, userId: string, until: OwnJobsCursor | null, window: number, filter: OwnJobsFilter | null): [Read | null, Read] {
+  if (filter) {
+    const args = filterArgs(userId, filter)
+    const rpc = (more: Record<string, unknown>) => client.rpc('own_photos_filtered', { ...args, ...more }).select(JOB_COLUMNS)
+    return [
+      until ? rpc({ p_limit: window, p_from_at: until.createdAt, p_from_id: until.id }) : null,
+      rpc({ p_limit: PHOTOS_PAGE + 1, ...(until ? { p_before_at: until.createdAt, p_before_id: until.id } : {}) }),
+    ]
+  }
   const base = (ascending = false) =>
-    ownWorks(client, userId, filter, JOB_COLUMNS)
+    client
+      .from('generation_jobs')
+      .select(JOB_COLUMNS)
+      .eq('user_id', userId)
       .in('status', LISTED)
+      .is('deleted_at', null).is('org_access_ended_at', null)
       .order('created_at', { ascending })
       .order('id', { ascending })
-  const read = async (query: PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<Row[]> => {
-    const { data, error } = await query
-    if (error) throw new AppError('INTERNAL', `listOwnJobs failed: ${error.message}`)
-    return data as Row[]
-  }
+  return [until ? base(true).or(atOrAfter(until)).limit(window) : null, (until ? base().or(before(until)) : base()).limit(PHOTOS_PAGE + 1)]
+}
+
+// filter: the list narrowed (finished works only). total stays every finished work, whatever the
+// filter; how many the filter holds is listOwnPhotoCategories' count.
+export async function listOwnJobs(client: SupabaseClient, userId: string, now: Date, until: OwnJobsCursor | null = null, window = MAX_WINDOW, filter: OwnJobsFilter | null = null): Promise<OwnJobs> {
+  const [up, down] = pageReads(client, userId, until, window, filter)
   const [above, page, total] = await Promise.all([
-    until ? read(base(true).or(atOrAfter(until)).limit(window)) : Promise.resolve([] as Row[]),
-    read((until ? base().or(before(until)) : base()).limit(PHOTOS_PAGE + 1)),
-    countDone(client, userId, filter),
+    up ? rowsOf(up, 'listOwnJobs') : Promise.resolve([] as Row[]),
+    rowsOf(down, 'listOwnJobs'),
+    countDone(client, userId),
   ])
+  // The function answers a union: put each read in its own order whatever came back.
+  const newestFirst = (x: Row, y: Row) => (x.created_at === y.created_at ? (x.id < y.id ? 1 : -1) : x.created_at < y.created_at ? 1 : -1)
+  if (filter) {
+    above.sort((x, y) => -newestFirst(x, y))
+    page.sort(newestFirst)
+  }
   // next always comes from the page below the cursor, so each Load more moves one page on.
   const below = page.slice(0, PHOTOS_PAGE)
   const rows = [...above.reverse(), ...below]
@@ -82,9 +108,13 @@ export async function listOwnJobs(client: SupabaseClient, userId: string, now: D
   return { running: jobs.filter(live), done: jobs.filter((job) => job.status === 'succeeded'), total, next }
 }
 
-async function countDone(client: SupabaseClient, userId: string, filter: OwnJobsFilter | null): Promise<number> {
-  const { count, error } = await ownWorks(client, userId, filter, 'id', { count: 'exact' })
+async function countDone(client: SupabaseClient, userId: string): Promise<number> {
+  const { count, error } = await client
+    .from('generation_jobs')
+    .select('id', { count: 'exact' })
+    .eq('user_id', userId)
     .eq('status', 'succeeded')
+    .is('deleted_at', null).is('org_access_ended_at', null)
     .limit(1)
   if (error) throw new AppError('INTERNAL', `listOwnJobs count failed: ${error.message}`)
   return count ?? 0
@@ -114,12 +144,18 @@ export function decodeOwnJobsCursor(value: unknown): OwnJobsCursor | null {
 async function withWholeBatches(client: SupabaseClient, userId: string, jobs: Job[], filter: OwnJobsFilter | null = null): Promise<Job[]> {
   const batchIds = [...new Set(jobs.flatMap((job) => (job.batchId ? [job.batchId] : [])))]
   if (batchIds.length === 0) return jobs
-  const { data, error } = await ownWorks(client, userId, filter, JOB_COLUMNS)
-    .in('batch_id', batchIds)
-    .eq('status', 'succeeded')
-  if (error) throw new AppError('INTERNAL', `listOwnJobs batches failed: ${error.message}`)
+  const query: Read = filter
+    ? client.rpc('own_photos_filtered', { ...filterArgs(userId, filter), p_batches: batchIds, p_limit: MAX_WINDOW }).select(JOB_COLUMNS)
+    : client
+        .from('generation_jobs')
+        .select(JOB_COLUMNS)
+        .eq('user_id', userId)
+        .in('batch_id', batchIds)
+        .eq('status', 'succeeded')
+        .is('deleted_at', null).is('org_access_ended_at', null)
+  const data = await rowsOf(query, 'listOwnJobs batches')
   const seen = new Set(jobs.map((job) => job.id))
-  return [...jobs, ...(data as unknown as Row[]).map((row) => jobRowSchema.parse(row)).filter((job) => !seen.has(job.id))]
+  return [...jobs, ...data.map((row) => jobRowSchema.parse(row)).filter((job) => !seen.has(job.id))]
 }
 
 // What the filter offers: each category the user has finished works in (an edit counts with the

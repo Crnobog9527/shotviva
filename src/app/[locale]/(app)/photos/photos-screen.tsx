@@ -11,7 +11,7 @@ import { logger } from '@/core/logger'
 import { r2Origin, r2Store } from '@/core/storage'
 import { cachedPosterTemplates, cachedWebTemplates, EDIT_TEMPLATE_ID } from '@/core/templates'
 import { readCompanySeat } from '@/core/org/works'
-import { DoneGrid, offersFilter, PhotoFilterRail, PhotosCount, photosHref, toPhotoItem, type TemplateLookup } from '@/modules/image'
+import { DoneGrid, heldBy, offersFilter, PhotoFilterRail, PhotosCount, photosHref, toPhotoItem, type TemplateLookup } from '@/modules/image'
 
 import { CompanyPhotos } from './company-screen'
 import { createWorkShareAction } from './share-actions'
@@ -43,15 +43,18 @@ async function Photos({ back, until, member, category, mark }: Asked) {
   // personal list is read alongside, not after, so nobody else waits for the seat check; a
   // company member's copy of it is dropped.
   // The first screen's small copies are signed while the templates are still being read.
-  // What the filter offers is read alongside. Without it the page still lists (no rail).
-  const offered = listOwnPhotoCategories(db, user.id).catch((error: unknown) => {
-    logger.error('photos.categories_failed', { error })
-    return [] as OwnPhotoCategory[]
-  })
   const works = listOwnJobs(db, user.id, now, cursor, undefined, filter).then(async (own) => ({ own, signed: await firstThumbUrls(r2Store, own.done, FIRST_SCREEN_THUMBS, 'tile') }))
   works.catch(() => undefined)
   const locale = await currentLocale()
-  const [seat, templates, posters] = await Promise.all([readCompanySeat(db, user.id), cachedWebTemplates(locale, true), cachedPosterTemplates(locale)])
+  const seated = readCompanySeat(db, user.id)
+  // What the filter offers: read once the seat check says this is a personal page (a company
+  // member's page never asks), while the templates are still coming. Without it the page still
+  // lists, with no rail.
+  const offered = seated.then((seat) => (seat ? [] : listOwnPhotoCategories(db, user.id))).catch((error: unknown) => {
+    logger.error('photos.categories_failed', { error })
+    return [] as OwnPhotoCategory[]
+  })
+  const [seat, templates, posters] = await Promise.all([seated, cachedWebTemplates(locale, true), cachedPosterTemplates(locale)])
   const tp = await getTranslations('app.photos')
   const fallback = tp('fallbackName')
   // Poster templates are outside the catalogue (ARCHITECTURE §5.3) but name their works too.
@@ -65,13 +68,13 @@ async function Photos({ back, until, member, category, mark }: Asked) {
     return <CompanyPhotos db={db} userId={user.id} seat={seat} now={now} timeZone={timeZone} filter={(await member) ?? null} until={cursor} lookup={lookup} liveTemplates={liveTemplates} covers={covers} />
   }
   const [{ own, signed }, categories] = await Promise.all([works, offered])
-  // Every finished work, whatever the filter: the header's count.
-  const all = categories.reduce((sum, c) => sum + c.works, 0) || own.total
   const running = own.running.map((job) => toPhotoItem(job, lookup, null, fallback))
   const done = own.done.map((job) => toPhotoItem(job, lookup, fileUrlFor(job.id), fallback, signed.get(job.id)))
+  // How many works the filter holds: the chip's own count (what is listed, if the chips failed).
+  const held = filter ? (heldBy(categories, filter) ?? done.length) : own.total
   return (
     <>
-      <Header aside={<PhotosCount runningIds={running.map((item) => item.id)} done={all} />} />
+      <Header aside={<PhotosCount runningIds={running.map((item) => item.id)} done={own.total} />} />
       <DoneGrid
         items={done}
         now={now}
@@ -80,7 +83,7 @@ async function Photos({ back, until, member, category, mark }: Asked) {
         running={filter ? null : { server: running, covers }}
         liveTemplates={liveTemplates}
         share={createWorkShareAction}
-        total={own.total}
+        total={held}
         more={own.next ? photosHref(filter, encodeOwnJobsCursor(own.next)) : null}
         rail={offersFilter(categories, filter) ? { filter: <PhotoFilterRail categories={categories} current={filter} />, emptyNote: tp('filter.empty') } : undefined}
       />

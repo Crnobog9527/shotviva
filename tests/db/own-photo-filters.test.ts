@@ -62,10 +62,59 @@ describe('Photos by category', () => {
     expect(await ids(user, null)).toEqual([d2, p1, d1])
     expect(await chips(user)).toEqual([[A, 2, 0], [B, 1, 0]])
     const page = await listOwnJobs(rest, user, new Date(), null, undefined, { category: A })
-    expect(page.total).toBe(2)
+    // total stays every finished work; the filter's own count is the chip's.
+    expect(page.total).toBe(3)
     expect(page.running).toEqual([])
     // A category the person never used: nothing, not an error.
     expect(await ids(user, { category: 'no-such-category' })).toEqual([])
+  })
+
+  it('reads one page at a time from the cursor, in the function itself', async () => {
+    const user = await person()
+    const made5: string[] = []
+    for (let i = 0; i < 5; i += 1) {
+      made5.push(await made(user, dish))
+      await made(user, poster)
+    }
+    const newest = [...made5].reverse()
+    const call = async (args: Record<string, unknown>) => {
+      const { data, error } = await rest.rpc('own_photos_filtered', { p_user: user, p_category: A, ...args }).select('id, created_at')
+      if (error) throw new Error(error.message)
+      return data as { id: string; created_at: string }[]
+    }
+    // The first page: p_limit rows, never the whole history.
+    const first = await call({ p_limit: 2 })
+    expect(first.map((row) => row.id)).toEqual(newest.slice(0, 2))
+    // The page older than the cursor.
+    const cursor = first[1]!
+    const second = await call({ p_limit: 2, p_before_at: cursor.created_at, p_before_id: cursor.id })
+    expect(second.map((row) => row.id)).toEqual(newest.slice(2, 4))
+    // From the cursor up to the newest, nearest the cursor first.
+    const up = await call({ p_limit: 2, p_from_at: second[0]!.created_at, p_from_id: second[0]!.id })
+    expect(up.map((row) => row.id)).toEqual([newest[2], newest[1]])
+    // Load more's list: down to the cursor plus the page below it, nothing twice, nothing missing.
+    const { encodeOwnJobsCursor, decodeOwnJobsCursor } = await import('@/core/jobs')
+    const until = decodeOwnJobsCursor(encodeOwnJobsCursor({ createdAt: cursor.created_at, id: cursor.id }))
+    expect((await listOwnJobs(rest, user, new Date(), until, undefined, { category: A })).done.map((job) => job.id)).toEqual(newest)
+    // The cap holds whatever is asked.
+    expect((await call({ p_limit: 100000 })).length).toBe(5)
+    expect((await call({ p_limit: 0 })).length).toBe(1)
+  })
+
+  it('completes a batch the page cut with its photos the filter keeps only', async () => {
+    const user = await person()
+    const batch = randomUUID()
+    const inBatch = async (template: string) => {
+      const id = await made(user, template)
+      await db.query('update public.generation_jobs set batch_id = $2 where id = $1', [id, batch])
+      return id
+    }
+    const d1 = await inBatch(dish)
+    const p1 = await inBatch(poster)
+    const { data, error } = await rest.rpc('own_photos_filtered', { p_user: user, p_category: A, p_batches: [batch], p_limit: 1000 }).select('id')
+    expect(error).toBeNull()
+    expect((data as { id: string }[]).map((row) => row.id)).toEqual([d1])
+    expect(p1).not.toBe(d1)
   })
 
   it('counts an edit, and an edit of an edit, with the work it started from', async () => {
@@ -107,7 +156,7 @@ describe('Photos by category', () => {
   })
 
   it('is closed to browsers', async () => {
-    for (const fn of ['own_photo_roots(uuid)', 'own_photo_categories(uuid)', 'own_photos_filtered(uuid, text, boolean)']) {
+    for (const fn of ['own_photo_edit_root(uuid, text, uuid)', 'own_photo_categories(uuid)', 'own_photos_filtered(uuid, text, boolean, integer, timestamptz, uuid, timestamptz, uuid, uuid[])']) {
       const { rows } = await db.query(
         `select has_function_privilege('anon', $1, 'execute') as anon, has_function_privilege('authenticated', $1, 'execute') as authed, has_function_privilege('service_role', $1, 'execute') as service`,
         [`public.${fn}`],

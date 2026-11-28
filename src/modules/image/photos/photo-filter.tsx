@@ -21,6 +21,12 @@ export function offersFilter(categories: readonly OwnPhotoCategory[], filter: Ow
   return categories.filter((c) => !c.system).length > 1 || (marked > 0 && marked < total)
 }
 
+// How many works a filter holds, by the chips' counts; null when they do not know the category.
+export function heldBy(categories: readonly OwnPhotoCategory[], filter: OwnJobsFilter): number | null {
+  if ('watermarked' in filter) return categories.reduce((sum, c) => sum + c.watermarked, 0)
+  return categories.find((c) => c.key === filter.category)?.works ?? null
+}
+
 export function PhotoFilterRail({ categories, current }: { categories: readonly OwnPhotoCategory[]; current: OwnJobsFilter | null }) {
   const t = useTranslations('app.photos.filter')
   const zh = useLocale() === 'zh'

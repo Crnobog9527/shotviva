@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { ownJobsFilterFrom, type OwnPhotoCategory } from '@/core/jobs'
 
-import { offersFilter, photosHref } from './photo-filter'
+import { heldBy, offersFilter, photosHref } from './photo-filter'
 
 const cat = (key: string, works: number, watermarked = 0, system = false): OwnPhotoCategory => ({ key, nameEn: key, nameZh: key, system, works, watermarked })
 
@@ -32,5 +32,12 @@ describe('Photos filter', () => {
     expect(offersFilter([cat('food', 5, 5)], null)).toBe(false)
     // A chosen filter always keeps the rail, so the way back to All is there.
     expect(offersFilter([], { category: 'food' })).toBe(true)
+  })
+
+  it('knows how many works a filter holds from the chips', () => {
+    const chips = [cat('food', 5, 2), cat('pets', 1, 1)]
+    expect(heldBy(chips, { category: 'food' })).toBe(5)
+    expect(heldBy(chips, { watermarked: true })).toBe(3)
+    expect(heldBy(chips, { category: 'gone' })).toBeNull()
   })
 })
