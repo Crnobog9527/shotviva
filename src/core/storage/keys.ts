@@ -102,9 +102,16 @@ export function workThumbKeyFor(userId: string, jobId: string, pool: 'free' | 'p
   return pool === 'free' ? `outputs/${userId}/${jobId}-thumb-p1.webp` : `outputs/${userId}/${jobId}-thumb.webp`
 }
 
-// Every list copy a work may have (current and retired), for deleting the work.
+// The smaller copy Photos' dense grid shows (ARCHITECTURE §8.3「作品小图」), kept like the list copy:
+// a free work's is cut from its protected list copy, under its own key.
+export function workTileKeyFor(userId: string, jobId: string, pool: 'free' | 'paid'): string {
+  return pool === 'free' ? `outputs/${userId}/${jobId}-tile-p1.webp` : `outputs/${userId}/${jobId}-tile.webp`
+}
+
+// Every list and tile copy a work may have (current and retired), for deleting the work.
 export function workThumbKeysFor(userId: string, jobId: string): string[] {
-  return [workThumbKeyFor(userId, jobId, 'paid'), workThumbKeyFor(userId, jobId, 'free')]
+  const pools = ['paid', 'free'] as const
+  return [...pools.map((pool) => workThumbKeyFor(userId, jobId, pool)), ...pools.map((pool) => workTileKeyFor(userId, jobId, pool))]
 }
 
 export function protectedCopyKeyFor(userId: string, jobId: string): string {

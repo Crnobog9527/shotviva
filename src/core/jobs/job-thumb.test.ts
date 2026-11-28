@@ -102,6 +102,49 @@ describe('resolveJobThumb for a free work made before 2026-11-22', () => {
   })
 })
 
+// The tile Photos' grid shows (2026-11-28): the same rules, cut from the list copy.
+describe('resolveJobThumb, tile', () => {
+  const TILE = `outputs/u1/${job.id}-tile.webp`
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.findOwnJob.mockResolvedValue(job)
+  })
+
+  it('signs the tile that exists without reading anything', async () => {
+    const r2 = createMemoryStore()
+    r2.upload(TILE, text('tile'), 'image/webp')
+    const get = vi.spyOn(r2.store, 'get')
+    expect(await resolveJobThumb({ db, store: r2.store }, req, 'tile')).toBe(`memory://get/${TILE}?expires=300`)
+    expect(get).not.toHaveBeenCalled()
+  })
+
+  it('cuts a missing tile from the list copy, not from the full output', async () => {
+    const r2 = createMemoryStore()
+    r2.upload(job.outputKey!, await png(1600, 2000), 'image/png')
+    r2.upload(THUMB, await sharp(await png(480, 600)).webp().toBuffer(), 'image/webp')
+    const get = vi.spyOn(r2.store, 'get')
+    expect(await resolveJobThumb({ db, store: r2.store }, req, 'tile')).toBe(`memory://get/${TILE}?expires=300`)
+    expect(get.mock.calls.map(([key]) => key)).toEqual([THUMB])
+    expect(await sharp(r2.objects.get(TILE)!.body).metadata()).toMatchObject({ format: 'webp', width: 320, height: 400 })
+  })
+
+  it('makes the list copy first when the work has neither, and a free work\'s tile comes from its protected copy', async () => {
+    const r2 = createMemoryStore()
+    r2.upload(job.outputKey!, await png(800, 1000), 'image/png')
+    mocks.findOwnJob.mockResolvedValue({ ...job, creditPool: 'free' })
+    expect(await resolveJobThumb({ db, store: r2.store }, req, 'tile')).toBe(`memory://get/outputs/u1/${job.id}-tile-p1.webp?expires=300`)
+    expect(r2.objects.has(FREE_THUMB)).toBe(true)
+    expect(r2.objects.has(TILE)).toBe(false)
+  })
+
+  it('answers the list copy when the tile cannot be written, and the full file when nothing can', async () => {
+    const r2 = createMemoryStore()
+    r2.upload(THUMB, text('not an image'), 'image/webp')
+    expect(await resolveJobThumb({ db, store: r2.store }, req, 'tile')).toBe(SIGNED)
+    expect(await resolveJobThumb({ db, store: createMemoryStore().store }, req, 'tile')).toBe(`/api/files/${job.id}`)
+  })
+})
+
 describe('firstThumbUrls', () => {
   const jobs = ['a', 'b', 'c'].map((id) => ({ id, userId: 'u1', creditPool: 'paid' as const }))
 
@@ -117,6 +160,13 @@ describe('firstThumbUrls', () => {
     // Nothing is made here: a missing copy is the thumbnail route's job.
     expect(get).not.toHaveBeenCalled()
     expect([...(await firstThumbUrls(() => r2.store, jobs, 1)).keys()]).toEqual(['a'])
+  })
+
+  it('signs tiles when asked for them, only where the tile exists', async () => {
+    const r2 = createMemoryStore()
+    r2.upload('outputs/u1/a-thumb.webp', text('thumb'), 'image/webp')
+    r2.upload('outputs/u1/b-tile.webp', text('tile'), 'image/webp')
+    expect([...(await firstThumbUrls(() => r2.store, jobs, 12, 'tile'))]).toEqual([['b', 'memory://get/outputs/u1/b-tile.webp?expires=300']])
   })
 
   it('signs a free work’s protected copy, never its older one', async () => {
