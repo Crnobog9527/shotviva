@@ -9,6 +9,7 @@ import { DEFAULT_LOCALE, isLocale } from '../locales'
 import { Link as IntlLink } from '../navigation'
 import { localizePath, matchesPaths } from '../paths'
 import { useLinkPrefetchOff } from './link-prefetch'
+import { useLinkPrefetchHeld } from './prefetch-hold'
 import { useTranslatedPaths } from './translated-paths'
 
 type Props = ComponentProps<typeof IntlLink>
@@ -33,6 +34,8 @@ export function Link({ locale, href, prefetch, ...rest }: Props) {
   const paths = useTranslatedPaths()
   // On public pages, click-only unless the caller asks (link-prefetch.tsx).
   const prefetchOff = useLinkPrefetchOff()
+  // Not ahead of the click while the page still waits for its own data (prefetch-hold.tsx).
+  const held = useLinkPrefetchHeld()
   const motion = useMotionTypes(href, locale, rest)
   // Never prefetched: the target sits under the other language's root, so the click is a full
   // page load and a prefetch could not be used; asking for it sent the router into a loop
@@ -40,7 +43,7 @@ export function Link({ locale, href, prefetch, ...rest }: Props) {
   // segments for /terms, /privacy and /refund-policy many times a second), and the English
   // page's payload preloads Instrument Serif, which a Chinese page then downloaded for nothing.
   if (leavesForEnglish(href, locale, current, paths)) return <NextLink href={href} {...rest} prefetch={false} />
-  const linkPrefetch = prefetch ?? (prefetchOff ? false : undefined)
+  const linkPrefetch = held ? false : (prefetch ?? (prefetchOff ? false : undefined))
   // next-intl writes `/#templates` as `/zh/#templates`; the home page's anchors and queries keep
   // the no-trailing-slash rule (建站规格 R4): `/zh#templates`.
   if (!locale && isLocale(current) && current !== DEFAULT_LOCALE && typeof href === 'string' && /^\/[#?]/.test(href)) {
