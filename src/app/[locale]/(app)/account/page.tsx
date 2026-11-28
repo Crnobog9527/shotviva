@@ -88,12 +88,13 @@ async function Account() {
   )
 }
 
-// An active member's (and the owner's) own invite code earns no personal invitee or inviter reward
-// while the org is active (2032), so the personal invite card would promise rewards that do not
-// come. They promote with the org's links instead.
+// An org member's (and the owner's) own invite code earns no personal invitee or inviter reward
+// while the org is active (2032) or runs the affiliate program (2035, A2: then the code is the
+// org's), so the personal invite card would promise rewards that do not come. They promote with
+// the org's links instead.
 function orgInvites(view: Awaited<ReturnType<typeof readOrgView>>) {
-  if (view.kind === 'member') return view.status === 'active'
-  return view.kind === 'owner' && view.org.status === 'active'
+  if (view.kind === 'member') return view.status === 'active' || view.withAffiliate
+  return view.kind === 'owner' && (view.org.status === 'active' || view.org.affiliateEnabled)
 }
 
 // The enterprise block (ARCHITECTURE §6.5, card E4): the owner gets a row into their console, a
@@ -131,11 +132,10 @@ async function OwnerCustomerLink({ user }: { user: string }) {
 }
 
 // Only an org that runs the affiliate program gives its members a promotion link: one bought just as
-// a production tool has no customers to bring (Owner 2026-11-28). And only while its workspace is
-// on: a staff code binds customers to the org only then (_invite_code_org), so with it off the
-// code is a personal invite and the personal card below shows it.
+// a production tool has no customers to bring (Owner 2026-11-28). Workspace on or off: a staff code
+// binds customers to the org whenever the affiliate program is on (2035, A2).
 function memberLinkFor(view: Awaited<ReturnType<typeof readOrgView>>, user: string) {
-  return view.kind === 'member' && view.withAffiliate && view.status === 'active' ? <Suspense fallback={null}><MemberLink user={user} /></Suspense> : null
+  return view.kind === 'member' && view.withAffiliate ? <Suspense fallback={null}><MemberLink user={user} /></Suspense> : null
 }
 
 // Streams in too: a member's promotion link, their own invite code on the page's language.
