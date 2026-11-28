@@ -2,17 +2,19 @@
 
 import { useEffect, useRef, useState } from 'react'
 
+import { restoreCells, snapshotCells, type CellField, type CellSnapshot } from './cell-edits'
 import type { CellKey, MatrixValues } from './matrix-state'
 import type { MatrixDraft } from './use-matrix-draft'
 
 export type BulkDone = 'doneNote' | 'doneTier' | 'doneSkip' | 'doneRestore' | 'doneCopy'
-export type UndoOffer = { done: BulkDone; count: number; before: MatrixValues }
+export type UndoOffer = { done: BulkDone; count: number; snapshot: CellSnapshot }
 
 // How long the "done · Undo" line stays after a change to several results.
 export const UNDO_MS = 6000
 
 // The review list's selection and its one-step undo (Owner 2026-11-28): pick rows (one by one, a
-// group, all), change them together, and take the change back if it hit the wrong rows.
+// group, all), change them together, and take the change back if it hit the wrong rows. Undo
+// restores only the field the change wrote, on the rows it wrote, never the whole batch.
 export function useBulk(draft: MatrixDraft) {
   const [picked, setPicked] = useState<ReadonlySet<CellKey>>(new Set())
   const [undo, setUndo] = useState<UndoOffer | null>(null)
@@ -27,10 +29,10 @@ export function useBulk(draft: MatrixDraft) {
     else next.delete(key)
     setPicked(next)
   }
-  const apply = (done: BulkDone, keys: readonly CellKey[], edit: (values: MatrixValues) => MatrixValues) => {
-    const before = draft.values
+  const apply = (done: BulkDone, keys: readonly CellKey[], field: CellField, edit: (values: MatrixValues) => MatrixValues) => {
+    const snapshot = snapshotCells(draft.values, keys, field)
     draft.change(edit)
-    setUndo({ done, count: keys.length, before })
+    setUndo({ done, count: keys.length, snapshot })
     if (timer.current) clearTimeout(timer.current)
     timer.current = setTimeout(() => setUndo(null), UNDO_MS)
   }
@@ -43,7 +45,7 @@ export function useBulk(draft: MatrixDraft) {
     undo,
     takeBack: () => {
       if (!undo) return
-      draft.setValues(() => undo.before)
+      draft.change((values) => restoreCells(values, undo.snapshot))
       setUndo(null)
     },
   }

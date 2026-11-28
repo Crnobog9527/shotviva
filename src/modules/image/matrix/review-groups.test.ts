@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { CatalogueTemplate } from '../catalogue/catalogue-template'
 import type { BatchPhoto } from '../workspace/photo-batch'
 import { mergedNote, cellTier, batchTiers } from './cell-choices'
-import { withBatchTier, withNote, withNotes, withRemoved, withTiers } from './cell-edits'
+import { restoreCells, snapshotCells, withBatchTier, withNote, withNotes, withRemoved, withTiers } from './cell-edits'
 import { cellKey, EMPTY_MATRIX, matrixCells } from './matrix-state'
 import { groupSummary, initiallyOpen, reviewGroups, samePhoto, sameTemplate, tierTargets } from './review-groups'
 
@@ -50,6 +50,22 @@ describe('editing results one by one or together', () => {
     expect(withBatchTier(v, '2k')).toMatchObject({ resolution: '2k', tiers: {} })
     v = withRemoved(v, [k1, k2], true)
     expect(withRemoved(v, [k1], false).removed).toEqual([k2])
+  })
+})
+
+describe('undoing a bulk change', () => {
+  it('puts back only the field it wrote, on the rows it wrote, keeping edits made since', () => {
+    const k1 = cellKey('a', 'p1')
+    const k2 = cellKey('a', 'p2')
+    const k3 = cellKey('a', 'p3')
+    const start = withRemoved(withNote(EMPTY_MATRIX, k1, 'less sauce'), [k2], true)
+    const notes = snapshotCells(start, [k1, k2], 'notes')
+    let v = withNotes(start, [k1, k2], 'same table', 'replace')
+    // Since then: another row's note, and a tier on a row the change wrote.
+    v = withTiers(withNote(v, k3, 'crisper'), [k1], '4k')
+    expect(restoreCells(v, notes)).toMatchObject({ notes: { [k1]: 'less sauce', [k3]: 'crisper' }, tiers: { [k1]: '4k' }, removed: [k2] })
+    const skips = snapshotCells(v, [k1, k2], 'removed')
+    expect(restoreCells(withRemoved(v, [k1, k2], false), skips).removed).toEqual([k2])
   })
 })
 
