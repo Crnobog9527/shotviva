@@ -1213,7 +1213,7 @@
       "badgeAria": "{count} 张生成中",
       "pill": "{count, plural, =1 {生成中…} other {# 张生成中…}}",
       "tileMeta": "{size} · {tier}",
-      "company": {"all": "全部", "mine": "我", "personal": "个人作品", "owner": "主管理员", "deleted": "已注销成员", "unknown": "账号", "left": "{who}（已离开）", "leftMark": "已离开", "filterLabel": "按出图人查看", "madeBy": "{who} · {date}", "download": "下载原图", "viewOnly": "这是同事的作品，可以查看和下载。", "empty": "公司里还没有人生成作品。", "emptyFilter": "这里还没有作品。"},
+      "company": {"close": "关闭", "all": "全部", "mine": "我", "personal": "个人作品", "owner": "主管理员", "deleted": "已注销成员", "unknown": "账号", "left": "{who}（已离开）", "leftMark": "已离开", "filterLabel": "按出图人查看", "madeBy": "{who} · {date}", "download": "下载原图", "viewOnly": "这是同事的作品，可以查看和下载。", "empty": "公司里还没有人生成作品。", "emptyFilter": "这里还没有作品。"},
       "dayCount": "{count} 张",
       "runningMeta": "{size} · {tier} · {count} 积分",
       "waiting": "排队中，等空位",
