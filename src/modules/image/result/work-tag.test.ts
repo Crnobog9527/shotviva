@@ -12,3 +12,13 @@ describe('workTagKey', () => {
     expect(workTagKey('paid', 'public')).toBe('public')
   })
 })
+
+describe('workMarkKey', () => {
+  it('marks only what is not a private, clean work', async () => {
+    const { workMarkKey } = await import('./work-tag')
+    expect(workMarkKey('paid', 'private')).toBeNull()
+    expect(workMarkKey('paid', 'public')).toBe('public')
+    expect(workMarkKey('free', 'public')).toBe('public')
+    expect(workMarkKey('free', 'private')).toBe('watermark')
+  })
+})

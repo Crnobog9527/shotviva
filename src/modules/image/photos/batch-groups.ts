@@ -40,20 +40,32 @@ function batchOrder(a: PhotoItem, b: PhotoItem): number {
   return a.createdAt.localeCompare(b.createdAt)
 }
 
-// The Done list cut into calendar months (UTC, as Photos counts days), newest first: a batch
-// sits in the month of its newest photo, where it stands in the list. key is "2026-11".
-export type MonthSection = { key: string; first: string; entries: DoneEntry[] }
+// The Done list cut into calendar days in the viewer's time zone, newest first (2026-11-28; it
+// was cut by month, which told nothing while every work was a few weeks old): a batch sits in
+// the day of its newest photo, where it stands in the list. key is "2026-11-28"; count is the
+// photos in the section, a batch counted by its photos.
+export type DaySection = { key: string; first: string; entries: DoneEntry[]; count: number }
 
-export function groupByMonth(entries: readonly DoneEntry[]): MonthSection[] {
-  const sections: MonthSection[] = []
+export function groupByDay(entries: readonly DoneEntry[], timeZone: string): DaySection[] {
+  const dayOf = dayKeyIn(timeZone)
+  const sections: DaySection[] = []
   for (const entry of entries) {
     const first = entry.kind === 'photo' ? entry.item.createdAt : newest(entry.items)
-    const key = first.slice(0, 7)
+    const size = entry.kind === 'photo' ? 1 : entry.items.length
+    const key = dayOf(first)
     const last = sections.at(-1)
-    if (last?.key === key) last.entries.push(entry)
-    else sections.push({ key, first, entries: [entry] })
+    if (last?.key === key) {
+      last.entries.push(entry)
+      last.count += size
+    } else sections.push({ key, first, entries: [entry], count: size })
   }
   return sections
+}
+
+// "2026-11-28" for an instant, in `timeZone` (en-CA writes dates that way). One formatter per list.
+export function dayKeyIn(timeZone: string): (iso: string | Date) => string {
+  const format = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' })
+  return (iso) => format.format(typeof iso === 'string' ? new Date(iso) : iso)
 }
 
 const newest = (items: readonly PhotoItem[]) => items.reduce((a, item) => (item.createdAt > a ? item.createdAt : a), items[0]!.createdAt)

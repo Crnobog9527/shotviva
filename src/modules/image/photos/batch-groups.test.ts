@@ -39,17 +39,24 @@ describe('groupByBatch', () => {
   })
 })
 
-describe('groupByMonth', () => {
-  it('cuts the list into months, a batch in the month of its newest photo', async () => {
-    const { groupByMonth } = await import('./batch-groups')
+describe('groupByDay', () => {
+  it('cuts the list into days in the viewer\'s zone, a batch in the day of its newest photo', async () => {
+    const { groupByDay } = await import('./batch-groups')
     const list = [
       item('n', '2026-11-02T10:00:00Z', null),
       item('b2', '2026-11-01T00:10:00Z', 'B'),
       item('b1', '2026-10-31T23:50:00Z', 'B'),
-      item('o', '2026-10-20T10:00:00Z', null),
+      item('o', '2026-10-31T10:00:00Z', null),
       item('s', '2026-09-01T10:00:00Z', null),
     ]
-    const months = groupByMonth(groupByBatch(list))
-    expect(months.map((m) => [m.key, m.entries.length])).toEqual([['2026-11', 2], ['2026-10', 1], ['2026-09', 1]])
+    const days = groupByDay(groupByBatch(list), 'UTC')
+    expect(days.map((d) => [d.key, d.entries.length, d.count])).toEqual([['2026-11-02', 1, 1], ['2026-11-01', 1, 2], ['2026-10-31', 1, 1], ['2026-09-01', 1, 1]])
+  })
+
+  // 23:50 UTC on the 31st is 07:50 on the 1st in Shanghai: the same day as the 00:10 UTC photo.
+  it('counts the day where the viewer is, not in UTC', async () => {
+    const { groupByDay } = await import('./batch-groups')
+    const list = [item('a', '2026-11-01T00:10:00Z', null), item('b', '2026-10-31T23:50:00Z', null), item('c', '2026-10-31T15:00:00Z', null)]
+    expect(groupByDay(groupByBatch(list), 'Asia/Shanghai').map((d) => [d.key, d.count])).toEqual([['2026-11-01', 2], ['2026-10-31', 1]])
   })
 })
