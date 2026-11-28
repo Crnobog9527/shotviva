@@ -9,6 +9,7 @@ import type { OwnerConsole } from '../console/types'
 import type { OwnerActions } from './actions'
 import { Confirm } from './confirm'
 import { FIELD, Result } from './parts'
+import { orgShowsPromo } from './promo-visibility'
 import { useConsoleAction } from './use-console-action'
 
 const digits = (raw: string) => raw.replace(/\D/g, '').slice(0, 10)
@@ -61,6 +62,8 @@ export function DefaultsForm({ data, actions }: { data: OwnerConsole; actions: O
   const changed = change.paid !== undefined || change.promo !== undefined
   const suspended = data.org.status === 'suspended'
   const lines = confirmLines(data, change, t, format)
+  // Without promotion credits the promotion default is not shown, so it is never changed or sent.
+  const promoShown = orgShowsPromo(data.org)
   return (
     <form
       className="grid gap-2 rounded-md border border-hairline p-3"
@@ -74,7 +77,7 @@ export function DefaultsForm({ data, actions }: { data: OwnerConsole; actions: O
       <p className="text-caption text-muted-foreground">{t('hint')}</p>
       <div className="grid grid-cols-2 gap-3">
         <label className="grid gap-1 text-label"><span>{t('paid')}</span><input className={FIELD} inputMode="numeric" value={paid} onChange={(e) => setPaid(digits(e.target.value))} /></label>
-        <label className="grid gap-1 text-label"><span>{t('promo')}</span><input className={FIELD} inputMode="numeric" value={promo} onChange={(e) => setPromo(digits(e.target.value))} /></label>
+        {promoShown ? <label className="grid gap-1 text-label"><span>{t('promo')}</span><input className={FIELD} inputMode="numeric" value={promo} onChange={(e) => setPromo(digits(e.target.value))} /></label> : null}
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" size="touch" variant="glass" disabled={pending || !changed || suspended}>{t('save')}</Button>

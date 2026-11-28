@@ -15,6 +15,7 @@ import type { OwnerActions } from './actions'
 import { RefCodeBox } from './ref-code-box'
 import { TransferContactButton } from './transfer-contact'
 import { FIELD, Panel, Result, Stat } from './parts'
+import { orgShowsPromo } from './promo-visibility'
 import { useConsoleAction } from './use-console-action'
 
 // The owner's console, panel by panel (ARCHITECTURE §6.5): pool and deposit, packages, bank
@@ -23,9 +24,7 @@ import { useConsoleAction } from './use-console-action'
 export function PoolPanel({ data, actions }: { data: OwnerConsole; actions: OwnerActions }) {
   const t = useTranslations('app.org.pool')
   const format = useFormatter()
-  // Promotion credits come only with the affiliate program (1842); an org that just left it keeps
-  // showing what is left until the month-end expiry.
-  const promo = data.org.affiliateEnabled || data.org.promoPoolCredits > 0
+  const promo = orgShowsPromo(data.org)
   return (
     <Panel title={t('title')} hint={t(promo ? 'hint' : 'hintPaidOnly')}>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
