@@ -1863,8 +1863,7 @@
         "promoNone": "No promotion credits this month",
         "promoHint": "Images made with promotion credits are watermarked, public and not for commercial use. What is left in the pool and with members goes at the end of the month (UTC).",
         "hintPaidOnly": "The credits you buy are held here. Give them to members, who spend them on their own generations.",
-        "purchaseNote": "What you buy while the company is active goes straight into the pool. These purchases can't be refunded by yourself; for a refund, contact support.",
-        "purchaseNoteOff": "While the company workspace is off, what you buy goes to your own account, not the pool."
+        "purchaseNote": "What you buy while the company is active goes straight into the pool. These purchases can't be refunded by yourself; for a refund, contact support."
       },
       "packages": {
         "title": "Company packages",
@@ -1889,6 +1888,7 @@
         "resetDone": "New link ready.",
         "cancel": "Cancel",
         "warning": "Don't send it to customers. A customer who opens it joins your company as staff instead of counting as a customer you referred.",
+        "warningNoAffiliate": "Don't pass it on. Anyone who opens it joins your company as staff and can be given its credits.",
         "toAffiliate": "To invite customers, use the customer referral link in Company affiliate"
       },
       "members": {
@@ -2173,7 +2173,7 @@
         "given": "Gave {total} to {count}.",
         "allowanceConfirmPaidOnly": "This replaces their monthly allowances."
       },
-      "workspaceOffBanner": "The company workspace is not active: the pool, member allowances and staff link are off, and the people and credits already here stay as they are. Customer referrals and commissions in Company affiliate carry on as usual. Contact us to turn the workspace on."
+      "workspaceOffBanner": "The company workspace is not active: the pool, member allowances and staff link are off, and the people already here keep the credits they hold. Commissions on customers already linked to the company carry on, and new customers who sign up through the customer referral link in Company affiliate are still linked to the company. Contact us to turn the workspace on."
     },
     "templateShare": {
       "modeOff": "Share templates",
