@@ -18,8 +18,8 @@ const SECTIONS: readonly { id: EnterpriseSection; href: string; label: 'affiliat
   { id: 'purchasing', href: '/account/enterprise/purchasing', label: 'purchasing' },
 ]
 
-// A member's sections (Owner 2026-11-23): their own view of the org (the same address as the
-// owner's workspace) and 企业作品, which every active member sees.
+// A member's sections: their customers (the same address as the owner's workspace; only with the
+// affiliate program, Owner 2026-11-28) and 企业作品, which every active member sees.
 const MEMBER_SECTIONS: readonly { id: EnterpriseSection; href: string; label: 'mine' | 'works' }[] = [
   { id: 'workspace', href: '/account/enterprise', label: 'mine' },
   { id: 'works', href: '/account/enterprise/works', label: 'works' },
@@ -28,7 +28,7 @@ const MEMBER_SECTIONS: readonly { id: EnterpriseSection; href: string; label: 'm
 export type EnterpriseRole = 'owner' | 'member'
 
 export function enterpriseSections(affiliate: boolean, role: EnterpriseRole = 'owner') {
-  if (role === 'member') return MEMBER_SECTIONS
+  if (role === 'member') return MEMBER_SECTIONS.filter((section) => affiliate || section.id !== 'workspace')
   return SECTIONS.filter((section) => affiliate || section.id !== 'affiliate')
 }
 
@@ -57,7 +57,8 @@ export function EnterpriseFrame({ orgName, current, affiliate, role = 'owner', i
     <div className="mx-(--gutter) mt-4 grid gap-4 lg:mt-8 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-x-10 lg:gap-y-8">
       <EnterpriseHeader orgName={orgName} intro={intro} className="lg:col-span-2" />
       <aside className="max-lg:contents lg:sticky lg:top-[80px] lg:self-start">
-        <SectionNav current={current} affiliate={affiliate} role={role} subnav={subnav} />
+        {/* One section is no navigation: a member without the affiliate program has 企业作品 only. */}
+        {enterpriseSections(affiliate, role).length > 1 ? <SectionNav current={current} affiliate={affiliate} role={role} subnav={subnav} /> : subnav}
       </aside>
       <div className="min-w-0 space-y-4">{children}</div>
     </div>

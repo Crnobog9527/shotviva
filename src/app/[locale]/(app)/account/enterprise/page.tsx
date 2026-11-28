@@ -1,8 +1,10 @@
 import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 import { getTranslations } from 'next-intl/server'
 
 import { AppPage } from '@/core/app-shell'
+import { localized } from '@/core/i18n/server'
 import { maskPhone } from '@/core/auth/phone'
 import { readOwnerReport, type StaffCard } from '@/core/org/console'
 import { BillingProfilePanel, EnterpriseFrame, MemberOrgView, OwnerConsoleView, type OwnerActions } from '@/core/org/ui'
@@ -41,7 +43,12 @@ const actions: OwnerActions = {
 // for a member their own view of the org (Owner 2026-11-23), opened from 「企业」 on /account.
 async function Workspace({ searchParams }: { searchParams: Promise<{ month?: string | string[] }> }) {
   const [area, { month }] = await Promise.all([readEnterpriseArea(PATH), searchParams])
-  if (area.kind === 'member') return <MemberArea data={area.view} />
+  if (area.kind === 'member') {
+    // A member of an org without the affiliate program has no page of their own: everything they
+    // need is in 企业 on /account (Owner 2026-11-28).
+    if (!area.view.withAffiliate) redirect(await localized('/account'))
+    return <MemberArea data={area.view} />
+  }
   const { user, db, view, affiliate } = area
   const [report, billing, t] = await Promise.all([
     readOwnerReport({ db, user: user.id, console: view, month: Array.isArray(month) ? month[0] : month, maskPhone }),
@@ -56,11 +63,11 @@ async function Workspace({ searchParams }: { searchParams: Promise<{ month?: str
   )
 }
 
-// A member's page: their own numbers only, with 企业作品 next to it in the member's navigation.
+// A member's customers page, with 企业作品 next to it in the member's navigation.
 async function MemberArea({ data }: { data: StaffCard }) {
   const t = await getTranslations('app.org.staff')
   return (
-    <EnterpriseFrame orgName={data.orgName} current="workspace" affiliate={false} role="member" intro={t(data.withAffiliate ? 'pageIntro' : 'pageIntroNoAffiliate')}>
+    <EnterpriseFrame orgName={data.orgName} current="workspace" affiliate role="member" intro={t('pageIntro')}>
       <MemberOrgView data={data} />
     </EnterpriseFrame>
   )

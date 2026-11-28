@@ -42,6 +42,9 @@ export type AccountData = {
   // profiles.role = 'admin': the "Admin" row (spec #186).
   affiliate: boolean
   admin: boolean
+  // A staff member of an org whose workspace is on: no buy buttons (ORG_MEMBER_CHECKOUT, Owner
+  // 2026-11-28). With the workspace off they buy and spend their own credits (2034).
+  orgStaff?: boolean
 }
 
 export type AccountActions = {
@@ -85,10 +88,10 @@ export function AccountView({ data, actions, site, children }: Props) {
       <AccountHeader email={data.email ?? data.phone} />
       <div className="md:mx-(--gutter) md:mt-6 md:grid md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] md:items-start md:gap-4">
         <Group title={t('plan.title')} className={pair}>
-          <PlanCard summary={data.subscription} products={site.products} paid={data.balance.paid} manage={actions.manageSubscription} cancelWaffo={actions.cancelWaffoSubscription} facts={facts} />
+          <PlanCard summary={data.subscription} products={site.products} paid={data.balance.paid} manage={actions.manageSubscription} cancelWaffo={actions.cancelWaffoSubscription} facts={facts} buy={!data.orgStaff} />
         </Group>
         <Group title={t('credits.title')} className={pair}>
-          <CreditDials balance={data.balance} giftRefused={data.giftRefused} allowance={allowance} freeGift={site.freeCredits} />
+          <CreditDials balance={data.balance} giftRefused={data.giftRefused} allowance={allowance} freeGift={site.freeCredits} buy={!data.orgStaff} />
           <FilmStrip ids={data.works.ids} count={data.works.count} thumbUrl={thumbUrlFor} />
         </Group>
       </div>

@@ -11,7 +11,7 @@ import type { StaffCard } from '@/core/org/console/types'
 vi.mock('@/core/i18n/ui', () => ({ Link: ({ href, children, ...rest }: { href: string; children: unknown }) => createElement('a', { href, ...rest }, children as never) }))
 vi.mock('@/core/analytics/replay', () => ({ REPLAY_BLOCK_CLASS: 'sv-replay-block' }))
 
-const { MemberEntry, MemberLinkCallout, MEMBER_ORG_HREF } = await import('@/core/org/ui/member-entry')
+const { MemberEntry, MemberLinkCallout, MEMBER_ORG_HREF, ORG_WORKS_HREF } = await import('@/core/org/ui/member-entry')
 const { MemberOrgView } = await import('@/core/org/ui/staff-card')
 
 // Fake data only: no real company, account or price.
@@ -31,21 +31,29 @@ function render(locale: 'en' | 'zh', element: ReactElement) {
 }
 
 describe.each(['en', 'zh'] as const)('a member of an org (%s)', (locale) => {
-  it("on /account shows only the org row, into the member's own org page, and what is left of the month", () => {
+  // Owner 2026-11-28: everything a member needs is in the block; no back office to open.
+  it("on /account shows this month's credits, 企业作品 and the customers, with nothing to leave", () => {
     const { html, text, errors } = render(locale, createElement(MemberEntry, { data: staff() }))
     expect(errors).toEqual([])
-    expect(html).toContain(`href="${MEMBER_ORG_HREF}"`)
     expect(text).toContain('Acme Studio')
-    // Paid: 80 left of 500 a month; promotion: 1,750 left of 2,000 a month.
+    // Paid: 500 a month, 600 given, 80 left; promotion: 2,000 given, 1,750 left.
+    for (const figure of ['500', '600', '2,000', '1,750']) expect(text).toContain(figure)
     expect(text).toMatch(/\b80\b/)
-    expect(text).toContain('500')
-    expect(text).toContain('1,750')
-    expect(text).toContain('2,000')
-    // The detail moved to the org page: no customers, spend or level-2 here, and no way to leave.
+    expect(text).toMatch(locale === 'en' ? /watermarked/ : /带水印/)
+    expect(html).toContain(`href="${ORG_WORKS_HREF}"`)
+    expect(html).toContain(`href="${MEMBER_ORG_HREF}"`)
     expect(text).not.toContain('$123.45')
-    expect(text).not.toMatch(/Paying this month|本月付费人数|Spend this month|本月消费|level 2|二级/)
     expect(text).not.toMatch(/Leave|退出/)
     expect(html).not.toMatch(/<button/)
+  })
+
+  it('gives a member of a workspace-only org the credits and 企业作品, and no page of their own', () => {
+    const { html, text, errors } = render(locale, createElement(MemberEntry, { data: staff({ withAffiliate: false, promo: { allowance: 0, allocated: 0, used: 0, held: 0 } }) }))
+    expect(errors).toEqual([])
+    expect(text).toContain('600')
+    expect(html).toContain(`href="${ORG_WORKS_HREF}"`)
+    expect(html).not.toContain(`href="${MEMBER_ORG_HREF}"`)
+    expect(text).not.toMatch(/customer|客户|Promotion|推广/i)
   })
 
   it('says when the promotion credits could not be read instead of a zero', () => {
@@ -53,9 +61,9 @@ describe.each(['en', 'zh'] as const)('a member of an org (%s)', (locale) => {
     expect(text).toContain('—')
   })
 
-  it('shows the paused org on the row', () => {
+  it('says the workspace is off on the row, and that the credits already given still work', () => {
     const { text } = render(locale, createElement(MemberEntry, { data: staff({ status: 'suspended' }) }))
-    expect(text).toMatch(/paused|暂停/)
+    expect(text).toContain(locale === 'en' ? 'workspace is off' : '企业工作台已关闭')
   })
 
   it('puts the promotion link on the highlighted callout with a copy button', () => {
@@ -67,31 +75,17 @@ describe.each(['en', 'zh'] as const)('a member of an org (%s)', (locale) => {
     expect(text).toMatch(/Copy link|复制链接/)
   })
 
-  it("on the org page shows the member's own month in detail and their customers, never a commission", () => {
+  it("on the customers page shows their customers and this month's spend, never a commission", () => {
     const { text, errors } = render(locale, createElement(MemberOrgView, { data: staff() }))
     expect(errors).toEqual([])
-    expect(text).toMatch(/600/)
-    expect(text).toContain('1,750')
-    expect(text).toContain('250')
-    expect(text).toMatch(locale === 'en' ? /watermarked/ : /带水印/)
     expect(text).toContain('$123.45')
     expect(text).not.toContain('$67.89')
     expect(text).not.toMatch(/commission|佣金|Leave|退出/i)
   })
 
-  it('shows no customers or promotion credits in an org without the affiliate program', () => {
-    const none = { withAffiliate: false, promo: { allowance: 0, allocated: 0, used: 0, held: 0 } }
-    const entry = render(locale, createElement(MemberEntry, { data: staff(none) }))
-    expect(entry.errors).toEqual([])
-    expect(entry.text).not.toMatch(/customer|客户|Promotion|推广/i)
-    const page = render(locale, createElement(MemberOrgView, { data: staff(none) }))
-    expect(page.errors).toEqual([])
-    expect(page.text).toContain('600')
-    expect(page.text).not.toMatch(/customer|客户|Promotion|推广|\$123\.45/i)
-    // Promotion credits still held after the org left the program stay visible until they expire.
-    const left = render(locale, createElement(MemberOrgView, { data: staff({ withAffiliate: false }) }))
-    expect(left.text).toContain('1,750')
-    expect(left.text).not.toContain('$123.45')
+  it('keeps promotion credits still held after the org left the program until they expire', () => {
+    const { text } = render(locale, createElement(MemberEntry, { data: staff({ withAffiliate: false }) }))
+    expect(text).toContain('1,750')
   })
 
   it('adds the level-2 customers when the org has them', () => {
@@ -104,13 +98,16 @@ const { EnterpriseFrame } = await import('@/core/org/ui/enterprise-frame')
 const { OrgWorksView } = await import('@/core/org/ui/works-view')
 
 describe.each(['en', 'zh'] as const)('企业作品 for staff (%s)', (locale) => {
-  it("gives a member's org page two sections: their own view and 企业作品, none of the owner's", () => {
+  it("gives a member of an affiliate org two sections: their customers and 企业作品, none of the owner's", () => {
     const { html, errors } = render(locale, createElement(EnterpriseFrame, { orgName: 'Acme Studio', current: 'workspace', affiliate: true, role: 'member', intro: '' }, null))
     expect(errors).toEqual([])
     expect(html).toContain('href="/account/enterprise/works"')
     expect(html).toMatch(/<a href="\/account\/enterprise" aria-current="page"/)
     expect(html).not.toContain('/account/enterprise/purchasing')
     expect(html).not.toContain('/partners/enterprise')
+    // Without the affiliate program 企业作品 is the member's only section: no navigation at all.
+    const alone = render(locale, createElement(EnterpriseFrame, { orgName: 'Acme Studio', current: 'works', affiliate: false, role: 'member', intro: '' }, null))
+    expect(alone.html).not.toContain('<nav')
   })
 
   const page = {

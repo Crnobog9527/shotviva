@@ -66,6 +66,47 @@ it('a staff code: no personal invitee credits, org_l1 binding and the org bonus,
   expect(await ledger(staff, 'invite_reward')).toEqual([])
 })
 
+// 2035 (Owner 2026-11-28, A2): the affiliate program, not the workspace, decides; an org with only
+// the affiliate program on (workspace off) still binds its staff's customers and gives its bonus.
+it('a staff code of an org with the workspace off still binds the customer to the org, with the bonus and no personal reward', async () => {
+  const { orgId, staff } = await orgTeam(300)
+  await db.query("update orgs set status='suspended' where id=$1", [orgId])
+  const code = await codeOf(staff)
+  expect(await preview(code)).toEqual({ credits: 300, org: true })
+  const { customer, result } = await invitedBy(staff)
+  expect(result).toMatchObject({ status: 'ok', credits_granted: 0 })
+  expect(await row(db, 'select org_invite from code_redemptions where user_id=$1', [customer])).toEqual({ org_invite: true })
+  const account = (await row(db, 'select user_id from affiliates where org_id=$1', [orgId])).user_id
+  expect(await row(db, 'select referred_by,referred_source,referred_member from profiles where id=$1', [customer]))
+    .toEqual({ referred_by: account, referred_source: 'org_l1', referred_member: staff })
+  expect(await ledger(customer, 'org_signup_bonus')).toEqual([300])
+  expect(await firstPayment(customer)).toMatchObject({ rewarded: false })
+  expect(await ledger(staff, 'invite_reward')).toEqual([])
+  // With the affiliate switch off as well, it is a personal code again.
+  await db.query('update orgs set affiliate_enabled=false where id=$1', [orgId])
+  expect(await preview(code)).toMatchObject({ org: false })
+})
+
+// Review on #991: a staff code is an org code also when another referrer bound the customer first:
+// no personal reward either way, workspace on or off, as the preview says.
+it('a staff code after another referrer\'s binding gives no personal reward, workspace on or off', async () => {
+  for (const status of ['active', 'suspended']) {
+    const { orgId, staff } = await orgTeam(300)
+    await db.query('update orgs set status=$2 where id=$1', [orgId, status])
+    const other = await createUser(db)
+    await db.query("insert into affiliates(user_id,slug,status) values($1,$2,'active')", [other, 'qa-' + other.slice(0, 12)])
+    const customer = await createUser(db)
+    await db.query("select grant_credits($1::uuid,6,'signup',$2,'free')", [customer, 'signup:' + customer])
+    await db.query("update profiles set referred_by=$2,referred_source='signup',referred_at=now() where id=$1", [customer, other])
+    const result = (await row(db, "select redeem_code($1,$2,'signup',null,$3) as r", [customer, await codeOf(staff), invite.windowDays])).r
+    expect(result, status).toMatchObject({ status: 'ok', credits_granted: 0 })
+    expect(await ledger(customer, 'code_grant'), status).toEqual([])
+    expect(await row(db, 'select referred_by from profiles where id=$1', [customer])).toEqual({ referred_by: other })
+    expect(await firstPayment(customer), status).toMatchObject({ rewarded: false })
+    expect(await ledger(staff, 'invite_reward'), status).toEqual([])
+  }
+})
+
 it('a personal code keeps both rewards', async () => {
   const friend = await createUser(db)
   const { customer, result } = await invitedBy(friend)

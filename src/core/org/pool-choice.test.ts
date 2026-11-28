@@ -79,4 +79,12 @@ describe('spendableBalance', () => {
     expect(await spendableBalance(db(seat, profile), 'u', { paid: 500, free: 80 })).toEqual({ paid: 30, free: 70 })
     expect(await spendableBalance(db(null, profile), 'u', { paid: 500, free: 80 })).toEqual({ paid: 500, free: 80 })
   })
+  // 2034: with the workspace off the seat is not read as org-only; the database picks who pays.
+  it('reads only seats of an org whose workspace is on', async () => {
+    const { readPoolChoiceOffer } = await import('./pool-choice')
+    const filters: unknown[][] = []
+    const chain = (data: unknown) => { const c = { select: () => c, eq: (...args: unknown[]) => { filters.push(args); return c }, maybeSingle: async () => ({ data, error: null }) }; return c }
+    await readPoolChoiceOffer({ from: () => chain(null) } as never, 'u')
+    expect(filters).toContainEqual(['orgs.status', 'active'])
+  })
 })

@@ -22,6 +22,7 @@ vi.mock('@/core/ui/responsive-sheet', () => ({ ResponsiveSheet: ({ children }: {
 const { OwnerConsoleView } = await import('@/core/org/ui/owner-console')
 const { MembersPanel } = await import('@/core/org/ui/members-panel')
 const { BulkSheet, GrantForm } = await import('@/core/org/ui/bulk-sheet')
+const { StaffLinkPanel } = await import('@/core/org/ui/staff-link-panel')
 
 // Fake data only: no real company, account or price.
 const MEMBER = '00000000-0000-4000-8000-0000000000b2'
@@ -120,5 +121,16 @@ describe.each(['en', 'zh'] as const)('bulk sheet without the affiliate program (
       expect(render(locale, sheet(data)).text).toMatch(promo)
       expect(render(locale, grant(data)).text).toMatch(promo)
     }
+  })
+})
+
+describe.each(['en', 'zh'] as const)('staff-only link without the affiliate program (%s)', (locale) => {
+  it('warns against passing it on without mentioning customers, and keeps the customer warning in an affiliate org', () => {
+    const none = render(locale, createElement(StaffLinkPanel, { data: owner({ affiliateEnabled: false }), actions: ownerActions, affiliate: false }))
+    expect(none.errors).toEqual([])
+    expect(none.text).not.toMatch(/customer|客户|referr|推荐/i)
+    expect(none.text).toContain(locale === 'en' ? 'Anyone who opens it joins your company as staff' : '不要外传')
+    const withProgram = render(locale, createElement(StaffLinkPanel, { data: owner(), actions: ownerActions, affiliate: true }))
+    expect(withProgram.text).toMatch(locale === 'en' ? /send it to customers/ : /不要发给客户/)
   })
 })

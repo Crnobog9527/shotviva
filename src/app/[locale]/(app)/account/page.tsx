@@ -17,7 +17,7 @@ import { lastMembership, readMemberSince, readSubscriptionSummary } from '@/core
 import { listMonthWorks } from '@/core/jobs'
 import { serverEnv } from '@/core/env'
 import { readOrgView } from '@/core/org/console'
-import { CustomerLinkRow, MemberEntry, MemberLinkCallout, OwnerEntryRow } from '@/core/org/ui'
+import { CustomerLinkRow, MemberEntry, MemberLinkCallout, orgSetup, OwnerEntryRow } from '@/core/org/ui'
 import { readLinkStatus } from '@/core/partner'
 import { graylumIntroLinks } from '@/core/partner/ui'
 import { formatMoney, hasUnreadReply, listPaymentOptions, paymentChoices, PICKER_LIMIT, ReplyTime } from '@/core/support'
@@ -71,7 +71,7 @@ async function Account() {
   const more = payments.length >= PICKER_LIMIT
   // Each line with its receipt / invoice links (T80); the support picker keeps the plain labels.
   const lines = purchaseLines(payments, purchases, locale)
-  const data = { email: user.email, phone: maskPhone(user.phone) || null, balance, giftRefused: signupGift.reason, subscription, since, lastMembership: last, works, purchases: lines, morePurchases: more, helpUnread, graylum, graylumLinks: graylumIntroLinks(serverEnv().VERCEL_ENV), affiliate, admin: user.role === 'admin' }
+  const data = { email: user.email, phone: maskPhone(user.phone) || null, balance, giftRefused: signupGift.reason, subscription, since, lastMembership: last, works, purchases: lines, morePurchases: more, helpUnread, graylum, graylumLinks: graylumIntroLinks(serverEnv().VERCEL_ENV), affiliate, admin: user.role === 'admin', orgStaff: buysThroughOrg(org) }
   // Help & feedback opens over the page (?help=…, T68); its payments picker is the Purchases list.
   return (
     <>
@@ -81,24 +81,39 @@ async function Account() {
         <StoreCard actions={storeActions} />
         {/* 2032: an org staff code earns no personal invite rewards; members promote with the org link above. */}
         {!orgInvites(org) && <InviteCard load={loadMyInvites} />}
-        <RedeemCard pending={discount} />
+        {usesCodes(org) && <RedeemCard pending={discount} />}
       </AccountView>
       <AccountHelp actions={helpActions} payments={purchases} replyTime={<ReplyTime userId={user.id} />} brand={site.brand.name} unread={helpUnread} />
     </>
   )
 }
 
-// An active member's (and the owner's) own invite code earns no personal invitee or inviter reward
-// while the org is active (2032), so the personal invite card would promise rewards that do not
-// come. They promote with the org's links instead.
+// An org member's (and the owner's) own invite code earns no personal invitee or inviter reward
+// while the org is active (2032) or runs the affiliate program (2035, A2: then the code is the
+// org's), so the personal invite card would promise rewards that do not come. They promote with
+// the org's links instead.
+// Staff of an org whose workspace is on buy nothing for themselves (ORG_MEMBER_CHECKOUT); with the
+// workspace off they buy and spend their own credits (2034).
+function buysThroughOrg(view: Awaited<ReturnType<typeof readOrgView>>) {
+  return view.kind === 'member' && view.status === 'active'
+}
+
+// Codes (Owner 2026-11-28): the redeem route refuses every code for an active member of an active
+// org, the main admin included (2032), so the code box is hidden for them. With the workspace off
+// the route accepts codes and the member can spend what they get (2034), so it shows again.
+function usesCodes(view: Awaited<ReturnType<typeof readOrgView>>) {
+  if (view.kind === 'member') return view.status !== 'active'
+  return !(view.kind === 'owner' && view.org.status === 'active')
+}
+
 function orgInvites(view: Awaited<ReturnType<typeof readOrgView>>) {
-  if (view.kind === 'member') return view.status === 'active'
-  return view.kind === 'owner' && view.org.status === 'active'
+  if (view.kind === 'member') return view.status === 'active' || view.withAffiliate
+  return view.kind === 'owner' && (view.org.status === 'active' || view.org.affiliateEnabled)
 }
 
 // The enterprise block (ARCHITECTURE §6.5, card E4): the owner gets a row into their console, a
-// member a row into their own org page with what is left of this month's credits, then their
-// promotion link (Owner 2026-11-23); everyone else sees nothing.
+// member this month's org credits, 企业作品 and (affiliate orgs) their customers, then their
+// promotion link (Owner 2026-11-28); everyone else sees nothing.
 function OrgBlock({ view, customerLink, memberLink }: { view: Awaited<ReturnType<typeof readOrgView>>; customerLink: ReactNode; memberLink: ReactNode }) {
   const t = useTranslations('app.org.entry')
   const format = useFormatter()
@@ -107,7 +122,7 @@ function OrgBlock({ view, customerLink, memberLink }: { view: Awaited<ReturnType
     return (
       <Group title={t('title')}>
         <RowsPanel>
-          <OwnerEntryRow name={view.org.name} pool={pool} suspended={view.org.status === 'suspended'} affiliate={customerLink !== null} />
+          <OwnerEntryRow name={view.org.name} pool={pool} setup={orgSetup(view.org.status, view.org.affiliateEnabled)} affiliate={customerLink !== null} />
         </RowsPanel>
         {customerLink}
       </Group>
@@ -131,7 +146,8 @@ async function OwnerCustomerLink({ user }: { user: string }) {
 }
 
 // Only an org that runs the affiliate program gives its members a promotion link: one bought just as
-// a production tool has no customers to bring (Owner 2026-11-28).
+// a production tool has no customers to bring (Owner 2026-11-28). Workspace on or off: a staff code
+// binds customers to the org whenever the affiliate program is on (2035, A2).
 function memberLinkFor(view: Awaited<ReturnType<typeof readOrgView>>, user: string) {
   return view.kind === 'member' && view.withAffiliate ? <Suspense fallback={null}><MemberLink user={user} /></Suspense> : null
 }
