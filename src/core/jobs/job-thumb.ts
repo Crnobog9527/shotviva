@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { AppError } from '../errors'
 import { logger } from '../logger'
-import { workThumbKeyFor, writeWorkThumb, type ObjectStore } from '../storage'
+import { workThumbKeyFor, workTileKeyFor, writeWorkThumb, writeWorkTile, type ObjectStore } from '../storage'
 import { findOwnJob } from './job-lookup'
 import type { Job } from './job-schema'
 import { fileUrlFor } from './job-view'
@@ -37,36 +37,57 @@ async function makeThumb(store: ObjectStore, job: Owned, outputKey: string): Pro
   }
 }
 
+// Which small copy: the list copy (480 px), or the tile Photos' grid shows (320 px, 2026-11-28).
+export type ThumbSize = 'thumb' | 'tile'
+const keyOf = (job: Owned, size: ThumbSize) => (size === 'tile' ? workTileKeyFor : workThumbKeyFor)(job.userId, job.id, job.creditPool)
+
+async function has(store: ObjectStore, job: Owned, size: ThumbSize): Promise<boolean> {
+  if (size === 'thumb') return hasThumb(store, job)
+  try {
+    return (await store.head(keyOf(job, 'tile'))) !== null
+  } catch (error) {
+    logger.warn('work tile head failed', { jobId: job.id, error })
+    return false
+  }
+}
+
 // The thumbnail route's logic (ARCHITECTURE §8.3「作品小图」). The access rule is the full file's:
 // owner only (anyone else gets the same 404 as a missing job), finished jobs only. Answers where
 // to redirect: a 5-minute signed URL of the small copy, or, when there is none and none could be
-// made, the full-file route, so a list never shows a broken image.
-export async function resolveJobThumb(deps: { db: SupabaseClient; store: ObjectStore }, req: { userId: string; jobId: string }): Promise<string> {
+// made, the full-file route, so a list never shows a broken image. A tile is cut from the list
+// copy (made first when that is missing too); a tile that cannot be made answers the list copy.
+export async function resolveJobThumb(deps: { db: SupabaseClient; store: ObjectStore }, req: { userId: string; jobId: string }, size: ThumbSize = 'thumb'): Promise<string> {
   const job = await findOwnJob(deps.db, req.userId, req.jobId)
   if (!job || job.status !== 'succeeded' || !job.outputKey) throw new AppError('NOT_FOUND', 'Not found')
-  if ((await hasThumb(deps.store, job)) || (await makeThumb(deps.store, job, job.outputKey))) {
-    return deps.store.presignGet(workThumbKeyFor(job.userId, job.id, job.creditPool), { expiresInSeconds: SIGNED_GET_SECONDS })
-  }
-  return fileUrlFor(job.id)
+  const which = await copyToServe(deps.store, job, job.outputKey, size)
+  return which ? deps.store.presignGet(keyOf(job, which), { expiresInSeconds: SIGNED_GET_SECONDS }) : fileUrlFor(job.id)
+}
+
+// Which copy the route answers with, made when missing; null when the work has none and none
+// could be made.
+async function copyToServe(store: ObjectStore, job: Owned, outputKey: string, size: ThumbSize): Promise<ThumbSize | null> {
+  if (size === 'tile' && (await has(store, job, 'tile'))) return 'tile'
+  if (!(await hasThumb(store, job)) && !(await makeThumb(store, job, outputKey))) return null
+  if (size === 'thumb') return 'thumb'
+  return (await writeWorkTile(store, { userId: job.userId, jobId: job.id, pool: job.creditPool })) ? 'tile' : 'thumb'
 }
 
 // How many of Photos' newest works get their signed URL written into the page: the first screen
-// (two rows of six on a desktop, four rows of three on a phone; done-card.tsx fetches as many
-// at once).
+// (two rows of six on a desktop, four rows of three on a phone).
 export const FIRST_SCREEN_THUMBS = 12
 
 // Photos' first screen: the signed URL of each of the caller's own newest works that already has
-// its small copy, so the browser fetches it straight from R2 without first asking the thumbnail
+// that small copy (`size`: Photos asks for tiles), so the browser fetches it straight from R2 without first asking the thumbnail
 // route (one function run and a redirect per image). `jobs` must be rows already read as their
 // owner. One HEAD each, in parallel; anything missing or failing is simply left out and the page
 // falls back to the route. Never throws, R2 not being configured included.
-export async function firstThumbUrls(store: () => ObjectStore, jobs: readonly Owned[], count = FIRST_SCREEN_THUMBS): Promise<Map<string, string>> {
+export async function firstThumbUrls(store: () => ObjectStore, jobs: readonly Owned[], count = FIRST_SCREEN_THUMBS, size: ThumbSize = 'thumb'): Promise<Map<string, string>> {
   try {
     const r2 = store()
     const signed = await Promise.all(
       jobs.slice(0, count).map(async (job) => {
-        if (!(await hasThumb(r2, job))) return null
-        return [job.id, await r2.presignGet(workThumbKeyFor(job.userId, job.id, job.creditPool), { expiresInSeconds: SIGNED_GET_SECONDS })] as const
+        if (!(await has(r2, job, size))) return null
+        return [job.id, await r2.presignGet(keyOf(job, size), { expiresInSeconds: SIGNED_GET_SECONDS })] as const
       }),
     )
     return new Map(signed.filter((entry) => entry !== null))

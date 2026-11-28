@@ -5,7 +5,7 @@ import { preconnect } from 'react-dom'
 
 import { AppPage, TabRootHeader } from '@/core/app-shell'
 import { createAdminSupabase, requireUser } from '@/core/auth'
-import { decodeOwnJobsCursor, encodeOwnJobsCursor, fileUrlFor, firstThumbUrls, listOwnJobs } from '@/core/jobs'
+import { decodeOwnJobsCursor, encodeOwnJobsCursor, fileUrlFor, FIRST_SCREEN_THUMBS, firstThumbUrls, listOwnJobs } from '@/core/jobs'
 import { currentLocale } from '@/core/i18n/server'
 import { r2Origin, r2Store } from '@/core/storage'
 import { cachedPosterTemplates, cachedWebTemplates, EDIT_TEMPLATE_ID } from '@/core/templates'
@@ -38,8 +38,12 @@ async function Photos({ back, until, member }: Asked) {
   // personal list is read alongside, not after, so nobody else waits for the seat check; a
   // company member's copy of it is dropped.
   // The first screen's small copies are signed while the templates are still being read.
+<<<<<<< HEAD
   const works = listOwnJobs(db, user.id, now, cursor).then(async (own) => ({ own, signed: await firstThumbUrls(r2Store, own.done) }))
   works.catch(() => undefined)
+=======
+  const works = listOwnJobs(createAdminSupabase(), user.id, now, cursor).then(async (own) => ({ own, signed: await firstThumbUrls(r2Store, own.done, FIRST_SCREEN_THUMBS, 'tile') }))
+>>>>>>> origin/main
   const locale = await currentLocale()
   const [seat, templates, posters] = await Promise.all([readCompanySeat(db, user.id), cachedWebTemplates(locale, true), cachedPosterTemplates(locale)])
   const tp = await getTranslations('app.photos')

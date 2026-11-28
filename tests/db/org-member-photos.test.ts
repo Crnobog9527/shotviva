@@ -7,6 +7,8 @@ import { listOwnJobs, reserveJob } from '@/core/jobs'
 import { allocateOrgCredits, joinOrg, removeOrgMember } from '@/core/org'
 import { archiveOrgWorksOf, DELETED_MAKERS, listCompanyPhotos, ME, PERSONAL, readCompanySeat } from '@/core/org/works'
 
+import { workThumbKeyFor } from '@/core/storage'
+
 import { createMemoryStore } from '../fakes/memory-store'
 import { seedTemplate } from './generation-fixtures'
 import { connectAdmin, serviceClient } from './helpers'
@@ -140,7 +142,10 @@ describe('leaving and the workspace switch', () => {
 
   it('lists a deleted account\'s archived works for the members, under their own filter', async () => {
     const c = await company()
-    await archiveOrgWorksOf({ db: rest, store: createMemoryStore().store }, c.peer)
+    const { store, upload } = createMemoryStore()
+    upload(`outputs/${c.peer}/${c.works.peer}.png`, new Uint8Array([1]), 'image/png')
+    upload(workThumbKeyFor(c.peer, c.works.peer, 'paid'), new Uint8Array([2]), 'image/webp')
+    await archiveOrgWorksOf({ db: rest, store }, c.peer)
     await db.query('delete from auth.users where id = $1', [c.peer])
     const rows = (await listCompanyPhotos(rest, c.veteran)).works
     expect(rows.find((w) => w.id === c.works.peer)).toMatchObject({ archived: true, userId: null, orgWork: true })

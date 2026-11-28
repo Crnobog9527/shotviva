@@ -23,8 +23,8 @@ export { hasInputPreview, originalUrlFor, resolveJobOriginal } from './job-origi
 export { deleteOwnWork } from './delete-work'
 export { deleteWorkFiles, keptInputsOf, photosForAgain, workFileKeys, type AgainPhoto } from './kept-inputs'
 export { findJobByIdempotencyKey, findLastWorks, findOwnJob, findOwnJobs, LAST_WORKS, STATUS_IDS_MAX } from './job-lookup'
-export { fileUrlFor, thumbUrlFor, toJobView, type JobView } from './job-view'
-export { FIRST_SCREEN_THUMBS, firstThumbUrls, resolveJobThumb } from './job-thumb'
+export { fileUrlFor, thumbUrlFor, tileUrlFor, toJobView, type JobView } from './job-view'
+export { FIRST_SCREEN_THUMBS, firstThumbUrls, resolveJobThumb, type ThumbSize } from './job-thumb'
 export {
   ProviderError,
   type GenerationProvider,
