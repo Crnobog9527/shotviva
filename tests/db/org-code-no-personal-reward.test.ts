@@ -87,6 +87,26 @@ it('a staff code of an org with the workspace off still binds the customer to th
   expect(await preview(code)).toMatchObject({ org: false })
 })
 
+// Review on #991: a staff code is an org code also when another referrer bound the customer first:
+// no personal reward either way, workspace on or off, as the preview says.
+it('a staff code after another referrer\'s binding gives no personal reward, workspace on or off', async () => {
+  for (const status of ['active', 'suspended']) {
+    const { orgId, staff } = await orgTeam(300)
+    await db.query('update orgs set status=$2 where id=$1', [orgId, status])
+    const other = await createUser(db)
+    await db.query("insert into affiliates(user_id,slug,status) values($1,$2,'active')", [other, 'qa-' + other.slice(0, 12)])
+    const customer = await createUser(db)
+    await db.query("select grant_credits($1::uuid,6,'signup',$2,'free')", [customer, 'signup:' + customer])
+    await db.query("update profiles set referred_by=$2,referred_source='signup',referred_at=now() where id=$1", [customer, other])
+    const result = (await row(db, "select redeem_code($1,$2,'signup',null,$3) as r", [customer, await codeOf(staff), invite.windowDays])).r
+    expect(result, status).toMatchObject({ status: 'ok', credits_granted: 0 })
+    expect(await ledger(customer, 'code_grant'), status).toEqual([])
+    expect(await row(db, 'select referred_by from profiles where id=$1', [customer])).toEqual({ referred_by: other })
+    expect(await firstPayment(customer), status).toMatchObject({ rewarded: false })
+    expect(await ledger(staff, 'invite_reward'), status).toEqual([])
+  }
+})
+
 it('a personal code keeps both rewards', async () => {
   const friend = await createUser(db)
   const { customer, result } = await invitedBy(friend)

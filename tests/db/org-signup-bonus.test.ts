@@ -252,6 +252,22 @@ it('gives a new account bound through the org\'s partner link the bonus once', a
   expect(await freeCredits(customer)).toBe(6 + 350)
 })
 
+// 2035 (A2, review on #991): with the workspace off and the affiliate program on, a sign-up through
+// the org's ?ref link still gets the bonus, at the binding and when the gift comes after it.
+it('gives the bonus through the org\'s partner link with the workspace off, also when the gift comes later', async () => {
+  const { orgId, owner } = await orgTeam(350)
+  await setOrg(orgId, { status: 'suspended' })
+  const atBind = await giftedUser()
+  expect(await bind(db, atBind, await orgSlug(owner))).toBe(true)
+  expect(await row(db, 'select referred_by,referred_source from profiles where id=$1', [atBind])).toEqual({ referred_by: owner, referred_source: 'signup' })
+  expect(await bonusLedger(atBind)).toEqual([{ delta: 350, pool: 'free', idempotency_key: 'org_signup_bonus:' + atBind }])
+  const giftLater = await createUser(db)
+  expect(await bind(db, giftLater, await orgSlug(owner))).toBe(true)
+  expect(await bonusLedger(giftLater)).toEqual([])
+  await db.query("select grant_credits($1::uuid,6,'signup',$2,'free')", [giftLater, 'signup:' + giftLater])
+  expect(await bonusLedger(giftLater)).toEqual([{ delta: 350, pool: 'free', idempotency_key: 'org_signup_bonus:' + giftLater }])
+})
+
 it('pays the org\'s amount through every enterprise referral link: the admin\'s ?ref link and each employee\'s invite link', async () => {
   const { orgId, owner, staff } = await orgTeam(350)
   const other = await createUser(db)

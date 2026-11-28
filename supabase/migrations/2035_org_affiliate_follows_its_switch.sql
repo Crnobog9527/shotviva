@@ -12,7 +12,7 @@
 --  - _invite_code_org (sign-up preview), _org_staff_code (partner per-IP allowance for a staff
 --    code), _signup_org_ref (same for an org ?ref link), _org_attribute_invite (level 1 and level 2
 --    binding of an invite redemption to the org), redeem_code (org_code: no personal invitee or
---    inviter reward for a staff code), _org_signup_bonus / _org_signup_bonus_after_gift (the org
+--    inviter reward for a staff code, also when another referrer bound the customer first), _org_signup_bonus / _org_signup_bonus_after_gift (the org
 --    signup bonus), grant_credits (the partner per-IP allowance for an org ?ref sign-up), and the
 --    sign-up form's previews (code_preview_credits / _org / _invite_credits, via _org_code_owner).
 -- Unchanged: everything about the workspace itself (pool, allowances, joining, limits, purchases
@@ -262,7 +262,9 @@ begin
 
   -- 2032: an org staff member's code gives no personal invitee reward (the org bonus instead).
   -- 2032: nor does an active org member's own code, affiliate switch on or off.
-  org_code := org_code or (offer.kind = 'invite' and public._in_active_org(offer.owner_user_id));
+  -- 2035 (review on #991): any staff code is an org code, also when another referrer bound the
+  -- customer first, workspace on or off (_org_code_owner, as the preview).
+  org_code := org_code or (offer.kind = 'invite' and public._org_code_owner(offer.owner_user_id));
   credits := case when offer.kind = 'invite' and org_code then 0
     when offer.kind = 'invite' then
     (select (value->>'inviteeCredits')::integer from public.system_settings where key = 'code_invite_rewards')
