@@ -6,11 +6,15 @@ import { describe, expect, it } from 'vitest'
 const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8')
 const CREATE = 'src/app/[locale]/(app)/generate/page.tsx'
 
-// The home-screen icon starts on the home page; a signed-in person's next tap is Open app, which
-// is prefetched in full (marketing pages use Next's full per-link prefetch): grid 1.5 -> 0.2 s (#881).
-describe('Open app arrives with Create prefetched', () => {
-  it('prefetches Open app per link', () => {
-    expect(read('src/core/content/blocks/nav-account.tsx')).toMatch(/<Link href="\/generate" className="mk-open" prefetch>/)
+// The home-screen icon starts on the home page; a signed-in person's next tap is Open app. That one
+// link prefetches Create's static shell (public pages otherwise prefetch nothing), never the full
+// page: a full prefetch renders /generate with the account's reads for every signed-in public page
+// view and keeps that account's data in the router cache (review of #1006).
+describe('Open app arrives with Create\'s shell prefetched', () => {
+  it('prefetches the shell only', () => {
+    const source = read('src/core/content/blocks/nav-account.tsx')
+    expect(source).toMatch(/<Link href="\/generate" className="mk-open" prefetch="auto">/)
+    expect(source).not.toMatch(/className="mk-open" prefetch(?:=\{true\})?>/)
   })
 })
 

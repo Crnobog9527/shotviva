@@ -37,14 +37,16 @@ export function NavAccount({ signedIn }: { signedIn: boolean }) {
       </>
     )
   }
-  // Open app is prefetched, Create's grid included (its page defers the catalogue with prefetch(),
-  // which a per-link prefetch renders): the home-screen icon starts on the home page, and a
-  // signed-in person's next tap is Open app, which then shows Create at once instead of waiting
-  // for a cross-border request. Public pages otherwise load links on the click only
-  // (i18n/ui/link-prefetch.tsx); this is one link, for signed-in visitors only.
+  // Open app prefetches Create's static shell only (prefetch="auto"): the home-screen icon starts on
+  // the home page and a signed-in person's next tap is this, so the frame is there at once and the
+  // grid comes from the copy on the device. Not prefetch={true}: without partial prefetching on the
+  // app (app/[locale]/(app)/layout.tsx) that is a full render of /generate for every signed-in
+  // public page view, the account's reads included, next to the public page's own first paint, and
+  // it would keep one account's balance in the router cache. Public pages otherwise load links on
+  // the click only (i18n/ui/link-prefetch.tsx); this is one link, for signed-in visitors only.
   return (
     <>
-      <Link href="/generate" className="mk-open" prefetch>
+      <Link href="/generate" className="mk-open" prefetch="auto">
         {t('openApp')}
       </Link>
       <Link href="/account" className="mk-acct" aria-label={t('account')} title={t('account')}>
