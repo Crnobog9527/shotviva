@@ -1845,22 +1845,24 @@
       },
       "pool": {
         "title": "Credit pools",
-        "hint": "Your company holds two kinds: paid credits (bought or deposited by you) and promotion credits (the monthly channel partner grant). Give them to members, who spend them on their own generations.",
+        "hint": "Your company holds two kinds: paid credits (bought or moved in by you) and promotion credits (the monthly channel partner grant). Give them to members, who spend them on their own generations.",
         "balance": "Paid pool",
         "unit": "credits",
-        "yours": "Yours to deposit",
-        "yoursNote": "your own paid credits",
-        "suspended": "The company is paused: deposits are off.",
-        "depositLabel": "Deposit your own paid credits",
+        "yours": "Yours to move in",
+        "yoursNote": "paid credits already on your account",
+        "suspended": "The company is paused: moving credits in is off.",
+        "depositLabel": "Move in paid credits already on your account",
         "depositPlaceholder": "Number of credits",
-        "depositHint": "What you buy while the company is active goes straight into the pool. These purchases can't be refunded by yourself; for a refund, contact support. This moves paid credits you already hold: credits you deposit here can't be refunded or moved back.",
-        "deposit": "Deposit",
-        "depositing": "Depositing…",
-        "deposited": "Deposited into the pool.",
+        "depositHint": "Only paid credits can be moved in. Once moved, they can't be refunded or moved back.",
+        "deposit": "Move in",
+        "depositing": "Moving in…",
+        "deposited": "Moved into the pool.",
         "promoBalance": "Promotion pool",
         "promoExpires": "Valid through {at} (UTC)",
         "promoNone": "No promotion credits this month",
-        "promoHint": "Images made with promotion credits are watermarked, public and not for commercial use. What is left in the pool and with members goes at the end of the month (UTC). Only paid credits can be deposited."
+        "promoHint": "Images made with promotion credits are watermarked, public and not for commercial use. What is left in the pool and with members goes at the end of the month (UTC).",
+        "hintPaidOnly": "The credits you buy are held here. Give them to members, who spend them on their own generations.",
+        "purchaseNote": "What you buy while the company is active goes straight into the pool. These purchases can't be refunded by yourself; for a refund, contact support."
       },
       "packages": {
         "title": "Company packages",
@@ -1948,7 +1950,9 @@
         "unknown": "Account",
         "downloadMembers": "Download CSV",
         "downloadCustomers": "Download customers CSV",
-        "definition": "Given: credits the company gave the member (monthly top-up and hand allocations). Used: company credits they spent, after refunds. Sign-ups: customers who joined through them this month. Paying: customers who paid this month. Spend: what those customers paid this month in USD, before tax and after refunds. A member who left keeps the customers they brought. Customers appear only as a masked email or phone."
+        "definition": "Given: credits the company gave the member (monthly top-up and hand allocations). Used: company credits they spent, after refunds. Sign-ups: customers who joined through them this month. Paying: customers who paid this month. Spend: what those customers paid this month in USD, before tax and after refunds. A member who left keeps the customers they brought. Customers appear only as a masked email or phone.",
+        "hintNoAffiliate": "What each person was given and used, month by month (UTC months).",
+        "definitionNoAffiliate": "Given: credits the company gave the member (monthly top-up and hand allocations). Used: company credits they spent, after refunds."
       },
       "staff": {
         "suspended": "Your company account is paused. Your own credits are unaffected.",
@@ -1977,7 +1981,9 @@
         "paidLeft": "Paid credits left",
         "promoLeftLabel": "Promotion credits left",
         "monthly": "{count} a month",
-        "pageIntro": "Credits your company gives you each month, and the customers who signed up with your link. Only your own numbers are shown here."
+        "pageIntro": "Credits your company gives you each month, and the customers who signed up with your link. Only your own numbers are shown here.",
+        "pageIntroNoAffiliate": "Credits your company gives you each month. Only your own numbers are shown here.",
+        "entryHintNoAffiliate": "This month's credits in detail"
       },
       "join": {
         "metaTitle": "Join a company",
@@ -2424,8 +2430,7 @@
     "legalNav": "Legal",
     "copyright": "© {year} {name}",
     "language": "Language",
-    "cookieSettings": "Cookie settings"
-,
+    "cookieSettings": "Cookie settings",
     "templateRequests": "Request a template"
   },
   "consent": {

@@ -23,41 +23,63 @@ import { useConsoleAction } from './use-console-action'
 export function PoolPanel({ data, actions }: { data: OwnerConsole; actions: OwnerActions }) {
   const t = useTranslations('app.org.pool')
   const format = useFormatter()
+  // Promotion credits come only with the affiliate program (1842); an org that just left it keeps
+  // showing what is left until the month-end expiry.
+  const promo = data.org.affiliateEnabled || data.org.promoPoolCredits > 0
+  return (
+    <Panel title={t('title')} hint={t(promo ? 'hint' : 'hintPaidOnly')}>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <Stat label={t('balance')} value={format.number(data.org.poolCredits)} note={t('unit')} />
+        {promo ? <PromoStat org={data.org} /> : null}
+      </div>
+      {promo ? <p className="text-caption text-muted-foreground">{t('promoHint')}</p> : null}
+      <p className="text-caption text-muted-foreground">{t('purchaseNote')}</p>
+      <MoveInForm data={data} actions={actions} />
+    </Panel>
+  )
+}
+
+function PromoStat({ org }: { org: OwnerConsole['org'] }) {
+  const t = useTranslations('app.org.pool')
+  const format = useFormatter()
+  const until = org.promoExpiresAt ? format.dateTime(new Date(Date.parse(org.promoExpiresAt) - 1), { dateStyle: 'medium', timeZone: 'UTC' }) : null
+  return <Stat label={t('promoBalance')} value={format.number(org.promoPoolCredits)} note={until ? t('promoExpires', { at: until }) : t('promoNone')} />
+}
+
+// Since 2033 the owner's purchases land in the pool, so moving credits in is only for paid credits
+// already on the account: the form shows while there are some (or right after a move, to keep its
+// result on screen), and nothing at all otherwise.
+function MoveInForm({ data, actions }: { data: OwnerConsole; actions: OwnerActions }) {
+  const t = useTranslations('app.org.pool')
+  const format = useFormatter()
   const [requestId, setRequestId] = useState(() => crypto.randomUUID())
   const [amount, setAmount] = useState('')
   const { pending, outcome, run } = useConsoleAction()
+  if (data.depositable <= 0 && outcome === null) return null
   const value = Number(amount)
-  const valid = Number.isInteger(value) && value > 0 && value <= data.depositable
   const suspended = data.org.status === 'suspended'
+  const blocked = pending || suspended || !(Number.isInteger(value) && value > 0 && value <= data.depositable)
   return (
-    <Panel title={t('title')} hint={t('hint')}>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-        <Stat label={t('balance')} value={format.number(data.org.poolCredits)} note={t('unit')} />
-        <Stat label={t('promoBalance')} value={format.number(data.org.promoPoolCredits)}
-          note={data.org.promoExpiresAt ? t('promoExpires', { at: format.dateTime(new Date(Date.parse(data.org.promoExpiresAt) - 1), { dateStyle: 'medium', timeZone: 'UTC' }) }) : t('promoNone')} />
-        <Stat label={t('yours')} value={format.number(data.depositable)} note={t('yoursNote')} />
-      </div>
-      <p className="text-caption text-muted-foreground">{t('promoHint')}</p>
+    <form
+      className="grid gap-2"
+      onSubmit={(event) => {
+        event.preventDefault()
+        if (blocked) return
+        run(() => actions.deposit({ requestId, credits: value }), t('deposited'), () => { setRequestId(crypto.randomUUID()); setAmount('') })
+      }}
+    >
+      <Stat label={t('yours')} value={format.number(data.depositable)} note={t('yoursNote')} />
       {suspended ? <p role="status" className="text-label text-destructive">{t('suspended')}</p> : null}
-      <form
-        className="grid gap-2"
-        onSubmit={(event) => {
-          event.preventDefault()
-          if (pending || !valid || suspended) return
-          run(() => actions.deposit({ requestId, credits: value }), t('deposited'), () => { setRequestId(crypto.randomUUID()); setAmount('') })
-        }}
-      >
-        <label className="grid gap-1 text-label">
-          <span className="font-medium">{t('depositLabel')}</span>
-          <input className={FIELD} inputMode="numeric" value={amount} placeholder={t('depositPlaceholder')} onChange={(e) => setAmount(e.target.value.replace(/\D/g, '').slice(0, 10))} />
-        </label>
-        <p className="text-caption text-muted-foreground">{t('depositHint')}</p>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button type="submit" size="touch" variant="glass" disabled={pending || !valid || suspended}><Coins />{pending ? t('depositing') : t('deposit')}</Button>
-          <Result outcome={outcome} />
-        </div>
-      </form>
-    </Panel>
+      <label className="grid gap-1 text-label">
+        <span className="font-medium">{t('depositLabel')}</span>
+        <input className={FIELD} inputMode="numeric" value={amount} placeholder={t('depositPlaceholder')} onChange={(e) => setAmount(e.target.value.replace(/\D/g, '').slice(0, 10))} />
+      </label>
+      <p className="text-caption text-muted-foreground">{t('depositHint')}</p>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="submit" size="touch" variant="glass" disabled={blocked}><Coins />{pending ? t('depositing') : t('deposit')}</Button>
+        <Result outcome={outcome} />
+      </div>
+    </form>
   )
 }
 

@@ -18,7 +18,7 @@ const { MemberOrgView } = await import('@/core/org/ui/staff-card')
 const staff = (over: Partial<StaffCard> = {}): StaffCard => ({
   kind: 'member', orgName: 'Acme Studio', status: 'active', monthlyAllowance: 500, allocatedThisMonth: 600, heldCredits: 80, customers: 3,
   promo: { allowance: 2000, allocated: 2000, used: 250, held: 1750 },
-  withLevel2: false, period: '2026-11', performance: { l1: { customers: 3, signups: 1, paying: 2, paidCents: 12345 }, l2: { customers: 4, signups: 0, paying: 1, paidCents: 6789 } },
+  withAffiliate: true, withLevel2: false, period: '2026-11', performance: { l1: { customers: 3, signups: 1, paying: 2, paidCents: 12345 }, l2: { customers: 4, signups: 0, paying: 1, paidCents: 6789 } },
   ...over,
 })
 
@@ -77,6 +77,21 @@ describe.each(['en', 'zh'] as const)('a member of an org (%s)', (locale) => {
     expect(text).toContain('$123.45')
     expect(text).not.toContain('$67.89')
     expect(text).not.toMatch(/commission|佣金|Leave|退出/i)
+  })
+
+  it('shows no customers or promotion credits in an org without the affiliate program', () => {
+    const none = { withAffiliate: false, promo: { allowance: 0, allocated: 0, used: 0, held: 0 } }
+    const entry = render(locale, createElement(MemberEntry, { data: staff(none) }))
+    expect(entry.errors).toEqual([])
+    expect(entry.text).not.toMatch(/customer|客户|Promotion|推广/i)
+    const page = render(locale, createElement(MemberOrgView, { data: staff(none) }))
+    expect(page.errors).toEqual([])
+    expect(page.text).toContain('600')
+    expect(page.text).not.toMatch(/customer|客户|Promotion|推广|\$123\.45/i)
+    // Promotion credits still held after the org left the program stay visible until they expire.
+    const left = render(locale, createElement(MemberOrgView, { data: staff({ withAffiliate: false }) }))
+    expect(left.text).toContain('1,750')
+    expect(left.text).not.toContain('$123.45')
   })
 
   it('adds the level-2 customers when the org has them', () => {
