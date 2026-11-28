@@ -37,7 +37,11 @@ const row = z.object({
 
 // orgWork false: one of the reader's own personal works. archived: a deleted account's (no maker).
 export type CompanyPhoto = { id: string; userId: string | null; orgWork: boolean; archived: boolean; templateId: string; templateName: string | null; createdAt: string; aspectRatio: string | null; memberActive: boolean }
-export type CompanyPhotos = { works: CompanyPhoto[]; total: number; next: OwnJobsCursor | null }
+// total: how many works the view holds for the scope; null under a category (the category chip's
+// own count says it, listCompanyPhotoCategories).
+export type CompanyPhotos = { works: CompanyPhoto[]; total: number | null; next: OwnJobsCursor | null }
+// One category chip of the company view: a root template category with works in it, for a scope.
+export type CompanyPhotoCategory = { key: string; nameEn: string; nameZh: string; system: boolean; works: number }
 export type CompanySeat = { orgId: string; owner: boolean }
 
 // The org whose works the account's Photos page shows: the one it holds an active seat in, when
@@ -71,14 +75,21 @@ const toPhoto = (r: z.infer<typeof row>): CompanyPhoto => ({
 
 // One screen of the company view, as listOwnJobs reads the personal one: everything from the
 // newest down to `until` (the last work already shown) plus the next page, and the count of all.
-export async function listCompanyPhotos(client: RpcClient, user: string, query: { filter?: CompanyFilter; until?: OwnJobsCursor | null } = {}): Promise<CompanyPhotos> {
+// category: only works of that root template category (migration 2040; an edit counts with the
+// work it was made from). The seat and the workspace are checked again inside either function.
+type CompanyQuery = { filter?: CompanyFilter; until?: OwnJobsCursor | null; category?: string | null }
+
+export async function listCompanyPhotos(client: RpcClient, user: string, query: CompanyQuery = {}): Promise<CompanyPhotos> {
   const scope = { p_user: uuid.parse(user), ...companyScope(query.filter ?? null) }
   const until = query.until ?? null
+  const category = query.category ?? null
   const rows = z.array(row)
+  const read = (page: Record<string, unknown>) =>
+    category ? callRpc(client, 'org_member_photos_in_category', { ...scope, p_category: category, ...page }, rows) : callRpc(client, 'org_member_photos', { ...scope, ...page }, rows)
   const [above, page, total] = await Promise.all([
-    until ? callRpc(client, 'org_member_photos', { ...scope, p_limit: MAX_WINDOW, p_from_at: until.createdAt, p_from_id: until.id }, rows) : Promise.resolve([]),
-    callRpc(client, 'org_member_photos', { ...scope, p_limit: COMPANY_PHOTOS_PAGE + 1, ...(until ? { p_before_at: until.createdAt, p_before_id: until.id } : {}) }, rows),
-    callRpc(client, 'org_member_photos_count', scope, z.number().int()),
+    until ? read({ p_limit: MAX_WINDOW, p_from_at: until.createdAt, p_from_id: until.id }) : Promise.resolve([]),
+    read({ p_limit: COMPANY_PHOTOS_PAGE + 1, ...(until ? { p_before_at: until.createdAt, p_before_id: until.id } : {}) }),
+    category ? Promise.resolve(null) : callRpc(client, 'org_member_photos_count', scope, z.number().int()),
   ])
   const below = page.slice(0, COMPANY_PHOTOS_PAGE)
   const last = below.at(-1)
@@ -87,4 +98,13 @@ export async function listCompanyPhotos(client: RpcClient, user: string, query: 
     total,
     next: page.length > COMPANY_PHOTOS_PAGE && last ? { createdAt: last.created_at, id: last.id } : null,
   }
+}
+
+const categoryRows = z.array(z.object({ category_key: z.string(), name_en: z.string(), name_zh: z.string(), is_system: z.boolean(), works: z.number().int() }))
+
+// The category chips for the company view under "whose works" (migration 2040). Nothing for
+// anyone who is not an active member of an org whose workspace is on.
+export async function listCompanyPhotoCategories(client: RpcClient, user: string, filter: CompanyFilter = null): Promise<CompanyPhotoCategory[]> {
+  const found = await callRpc(client, 'org_member_photo_categories', { p_user: uuid.parse(user), ...companyScope(filter) }, categoryRows)
+  return found.map((r) => ({ key: r.category_key, nameEn: r.name_en, nameZh: r.name_zh, system: r.is_system, works: r.works }))
 }
