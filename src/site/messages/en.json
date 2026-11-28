@@ -1887,6 +1887,7 @@
         "resetDone": "New link ready.",
         "cancel": "Cancel",
         "warning": "Don't send it to customers. A customer who opens it joins your company as staff instead of counting as a customer you referred.",
+        "warningNoAffiliate": "Don't pass it on. Anyone who opens it joins your company as staff and can be given its credits.",
         "toAffiliate": "To invite customers, use the customer referral link in Company affiliate"
       },
       "members": {
