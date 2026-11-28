@@ -45,6 +45,7 @@ export function DoneCard({ item, meta, live, place }: { item: PhotoItem; meta: s
           <WorkMark
             pool={item.creditPool}
             visibility={item.visibility}
+            personal={item.personal}
             className="absolute bottom-1.5 left-1.5 transition-opacity duration-250 group-hover:opacity-0 [@media(hover:hover)]:group-focus-within:opacity-0"
           />
           <span

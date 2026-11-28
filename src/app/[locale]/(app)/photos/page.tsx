@@ -20,6 +20,7 @@ export default function PhotosPage({ searchParams }: PageProps<'/[locale]/photos
     <PhotosScreen
       back="/photos"
       until={searchParams.then((params) => (typeof params.until === 'string' ? params.until : undefined))}
+      member={searchParams.then((params) => (typeof params.member === 'string' ? params.member : undefined))}
       extra={
         <Suspense>
           <Deleted searchParams={searchParams} />

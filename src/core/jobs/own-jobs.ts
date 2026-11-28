@@ -113,6 +113,40 @@ async function withWholeBatches(client: SupabaseClient, userId: string, jobs: Jo
   return [...jobs, ...data.map((row) => jobRowSchema.parse(row)).filter((job) => !seen.has(job.id))]
 }
 
+// The company view of Photos (core/org/works/photos.ts) lists other people's works too; the
+// reader's own ones among them are read here in full, so they behave as on the personal page
+// (batch groups, the viewer, Make again). Owner-scoped like every read in this file: an id that is
+// not the user's finished, undeleted, still-accessible work is simply not returned.
+export async function ownJobsByIds(client: SupabaseClient, userId: string, ids: readonly string[]): Promise<Job[]> {
+  if (ids.length === 0) return []
+  const { data, error } = await client
+    .from('generation_jobs')
+    .select(JOB_COLUMNS)
+    .eq('user_id', userId)
+    .in('id', [...ids])
+    .eq('status', 'succeeded')
+    .is('deleted_at', null).is('org_access_ended_at', null)
+  if (error) throw new AppError('INTERNAL', `ownJobsByIds failed: ${error.message}`)
+  return data.map((row) => jobRowSchema.parse(row))
+}
+
+// The user's photos in flight, as rows (the company view's "In progress"; the personal page gets
+// them from listOwnJobs).
+export async function listOwnRunning(client: SupabaseClient, userId: string, now: Date): Promise<Job[]> {
+  const since = new Date(now.getTime() - RATE_LIMIT.RUNNING_STALE_MS).toISOString()
+  const { data, error } = await client
+    .from('generation_jobs')
+    .select(JOB_COLUMNS)
+    .eq('user_id', userId)
+    .eq('status', 'running')
+    .is('deleted_at', null).is('org_access_ended_at', null)
+    .gt('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(RUNNING_LIMIT)
+  if (error) throw new AppError('INTERNAL', `listOwnRunning failed: ${error.message}`)
+  return data.map((row) => jobRowSchema.parse(row))
+}
+
 // The ids of the user's photos in flight, for the concurrency check of the creation dialog on
 // Create (T38): ids and times only, the running rows younger than the function limit. Served
 // by generation_jobs_user_id_created_at_idx (user_id, created_at desc).
