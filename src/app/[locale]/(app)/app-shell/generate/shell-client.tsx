@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import type { CreateContext } from '@/modules/image/create-page'
 import { DeviceCatalogue, FavoritesProvider } from '@/modules/image/create-page'
+import { HoldLinkPrefetch } from '@/core/i18n/ui'
 
 import { leaveShell, SHELL_FALLBACK_MS, sessionStore, shellSettled } from '@/core/offline/shell-fallback'
 
@@ -74,5 +75,12 @@ export function ShellFrame({ children }: { children: ReactNode }) {
     }
   }, [router])
   if (retired) return null
-  return <div ref={frame} data-app-shell="">{children}</div>
+  // The shell's only job is to be replaced: no link prefetches beside that refresh (the real
+  // page takes its own hold until the account lands).
+  return (
+    <div ref={frame} data-app-shell="">
+      <HoldLinkPrefetch until={never} />
+      {children}
+    </div>
+  )
 }
