@@ -21,10 +21,19 @@ describe('public pages read nothing at request time', () => {
 
   it('the home generator waits unsettled, then settles as a guest or is replaced by the member one', () => {
     const gate = code('src/app/[locale]/(marketing)/home-viewer-gate.tsx')
-    expect(gate).toMatch(/settled=\{hydrated && \(!signedIn \|\| member === 'none'\)\}/)
     expect(gate).toMatch(/if \(!signedIn\) return/)
     expect(gate).toMatch(/fetch\(`\/api\/home\/viewer\?locale=\$\{locale\}`/)
-    expect(gate).toMatch(/dynamic\(\(\) => import\('\.\/home-member-generator'\)/)
+    expect(gate).toMatch(/settled=\{hydrated && !waiting\}/)
+  })
+
+  // Review of #1004: a signed-in visitor's first screen must not go empty, and what they do on the
+  // signed-out generator must not be lost or start the signed-out flow.
+  it('the member generator replaces the first one only with its code and data both in, and the first one is inert meanwhile', () => {
+    const gate = code('src/app/[locale]/(marketing)/home-viewer-gate.tsx')
+    expect(gate).toMatch(/await Promise\.all\(\[\s*fetch\([\s\S]*?import\('\.\/home-member-generator'\),\s*\]\)/)
+    expect(gate).not.toMatch(/next\/dynamic/)
+    expect(gate).toMatch(/const waiting = signedIn && ready === null/)
+    expect(gate).toMatch(/inert=\{waiting\}/)
   })
 
   it('the routes they ask are for the signed-in caller only', () => {
