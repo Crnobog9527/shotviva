@@ -11,6 +11,7 @@ import { MembersPanel } from './members-panel'
 import { PerformancePanel } from './performance-panel'
 import { PoolMonthPanel } from './pool-month-panel'
 import { PackagesPanel, PaymentAccountsPanel, PoolPanel } from './owner-panels'
+import { monthShowsPromo } from './promo-visibility'
 import { StaffLinkPanel } from './staff-link-panel'
 
 // /account/enterprise, 「企业工作台」 (ARCHITECTURE §6.5, card E4): the staff-only link first (Owner
@@ -22,7 +23,7 @@ export function OwnerConsoleView({ data, actions, report, affiliate }: { data: O
       <SuspendedBanner data={data} />
       <StaffLinkPanel data={data} actions={actions} affiliate={affiliate} />
       <PoolPanel data={data} actions={actions} />
-      <PoolMonthPanel month={data.poolMonth} />
+      <PoolMonthPanel month={data.poolMonth} promo={monthShowsPromo(data.org, data.poolMonth)} />
       <MembersPanel data={data} actions={actions} />
       <PerformancePanel report={report} />
     </>

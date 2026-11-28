@@ -11,6 +11,7 @@ import type { OwnerActions } from './actions'
 import { blankAllowance, blankGrant, draftFor, membersKey, type AllowanceDraft, type GrantDraft, type Setting } from './bulk-drafts'
 import { newRequestId, useKeptState } from './kept-state'
 import { FIELD, Result } from './parts'
+import { orgShowsPromo } from './promo-visibility'
 import { useConsoleAction } from './use-console-action'
 
 // The amounts for a bulk action on the selected members (ARCHITECTURE §6.5 「默认额度与批量」): set
@@ -24,6 +25,8 @@ const allowanceOf = (s: Setting) => (s.mode === 'keep' ? undefined : s.mode === 
 const poolOf = (kind: 'paid' | 'promo', paid: number, promo: number) => (kind === 'paid' ? paid : promo)
 // The pool to show (the fresh read once there is one) and whether that read says it is short.
 const poolView = (fresh: number | null, page: number, total: number) => ({ pool: fresh ?? page, short: fresh !== null && total > fresh })
+// Without promotion credits the grant is paid only, whatever the draft says.
+const grantKind = (promoShown: boolean, kind: GrantDraft['kind']) => (promoShown ? kind : 'paid')
 const settingValid = (s: Setting) => s.mode !== 'set' || (s.value !== '' && Number.isInteger(Number(s.value)))
 
 export function BulkSheet({ open, onOpenChange, members, data, actions, onDone }: Props) {
@@ -38,7 +41,7 @@ export function BulkSheet({ open, onOpenChange, members, data, actions, onDone }
           ))}
         </div>
         {mode === 'allowance'
-          ? <AllowanceForm members={members} actions={actions} onDone={onDone} />
+          ? <AllowanceForm members={members} actions={actions} onDone={onDone} promo={orgShowsPromo(data.org)} />
           : <GrantForm members={members} data={data} actions={actions} onDone={onDone} />}
       </div>
     </ResponsiveSheet>
@@ -60,7 +63,9 @@ function SettingField({ label, value, onChange }: { label: string; value: Settin
   )
 }
 
-function AllowanceForm({ members, actions, onDone }: Pick<Props, 'members' | 'actions' | 'onDone'>) {
+// Without promotion credits (promo-visibility.ts) only the paid allowance is offered; the promotion
+// setting stays "keep" and is not sent.
+function AllowanceForm({ members, actions, onDone, promo: promoShown }: Pick<Props, 'members' | 'actions' | 'onDone'> & { promo: boolean }) {
   const t = useTranslations('app.org.bulk')
   const key = membersKey(members)
   const [stored, setDraft] = useKeptState<AllowanceDraft>('bulk:allowance', () => blankAllowance(key, newRequestId))
@@ -79,7 +84,7 @@ function AllowanceForm({ members, actions, onDone }: Pick<Props, 'members' | 'ac
   return (
     <div className="grid gap-4">
       <SettingField label={t('paidAllowance')} value={paid} onChange={setPaid} />
-      <SettingField label={t('promoAllowance')} value={promo} onChange={setPromo} />
+      {promoShown ? <SettingField label={t('promoAllowance')} value={promo} onChange={setPromo} /> : null}
       <Button type="button" size="touch" disabled={!valid || pending} onClick={() => setConfirming(true)}>{t('apply')}</Button>
       <Result outcome={outcome} />
       {confirming ? <InlineConfirm title={t('confirmTitle', { count: members.length })} description={t('allowanceConfirm')}
@@ -88,12 +93,15 @@ function AllowanceForm({ members, actions, onDone }: Pick<Props, 'members' | 'ac
   )
 }
 
-function GrantForm({ members, data, actions, onDone }: Omit<Props, 'open' | 'onOpenChange'>) {
+export function GrantForm({ members, data, actions, onDone }: Omit<Props, 'open' | 'onOpenChange'>) {
   const t = useTranslations('app.org.bulk')
   const format = useFormatter()
   const key = membersKey(members)
   const [stored, setDraft] = useKeptState<GrantDraft>('bulk:grant', () => blankGrant(key, newRequestId))
-  const { requestId, kind, each } = draftFor(stored, key, () => blankGrant(key, newRequestId))
+  const draft = draftFor(stored, key, () => blankGrant(key, newRequestId))
+  const { requestId, each } = draft
+  const promoShown = orgShowsPromo(data.org)
+  const kind = grantKind(promoShown, draft.kind)
   const [confirming, setConfirming] = useState(false)
   // The pool as read just now (null until "Give" reads it): the page's number may be stale either
   // way (a promotion top-up is handed out at once to members on the default; deposits and grants
@@ -126,11 +134,7 @@ function GrantForm({ members, data, actions, onDone }: Omit<Props, 'open' | 'onO
   const busy = pending || check.pending
   return (
     <div className="grid gap-4">
-      <div className="grid grid-cols-2 gap-2">
-        {(['promo', 'paid'] as const).map((k) => (
-          <Button key={k} type="button" size="touch" variant={kind === k ? 'default' : 'glass'} aria-pressed={kind === k} onClick={() => setKind(k)}>{t(`kind.${k}`)}</Button>
-        ))}
-      </div>
+      {promoShown ? <KindPicker kind={kind} onChange={setKind} /> : null}
       <label className="grid gap-1 text-label">
         <span className="font-medium">{t('each')}</span>
         <input className={FIELD} inputMode="numeric" value={each} onChange={(e) => setEach(digits(e.target.value))} />
@@ -141,6 +145,17 @@ function GrantForm({ members, data, actions, onDone }: Omit<Props, 'open' | 'onO
       <Result outcome={check.outcome ?? outcome} />
       {confirming && !short ? <InlineConfirm title={t('confirmTitle', { count: members.length })} description={summary}
         confirm={t('give')} cancel={t('cancel')} busy={pending} onConfirm={send} onCancel={() => setConfirming(false)} /> : null}
+    </div>
+  )
+}
+
+function KindPicker({ kind, onChange }: { kind: 'paid' | 'promo'; onChange(next: 'paid' | 'promo'): void }) {
+  const t = useTranslations('app.org.bulk')
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {(['promo', 'paid'] as const).map((k) => (
+        <Button key={k} type="button" size="touch" variant={kind === k ? 'default' : 'glass'} aria-pressed={kind === k} onClick={() => onChange(k)}>{t(`kind.${k}`)}</Button>
+      ))}
     </div>
   )
 }

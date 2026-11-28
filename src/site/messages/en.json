@@ -1926,7 +1926,9 @@
         "isDefault": "(default)",
         "useDefault": "Use default",
         "defaultRestored": "Back on the default.",
-        "pick": "Select {who}"
+        "pick": "Select {who}",
+        "hintPaidOnly": "The monthly allowance tops a person up to that number on the 1st (UTC). Top up manually moves credits from the pool straight away.",
+        "removeBodyPaidOnly": "The company's unspent credits go back to the pool. Credits of their own stay with them."
       },
       "performance": {
         "title": "Monthly performance",
@@ -2123,7 +2125,8 @@
         "clawedBack": "Taken back for refunds",
         "restored": "Returned after a won dispute",
         "held": "Still with members",
-        "expired": "Expired at month end"
+        "expired": "Expired at month end",
+        "hintPaidOnly": "UTC month."
       },
       "defaults": {
         "title": "Default monthly allowances",
@@ -2169,7 +2172,8 @@
         "total": "{count} × {each} = {total} from the {kind} pool ({pool} in it)",
         "short": "The {kind} pool has {pool} now, not enough for everyone, so nobody gets any.",
         "give": "Give",
-        "given": "Gave {total} to {count}."
+        "given": "Gave {total} to {count}.",
+        "allowanceConfirmPaidOnly": "This replaces their monthly allowances."
       }
     },
     "templateShare": {
