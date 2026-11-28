@@ -24,7 +24,7 @@ const B = `ph-b-${randomUUID().slice(0, 8)}`
 beforeAll(async () => {
   db = await connectAdmin()
   for (const [key, order] of [[A, 9001], [B, 9002]] as const) {
-    await db.query('insert into public.template_categories (key, name_en, name_zh, sort_order) values ($1, $2, $3, $4)', [key, `En ${key}`, `中 ${key}`, order])
+    await db.query('insert into public.template_categories (key, name_en, name_zh, sort_order) values ($1, $2, $3, $4)', [key, `En ${key}`, `中${key.slice(-8)}`, order])
   }
   dish = await seedTemplate(db)
   poster = await seedTemplate(db)
@@ -37,10 +37,11 @@ afterAll(async () => {
 })
 
 let tick = 0
+// 2K: paid from the person's own paid credits (clean, no watermark).
 // A finished work, each a second later than the last. parent: an edit of that work.
-async function made(userId: string, templateId: string, parent: string | null = null, batchId?: string) {
+async function made(userId: string, templateId: string, parent: string | null = null) {
   const jobId = randomUUID()
-  await reserveJob(rest, { jobId, userId, module: 'image', templateId, source: 'web', parentJobId: parent, inputs: { resolution: '1k', attempt_id: randomUUID(), ...(batchId ? { batch_id: batchId } : {}) } })
+  await reserveJob(rest, { jobId, userId, module: 'image', templateId, source: 'web', parentJobId: parent, inputs: { resolution: '2k', attempt_id: randomUUID() } })
   await db.query('select public.confirm_job($1, $2)', [jobId, `outputs/${userId}/${jobId}.png`])
   await db.query(`update public.generation_jobs set created_at = now() - interval '1 hour' + ($2 || ' seconds')::interval where id = $1`, [jobId, String(++tick)])
   return jobId
@@ -87,7 +88,7 @@ describe('Photos by category', () => {
     const user = await person()
     const clean = await made(user, dish)
     const marked = await made(user, dish)
-    await db.query(`update public.generation_jobs set credit_pool = 'free' where id = $1`, [marked])
+    await db.query(`update public.generation_jobs set credit_pool = 'free', visibility = 'public' where id = $1`, [marked])
     expect(await ids(user, { watermarked: true })).toEqual([marked])
     expect(await ids(user, { category: A })).toEqual([marked, clean])
     expect(await chips(user)).toEqual([[A, 2, 1]])
@@ -100,7 +101,7 @@ describe('Photos by category', () => {
     await made(other, dish)
     const gone = await made(user, dish)
     await db.query('update public.generation_jobs set deleted_at = now() where id = $1', [gone])
-    await reserveJob(rest, { jobId: randomUUID(), userId: user, module: 'image', templateId: dish, source: 'web', inputs: { resolution: '1k', attempt_id: randomUUID() } })
+    await reserveJob(rest, { jobId: randomUUID(), userId: user, module: 'image', templateId: dish, source: 'web', inputs: { resolution: '2k', attempt_id: randomUUID() } })
     expect(await ids(user, { category: A })).toEqual([mine])
     expect(await chips(user)).toEqual([[A, 1, 0]])
   })
