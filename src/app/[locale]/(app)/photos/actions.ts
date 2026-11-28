@@ -8,10 +8,10 @@ import { createAdminSupabase, createServerSupabase, requireApiUser } from '@/cor
 import { AppError, toAppError } from '@/core/errors'
 import { GALLERY_CACHE_TAG } from '@/core/gallery/cache'
 import { currentLocale, localized } from '@/core/i18n/server'
-import { deleteOwnWork } from '@/core/jobs'
+import { deleteOwnWork, deleteOwnWorks } from '@/core/jobs'
 import { logger } from '@/core/logger'
 import { r2Store } from '@/core/storage'
-import { loadAgainContext, type AgainContext } from '@/modules/image'
+import { loadAgainContext, type AgainContext, type BulkDeleteResult } from '@/modules/image'
 
 // Delete one of your own works (T41, ARCHITECTURE §6.2「删除作品」). Server actions are public
 // endpoints, so the session is checked here; delete_own_job checks ownership and status. The
@@ -37,6 +37,25 @@ export async function deleteWorkAction(jobId: string): Promise<{ failed: 'runnin
   revalidatePath('/[locale]/photos', 'layout')
   // Replace: the viewer pushed the work's address, and Back must not land on a deleted work.
   redirect(await localized('/photos?deleted=1'), RedirectType.replace)
+}
+
+// Delete the works picked on Photos (作品页改版 PR④): at most 30 at once, each through the same
+// deleteOwnWork as one work's delete (core/jobs/delete-work.ts). Server actions are public
+// endpoints: the session is checked here and the ids like any input. No redirect: the grid is
+// re-read and the picker reports what stayed.
+const bulkIds = z.array(z.uuid()).min(1).max(30)
+
+export async function deleteWorksAction(jobIds: string[]): Promise<BulkDeleteResult> {
+  const user = await requireApiUser()
+  const parsed = bulkIds.safeParse(jobIds)
+  if (!parsed.success) throw new AppError('INVALID_INPUT', 'Pick 1 to 30 works')
+  const result = await deleteOwnWorks({ db: createAdminSupabase(), store: r2Store() }, user.id, parsed.data)
+  if (result.deleted > 0) {
+    // As one work's delete: the gallery's cached pages and the client router's copy of Photos.
+    updateTag(GALLERY_CACHE_TAG)
+    revalidatePath('/[locale]/photos', 'layout')
+  }
+  return result
 }
 
 // Make again inside the Photos viewer (T40): the work's template, settings and kept photos,

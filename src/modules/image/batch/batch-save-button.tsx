@@ -4,7 +4,7 @@ import { useState, useSyncExternalStore } from 'react'
 import { useTranslations } from 'next-intl'
 
 import { PhotoSaveButton } from './photo-save-button'
-import { phoneSaveSupported } from './photo-save'
+import { phoneSaveSupported, requestPhotoLinks } from './photo-save'
 import { ZipButton } from './zip-button'
 
 type Props = { batchId: string; count: number; className?: string }
@@ -15,6 +15,7 @@ const subscribe = (notify: () => void) => {
   query.addEventListener('change', notify)
   return () => query.removeEventListener('change', notify)
 }
+export const usePhoneSave = () => useSyncExternalStore(subscribe, phoneSnapshot, () => false)
 const phoneSnapshot = () => phoneSaveSupported(window.matchMedia(COARSE).matches, navigator)
 
 // One "save all" entry for a finished batch: on a phone whose browser can share files it saves
@@ -22,8 +23,8 @@ const phoneSnapshot = () => phoneSaveSupported(window.matchMedia(COARSE).matches
 // refused) it stays the Download ZIP button.
 export function BatchSaveButton(props: Props) {
   const t = useTranslations('app.batchSave')
-  const phone = useSyncExternalStore(subscribe, phoneSnapshot, () => false)
+  const phone = usePhoneSave()
   const [refused, setRefused] = useState(false)
-  if (phone && !refused) return <PhotoSaveButton {...props} onUnsupported={() => setRefused(true)} />
+  if (phone && !refused) return <PhotoSaveButton links={() => requestPhotoLinks(props.batchId)} count={props.count} className={props.className} onUnsupported={() => setRefused(true)} />
   return <ZipButton {...props} notice={refused ? t('unsupported') : undefined} />
 }

@@ -10,6 +10,7 @@ import { r2Store } from '@/core/storage'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { deleteOrgWorkAction } from '../account/enterprise/works/actions'
+import { deleteWorksAction } from './actions'
 import { createWorkShareAction } from './share-actions'
 
 type Chips = Parameters<typeof useCompanyChips>
@@ -75,6 +76,7 @@ export async function CompanyPhotos({ db, userId, seat, now, timeZone, filter, u
         running={showRunning ? { server: running, covers } : null}
         liveTemplates={liveTemplates}
         share={createWorkShareAction}
+        removeMany={deleteWorksAction}
         total={page.total}
         more={page.next ? companyHref(filter, encodeOwnJobsCursor(page.next)) : null}
         rail={{ filter: rail, emptyNote: tp(filter ? 'company.emptyFilter' : 'company.empty'), remove: seat.owner ? deleteOrgWorkAction : null }}
