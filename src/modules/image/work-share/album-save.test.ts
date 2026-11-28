@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { albumSrc, savedNotes, saveRoute } from './album-save'
+afterEach(() => vi.unstubAllGlobals())
+
+import { albumSrc, savedHref, savedNotes, saveRoute } from './album-save'
 
 const A = '11111111-1111-4111-8111-111111111111'
 const B = '22222222-2222-4222-8222-222222222222'
@@ -32,50 +34,54 @@ describe('where picked works are saved to', () => {
   })
 })
 
-describe('noting works shown in the album view', () => {
-  afterEach(() => vi.useRealTimers())
+describe('noting works shown full size for a long press', () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 
-  it('notes each work once, works that load together in one call', async () => {
-    vi.useFakeTimers()
-    const calls: string[][] = []
-    const note = savedNotes(async (ids) => void calls.push(ids), 100, new Set())
-    note(A)
-    note(B)
-    note(A)
-    await vi.advanceTimersByTimeAsync(100)
-    expect(calls).toEqual([[A, B]])
-    note(A)
-    note(B)
-    await vi.advanceTimersByTimeAsync(100)
-    expect(calls).toHaveLength(1)
+  it('posts to the work\'s own saved route', async () => {
+    const fetcher = vi.fn(async () => new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', fetcher)
+    savedNotes(undefined, new Set())(albumSrc(A))
+    await settle()
+    expect(savedHref(albumSrc(A))).toBe(`/api/files/${A}/saved`)
+    expect(fetcher).toHaveBeenCalledWith(`/api/files/${A}/saved`, { method: 'POST', credentials: 'same-origin' })
   })
 
-  it('remembers across views of the same page', async () => {
-    vi.useFakeTimers()
-    const calls: string[][] = []
+  it('notes each work once, however often it is shown', async () => {
+    const calls: string[] = []
+    const note = savedNotes(async (url) => void calls.push(url), new Set())
+    note(albumSrc(A))
+    note(albumSrc(B))
+    note(albumSrc(A))
+    await settle()
+    expect(calls).toEqual([albumSrc(A), albumSrc(B)])
+  })
+
+  it('the album view and the viewer\'s hold sheet share one record: the same work is noted once', async () => {
+    const calls: string[] = []
     const noted = new Set<string>()
-    savedNotes(async (ids) => void calls.push(ids), 100, noted)(A)
-    await vi.advanceTimersByTimeAsync(100)
-    const again = savedNotes(async (ids) => void calls.push(ids), 100, noted)
-    again(A)
-    again(B)
-    await vi.advanceTimersByTimeAsync(100)
-    expect(calls).toEqual([[A], [B]])
+    const send = async (url: string) => void calls.push(url)
+    const fromAlbum = savedNotes(send, noted)
+    const fromViewer = savedNotes(send, noted)
+    // The viewer's fileUrl is the address the album view shows.
+    fromViewer(`/api/files/${A}`)
+    fromAlbum(albumSrc(A))
+    fromAlbum(albumSrc(B))
+    await settle()
+    expect(calls).toEqual([albumSrc(A), albumSrc(B)])
   })
 
-  it('asks again for works whose note failed', async () => {
-    vi.useFakeTimers()
-    const calls: string[][] = []
+  it('asks again for a work whose note failed', async () => {
+    const calls: string[] = []
     let broken = true
-    const note = savedNotes(async (ids) => {
-      calls.push(ids)
+    const note = savedNotes(async (url) => {
+      calls.push(url)
       if (broken) throw new Error('offline')
-    }, 100, new Set())
-    note(A)
-    await vi.advanceTimersByTimeAsync(100)
+    }, new Set())
+    note(albumSrc(A))
+    await settle()
     broken = false
-    note(A)
-    await vi.advanceTimersByTimeAsync(100)
-    expect(calls).toEqual([[A], [A]])
+    note(albumSrc(A))
+    await settle()
+    expect(calls).toEqual([albumSrc(A), albumSrc(A)])
   })
 })

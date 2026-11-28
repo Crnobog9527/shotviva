@@ -2,23 +2,21 @@
 
 import { useTranslations } from 'next-intl'
 import { Dialog as DialogPrimitive } from 'radix-ui'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 
 import { REPLAY_BLOCK_CLASS } from '@/core/analytics/replay'
 import { buttonVariants } from '@/core/ui/button'
 
 import { GroundedImg } from '../result/grounded-img'
-import { albumSrc, savedNotes } from './album-save'
-import type { BulkSavedAction } from './share-types'
+import { albumSrc, noteSaved } from './album-save'
 
-type Props = { jobIds: readonly string[]; onClose(): void; saved?: BulkSavedAction }
+type Props = { jobIds: readonly string[]; onClose(): void }
 
 // 「存到相册」 on a phone whose browser cannot hand files to the share sheet: the whole screen, the
 // picked works full size one under another, and a hint that stays put while they scroll. A long
 // press on each saves it to the gallery. Every picked work is here; they load as they come near.
-export function AlbumView({ jobIds, onClose, saved }: Props) {
+export function AlbumView({ jobIds, onClose }: Props) {
   const t = useTranslations('app.workShare.bulk')
-  const note = useMemo(() => (saved ? savedNotes(saved) : () => undefined), [saved])
   return (
     <DialogPrimitive.Root open onOpenChange={(next) => (next ? undefined : onClose())}>
       <DialogPrimitive.Portal>
@@ -32,7 +30,7 @@ export function AlbumView({ jobIds, onClose, saved }: Props) {
           </header>
           <ol className="grid min-h-0 flex-1 content-start gap-6 overflow-y-auto overscroll-contain px-(--gutter) pt-4 pb-[calc(var(--sab)+24px)]">
             {jobIds.map((id, index) => (
-              <AlbumPhoto key={id} jobId={id} index={index} total={jobIds.length} onShown={note} />
+              <AlbumPhoto key={id} jobId={id} index={index} total={jobIds.length} />
             ))}
           </ol>
         </DialogPrimitive.Content>
@@ -43,7 +41,8 @@ export function AlbumView({ jobIds, onClose, saved }: Props) {
 
 // The first two load at once, the rest as they come near. One that did not load says so and
 // loads again on a tap (the route is never cached).
-function AlbumPhoto({ jobId, index, total, onShown }: { jobId: string; index: number; total: number; onShown(jobId: string): void }) {
+// One that loaded is noted as downloaded, once (album-save.ts).
+function AlbumPhoto({ jobId, index, total }: { jobId: string; index: number; total: number }) {
   const t = useTranslations('app.workShare.bulk')
   const [failed, setFailed] = useState(false)
   const place = t('albumCount', { index: index + 1, total })
@@ -62,7 +61,7 @@ function AlbumPhoto({ jobId, index, total, onShown }: { jobId: string; index: nu
             ground="white"
             loading={index < 2 ? 'eager' : 'lazy'}
             decoding="async"
-            onLoad={() => onShown(jobId)}
+            onLoad={() => noteSaved(albumSrc(jobId))}
             onError={() => setFailed(true)}
             className={`${REPLAY_BLOCK_CLASS} block h-auto w-full select-auto [-webkit-touch-callout:default]`}
           />

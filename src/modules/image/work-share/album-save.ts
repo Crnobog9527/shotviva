@@ -19,29 +19,33 @@ export function saveRoute(coarsePointer: boolean, sharer: FileSharer | undefined
 
 // The file as its owner sees it, shown in the page: the same owner check and the same watermark
 // rule as the download (core/jobs/job-file.ts), with no attachment header and no download noted,
-// so the browser fetching it again for the long press changes nothing.
+// so the browser fetching it again for the long press changes nothing. The same address as the
+// viewer's fileUrl.
 export const albumSrc = (jobId: string) => `/api/files/${jobId}`
 
-// Works whose download was already noted on this page: once each, however often the view opens.
+// Where the page says that a work was shown full size for a long-press save
+// (app/api/files/[jobId]/saved): one download noted, as the download route notes one.
+export const savedHref = (fileUrl: string) => `${fileUrl}/saved`
+
+async function postSaved(fileUrl: string): Promise<void> {
+  const response = await fetch(savedHref(fileUrl), { method: 'POST', credentials: 'same-origin' })
+  if (!response.ok) throw new Error('not noted')
+}
+
+// Works already noted on this page, by file address (/api/files/:id): once each, however often
+// the album view or the viewer's hold sheet opens, and whichever of the two showed it first.
 const NOTED = new Set<string>()
 
-// A work shown full size in the album view is noted as downloaded, once, as the download route
-// notes one (the page cannot tell whether the long press followed). Works that load close
-// together go in one call. A failed call forgets its works, so showing them again asks again.
-export function savedNotes(send: (jobIds: string[]) => Promise<unknown>, waitMs = 800, noted: Set<string> = NOTED) {
-  let queue: string[] = []
-  let timer: ReturnType<typeof setTimeout> | null = null
-  const flush = () => {
-    const ids = queue
-    queue = []
-    timer = null
-    void send(ids).catch(() => ids.forEach((id) => noted.delete(id)))
-  }
-  return (jobId: string) => {
-    if (noted.has(jobId)) return
-    noted.add(jobId)
-    queue.push(jobId)
-    if (timer) clearTimeout(timer)
-    timer = setTimeout(flush, waitMs)
+// A work shown full size for a long press is noted as downloaded, once (the page cannot tell
+// whether the long press followed). A failed call forgets the work, so showing it again asks
+// again.
+export function savedNotes(send: (fileUrl: string) => Promise<unknown> = postSaved, noted: Set<string> = NOTED) {
+  return (fileUrl: string) => {
+    if (noted.has(fileUrl)) return
+    noted.add(fileUrl)
+    void send(fileUrl).catch(() => noted.delete(fileUrl))
   }
 }
+
+// The page's one notebook: the album view and the viewer's hold sheet share it.
+export const noteSaved = savedNotes()

@@ -12,7 +12,3 @@ export { WORK_SHARE_MAX_WORKS as SHARE_MAX, WORK_SHARE_NOTE_MAX as SHARE_NOTE_MA
 // theirs is left to show.
 export type BulkDeleteResult = { deleted: number; running: number; org: number; failed: number }
 export type BulkDeleteAction = (jobIds: string[]) => Promise<BulkDeleteResult>
-
-// The album view (album-save.ts) showed these works full size for a long-press save: the page's
-// server action notes one download for each, as the download route does.
-export type BulkSavedAction = (jobIds: string[]) => Promise<void>

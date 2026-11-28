@@ -18,16 +18,14 @@ import { WorksIndex } from './viewer/works-index'
 import { ShareSelectProvider } from '../work-share/select-context'
 import { ShareBar } from '../work-share/share-bar'
 import { ShareToggle } from '../work-share/share-toggle'
-import type { BulkDeleteAction, BulkSavedAction, CreateShareAction } from '../work-share/share-types'
+import type { BulkDeleteAction, CreateShareAction } from '../work-share/share-types'
 
 // "Done", newest first: finished photos as a dense grid of pictures (2026-11-28; three columns
 // on a phone, four from sm, six from lg), cut under a heading per day in the viewer's time zone.
 // Each tile opens the viewer over the grid (2026-11-12). Empty state per DESIGN §4.6. Every tile
 // shows the work's small copy, never the full file (ARCHITECTURE §8.3「作品小图」). share: with it,
 // a Select button next to "Done" turns on picking works: one share link (§6.2「作品集分享」),
-// download, or with bulk.remove delete (作品页改版 PR④). bulk.saved notes the downloads of works
-// shown in the album view (work-share/album-save.ts). One prop for both: this file rides in
-// Photos' first load, and the bar's body, which uses them, does not.
+// download, or with removeMany delete (作品页改版 PR④).
 // more: the next page's address while older works remain (LoadMore); total: every finished work.
 // rail: the filter under the heading and what an empty filter says: the personal page's
 // categories, or on the company view (§6.5「作品页就是企业作品」) whose works, with the org owner's
@@ -37,9 +35,9 @@ export type GridRail = { filter: ReactNode; emptyNote: string; remove?: DeleteCo
 // stand in for them; they are the first tiles of Today. null: none are shown at all, this tab's
 // own included (the company view under a filter that leaves the reader out).
 export type Running = { server: PhotoItem[]; covers: Record<string, string | null> }
-type Props = { items: PhotoItem[]; now: Date; timeZone: string; running: Running | null; liveTemplates: string[]; share?: CreateShareAction; bulk?: { remove?: BulkDeleteAction; saved?: BulkSavedAction }; more?: string | null; total?: number; rail?: GridRail }
+type Props = { items: PhotoItem[]; now: Date; timeZone: string; running: Running | null; liveTemplates: string[]; share?: CreateShareAction; removeMany?: BulkDeleteAction; more?: string | null; total?: number; rail?: GridRail }
 
-export function DoneGrid({ items, now, timeZone, running, liveTemplates, share, bulk, more = null, total = items.length, rail }: Props) {
+export function DoneGrid({ items, now, timeZone, running, liveTemplates, share, removeMany, more = null, total = items.length, rail }: Props) {
   const t = useTranslations('app')
   const format = useFormatter()
   const today = t('photos.today')
@@ -71,7 +69,7 @@ export function DoneGrid({ items, now, timeZone, running, liveTemplates, share, 
       <Days entries={entries} zone={{ now, timeZone }} running={running} today={today} whole={more === null} draw={{ card, when, slot: (id) => place.get(id) ?? EAGER_TILES }} />
       {more ? <LoadMore href={more} shown={items.length} total={total} /> : null}
       <p className="mx-(--gutter) mt-6 max-w-[72ch] text-caption leading-[1.4] text-muted-foreground">{t('photos.footnote')}</p>
-      {share ? <ShareBar create={share} {...bulk} /> : null}
+      {share ? <ShareBar create={share} remove={removeMany} /> : null}
     </section>
   )
   return share ? <ShareSelectProvider>{grid}</ShareSelectProvider> : grid

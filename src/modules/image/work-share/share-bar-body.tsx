@@ -8,7 +8,7 @@ import { Button, buttonVariants } from '@/core/ui/button'
 
 import { BulkSaveButton } from './bulk-save-button'
 import { useShareSelect } from './select-context'
-import { SHARE_MAX, type BulkDeleteAction, type BulkSavedAction, type CreateShareAction } from './share-types'
+import { SHARE_MAX, type BulkDeleteAction, type CreateShareAction } from './share-types'
 
 // The dialogs' code loads on first use, not with Photos (scripts/js-budget.json).
 const CreateShareSheet = dynamic(() => import('./create-share-sheet').then((mod) => mod.CreateShareSheet), { ssr: false })
@@ -17,8 +17,7 @@ const BulkDeleteSheet = dynamic(() => import('./bulk-delete-sheet').then((mod) =
 // While picking: a bar over the tab bar on phones (sticky at the bottom of the content from md)
 // with the count and what to do with the picked works: download them, delete them, or the one
 // primary, a share link (作品页改版 PR④). remove: the page's delete action; without it no Delete.
-// saved: the page's action that notes a download for works shown in the album view.
-export function ShareBarBody({ create, remove, saved }: { create: CreateShareAction; remove?: BulkDeleteAction; saved?: BulkSavedAction }) {
+export function ShareBarBody({ create, remove }: { create: CreateShareAction; remove?: BulkDeleteAction }) {
   const select = useShareSelect()
   const t = useTranslations('app.workShare')
   const [open, setOpen] = useState<'share' | 'delete' | null>(null)
@@ -34,7 +33,7 @@ export function ShareBarBody({ create, remove, saved }: { create: CreateShareAct
         {count > 0 ? (
           <div className="flex items-start gap-2">
             {/* Remounted when the picked works change: a save under way belongs to the old set. */}
-            <BulkSaveButton key={select.selected.join()} jobIds={select.selected} saved={saved} />
+            <BulkSaveButton key={select.selected.join()} jobIds={select.selected} />
             {remove ? (
               <button type="button" aria-haspopup="dialog" onClick={() => setOpen('delete')} className={buttonVariants({ variant: 'glass', size: 'touch', className: 'shrink-0 px-6 text-destructive' })}>
                 {t('bulk.delete')}

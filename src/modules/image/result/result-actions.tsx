@@ -15,6 +15,7 @@ import type { ShareMode } from './share-mode'
 import { useShareFile } from './use-share-file'
 import { useWatermarkMoment } from './use-watermark-moment'
 import { isIosBrowser } from './ios-browser'
+import { noteSaved } from '../work-share/album-save'
 import type { CreateShareAction } from '../work-share/share-types'
 import { shareChoice } from './share-choice'
 
@@ -64,7 +65,7 @@ export default function ResultActions({ fileUrl, name, shareText, px, work, wate
       {t('downloadBoth')}
     </a>
   ) : null
-  if (phone.hold) return <div className="grid gap-2"><IosPhotoActions mode={mode} fileUrl={fileHref(fileUrl, background, false)} onSaved={saved} holdHint={phone.ios ? undefined : t('holdToAlbumHint')} />{pair}{link ? <ShareAction mode={mode} link={link} name={name} shareText={shareText} onShared={saved} block /> : null}</div>
+  if (phone.hold) return <div className="grid gap-2"><IosPhotoActions mode={mode} fileUrl={fileHref(fileUrl, background, false)} onSaved={saved} hold={phone.ios ? undefined : { hint: t('holdToAlbumHint'), shown: () => noteSaved(fileUrl) }} />{pair}{link ? <ShareAction mode={mode} link={link} name={name} shareText={shareText} onShared={saved} block /> : null}</div>
   const label = () => {
     if (px) return t.rich(background ? LABEL_PX[background] : 'downloadPx', { px, cost: sizeTag, mono: monoTag })
     return t(background ? LABEL[background] : 'download')

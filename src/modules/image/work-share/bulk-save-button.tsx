@@ -9,20 +9,19 @@ import { PhotoSaveButton } from '../batch/photo-save-button'
 import { saveRoute } from './album-save'
 import { AlbumView } from './album-view'
 import { downloadEach, pickedSource, toDownload, type DownloadProgress } from './bulk-save'
-import type { BulkSavedAction } from './share-types'
 
 // "Download" for the works picked on Photos, by what the browser can do (album-save.ts): a phone
 // that can share files sends them to the photo library through the share sheet, ten at a time (as
 // a batch's Save all does); a phone that cannot opens the album view, where a long press saves
 // each one to the gallery; a desktop fetches and saves each file. Remount it (key) when the
 // picked works change.
-export function BulkSaveButton({ jobIds, saved }: { jobIds: readonly string[]; saved?: BulkSavedAction }) {
+export function BulkSaveButton({ jobIds }: { jobIds: readonly string[] }) {
   const coarse = useCoarsePointer()
   const [refused, setRefused] = useState(false)
   const links = useMemo(() => pickedSource(jobIds), [jobIds])
   const route = coarse === null ? null : saveRoute(coarse, navigator, refused)
   if (route === 'share') return <PhotoSaveButton links={links} count={jobIds.length} className="min-w-0 flex-1" onUnsupported={() => setRefused(true)} />
-  if (route === 'album') return <AlbumButton jobIds={jobIds} saved={saved} />
+  if (route === 'album') return <AlbumButton jobIds={jobIds} />
   return <DownloadEach jobIds={jobIds} />
 }
 
@@ -36,7 +35,7 @@ const subscribe = (notify: () => void) => {
 const useCoarsePointer = () => useSyncExternalStore<boolean | null>(subscribe, () => window.matchMedia(COARSE).matches, () => null)
 
 // Opens the album view. The line under it says why this is not a plain download.
-function AlbumButton({ jobIds, saved }: { jobIds: readonly string[]; saved?: BulkSavedAction }) {
+function AlbumButton({ jobIds }: { jobIds: readonly string[] }) {
   const t = useTranslations('app.workShare.bulk')
   const [open, setOpen] = useState(false)
   return (
@@ -45,7 +44,7 @@ function AlbumButton({ jobIds, saved }: { jobIds: readonly string[]; saved?: Bul
         {t('album', { count: jobIds.length })}
       </button>
       <p className="mt-1.5 text-caption leading-[1.4] text-muted-foreground">{t('albumWhy')}</p>
-      {open ? <AlbumView jobIds={jobIds} saved={saved} onClose={() => setOpen(false)} /> : null}
+      {open ? <AlbumView jobIds={jobIds} onClose={() => setOpen(false)} /> : null}
     </div>
   )
 }

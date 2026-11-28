@@ -1,15 +1,14 @@
 'use server'
 
 import { revalidatePath, updateTag } from 'next/cache'
-import { headers } from 'next/headers'
 import { redirect, RedirectType } from 'next/navigation'
 import { z } from 'zod'
 
-import { clientIp, createAdminSupabase, createServerSupabase, requireApiUser } from '@/core/auth'
+import { createAdminSupabase, createServerSupabase, requireApiUser } from '@/core/auth'
 import { AppError, toAppError } from '@/core/errors'
 import { GALLERY_CACHE_TAG } from '@/core/gallery/cache'
 import { currentLocale, localized } from '@/core/i18n/server'
-import { deleteOwnWork, deleteOwnWorks, recordJobDownload } from '@/core/jobs'
+import { deleteOwnWork, deleteOwnWorks } from '@/core/jobs'
 import { logger } from '@/core/logger'
 import { r2Store } from '@/core/storage'
 import { loadAgainContext, type AgainContext, type BulkDeleteResult } from '@/modules/image'
@@ -57,19 +56,6 @@ export async function deleteWorksAction(jobIds: string[]): Promise<BulkDeleteRes
     revalidatePath('/[locale]/photos', 'layout')
   }
   return result
-}
-
-// The album view showed these works full size for a long-press save (a phone whose browser cannot
-// share files; ARCHITECTURE §6.2): one download noted for each, as the download route notes one.
-// record_job_download only touches the caller's own finished works, so other ids do nothing.
-// Best effort like the route's note: it never fails the page.
-export async function noteWorksSavedAction(jobIds: string[]): Promise<void> {
-  const user = await requireApiUser()
-  const parsed = bulkIds.safeParse(jobIds)
-  if (!parsed.success) throw new AppError('INVALID_INPUT', 'Pick 1 to 30 works')
-  const db = createAdminSupabase()
-  const ip = clientIp(await headers())
-  await Promise.all([...new Set(parsed.data)].map((jobId) => recordJobDownload(db, { userId: user.id, jobId, ip })))
 }
 
 // Make again inside the Photos viewer (T40): the work's template, settings and kept photos,

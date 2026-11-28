@@ -12,7 +12,7 @@ import { cachedCategoryTree } from '@/core/templates'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { deleteOrgWorkAction } from '../account/enterprise/works/actions'
-import { deleteWorksAction, noteWorksSavedAction } from './actions'
+import { deleteWorksAction } from './actions'
 import { createWorkShareAction } from './share-actions'
 
 type Chips = Parameters<typeof useCompanyChips>
@@ -131,7 +131,7 @@ export async function CompanyPhotos({ db, userId, seat, now, timeZone, filter, c
         running={showRunning ? { server: running, covers } : null}
         liveTemplates={liveTemplates}
         share={createWorkShareAction}
-        bulk={{ remove: deleteWorksAction, saved: noteWorksSavedAction }}
+        removeMany={deleteWorksAction}
         total={held}
         more={page.next ? companyHref(filter, encodeOwnJobsCursor(page.next), category, carry) : null}
         rail={{ filter: <>{rail}<CompanyCategoryRail categories={categories} total={railTotal} member={filter} current={category} /></>, emptyNote: tp(narrowed ? 'company.emptyFilter' : 'company.empty'), remove: seat.owner ? deleteOrgWorkAction : null }}
