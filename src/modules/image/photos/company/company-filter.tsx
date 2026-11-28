@@ -1,8 +1,7 @@
 import { useTranslations } from 'next-intl'
 
-import { Link } from '@/core/i18n/ui'
 import { DELETED_MAKERS, ME, PERSONAL, type CompanyFilter, type OrgWorkMember } from '@/core/org/works'
-import { cn } from '@/core/ui/cn'
+import { FilterRail } from '../filter-rail'
 
 // One chip of the rail: whose works, and how many when known.
 export type FilterChip = { id: CompanyFilter; label: string; works?: number; removed?: boolean }
@@ -34,33 +33,13 @@ export const companyHref = (filter: CompanyFilter, until?: string) => {
   return query ? `/photos?${query}` : '/photos'
 }
 
-// The rail itself: a row of pills that scrolls sideways on a phone, the chosen one in bone. Each
-// is a link, so the filter lives in the address and Back, refresh and Load more keep it.
+// The rail itself (the shared pills of Photos' filters), whose works by maker.
 export function CompanyFilterRail({ chips, current }: { chips: readonly FilterChip[]; current: CompanyFilter }) {
   const t = useTranslations('app.photos.company')
   return (
-    <nav aria-label={t('filterLabel')} className="no-scrollbar mt-3 overflow-x-auto px-(--gutter)">
-      <ul className="flex gap-2">
-        {chips.map((chip) => {
-          const here = chip.id === current
-          return (
-            <li key={chip.id ?? 'all'} className="shrink-0">
-              <Link
-                href={companyHref(chip.id)}
-                aria-current={here ? 'page' : undefined}
-                className={cn(
-                  'press inline-flex min-h-9 max-w-[16rem] items-center gap-1.5 rounded-full px-3.5 text-caption font-medium whitespace-nowrap',
-                  here ? 'bg-foreground text-background' : 'hairline bg-wash text-bone-dim hover:text-foreground',
-                )}
-              >
-                <span className="min-w-0 truncate">{chip.label}</span>
-                {chip.removed ? <span className="shrink-0 opacity-70">· {t('leftMark')}</span> : null}
-                {chip.works === undefined ? null : <span className="shrink-0 tabular-nums opacity-70">{chip.works}</span>}
-              </Link>
-            </li>
-          )
-        })}
-      </ul>
-    </nav>
+    <FilterRail
+      label={t('filterLabel')}
+      chips={chips.map((chip) => ({ key: chip.id ?? 'all', href: companyHref(chip.id), label: chip.label, here: chip.id === current, count: chip.works, note: chip.removed ? t('leftMark') : undefined }))}
+    />
   )
 }

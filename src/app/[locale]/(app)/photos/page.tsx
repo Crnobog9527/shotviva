@@ -16,11 +16,14 @@ async function Deleted({ searchParams }: { searchParams: Promise<Record<string, 
 }
 
 export default function PhotosPage({ searchParams }: PageProps<'/[locale]/photos'>) {
+  const asked = (name: string) => searchParams.then((params) => (typeof params[name] === 'string' ? params[name] : undefined))
   return (
     <PhotosScreen
       back="/photos"
-      until={searchParams.then((params) => (typeof params.until === 'string' ? params.until : undefined))}
-      member={searchParams.then((params) => (typeof params.member === 'string' ? params.member : undefined))}
+      until={asked('until')}
+      member={asked('member')}
+      category={asked('category')}
+      mark={asked('mark')}
       extra={
         <Suspense>
           <Deleted searchParams={searchParams} />

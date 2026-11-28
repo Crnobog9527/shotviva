@@ -77,7 +77,7 @@ export async function CompanyPhotos({ db, userId, seat, now, timeZone, filter, u
         share={createWorkShareAction}
         total={page.total}
         more={page.next ? companyHref(filter, encodeOwnJobsCursor(page.next)) : null}
-        company={{ filter: rail, emptyNote: tp(filter ? 'company.emptyFilter' : 'company.empty'), remove: seat.owner ? deleteOrgWorkAction : null }}
+        rail={{ filter: rail, emptyNote: tp(filter ? 'company.emptyFilter' : 'company.empty'), remove: seat.owner ? deleteOrgWorkAction : null }}
       />
     </>
   )
