@@ -19598,7 +19598,9 @@ begin
 
   -- 2032: an org staff member's code gives no personal invitee reward (the org bonus instead).
   -- 2032: nor does an active org member's own code, affiliate switch on or off.
-  org_code := org_code or (offer.kind = 'invite' and public._in_active_org(offer.owner_user_id));
+  -- 2035 (review on #991): any staff code is an org code, also when another referrer bound the
+  -- customer first, workspace on or off (_org_code_owner, as the preview).
+  org_code := org_code or (offer.kind = 'invite' and public._org_code_owner(offer.owner_user_id));
   credits := case when offer.kind = 'invite' and org_code then 0
     when offer.kind = 'invite' then
     (select (value->>'inviteeCredits')::integer from public.system_settings where key = 'code_invite_rewards')
