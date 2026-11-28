@@ -5,7 +5,7 @@ import { preconnect } from 'react-dom'
 
 import { AppPage, TabRootHeader } from '@/core/app-shell'
 import { createAdminSupabase, requireUser } from '@/core/auth'
-import { decodeOwnJobsCursor, encodeOwnJobsCursor, fileUrlFor, firstThumbUrls, listOwnJobs } from '@/core/jobs'
+import { decodeOwnJobsCursor, encodeOwnJobsCursor, fileUrlFor, FIRST_SCREEN_THUMBS, firstThumbUrls, listOwnJobs } from '@/core/jobs'
 import { currentLocale } from '@/core/i18n/server'
 import { r2Origin, r2Store } from '@/core/storage'
 import { cachedPosterTemplates, cachedWebTemplates, EDIT_TEMPLATE_ID } from '@/core/templates'
@@ -29,7 +29,7 @@ async function Photos({ back, until }: { back: string | Promise<string>; until?:
   const now = new Date()
   const cursor = decodeOwnJobsCursor(await until)
   // The first screen's small copies are signed while the templates are still being read.
-  const works = listOwnJobs(createAdminSupabase(), user.id, now, cursor).then(async (own) => ({ own, signed: await firstThumbUrls(r2Store, own.done) }))
+  const works = listOwnJobs(createAdminSupabase(), user.id, now, cursor).then(async (own) => ({ own, signed: await firstThumbUrls(r2Store, own.done, FIRST_SCREEN_THUMBS, 'tile') }))
   const locale = await currentLocale()
   const [{ own, signed }, templates, posters] = await Promise.all([works, cachedWebTemplates(locale, true), cachedPosterTemplates(locale)])
   const tp = await getTranslations('app.photos')

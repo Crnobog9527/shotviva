@@ -1,5 +1,5 @@
 import { REPLAY_BLOCK_CLASS } from '@/core/analytics/browser'
-import { thumbUrlFor } from '@/core/jobs/job-view'
+import { tileUrlFor } from '@/core/jobs/job-view'
 import { ThumbImg } from '@/core/ui/thumb-img'
 import { useTranslations } from 'next-intl'
 
@@ -33,10 +33,10 @@ export function DoneCard({ item, meta, live, place }: { item: PhotoItem; meta: s
           {item.thumbUrl ? (
             <ThumbImg
               src={item.thumbUrl}
-              fallback={thumbUrlFor(item.id)}
+              fallback={tileUrlFor(item.id)}
               alt={t('photos.photoAlt', { name: item.templateName })}
-              width={480}
-              height={600}
+              width={320}
+              height={400}
               loading={place < EAGER_TILES ? 'eager' : 'lazy'}
               fetchPriority={place < FIRST_ROW ? 'high' : 'auto'}
               decoding="async"

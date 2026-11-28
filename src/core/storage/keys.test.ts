@@ -53,3 +53,12 @@ describe('store QR keys', () => {
     expect(isOwnInputKey(USER, key)).toBe(false)
   })
 })
+
+describe('work tile keys', () => {
+  it('keeps a free work\'s tile under its own key, and deletes every copy with the work', async () => {
+    const { workTileKeyFor, workThumbKeysFor } = await import('./keys')
+    expect(workTileKeyFor('u', 'j', 'paid')).toBe('outputs/u/j-tile.webp')
+    expect(workTileKeyFor('u', 'j', 'free')).toBe('outputs/u/j-tile-p1.webp')
+    expect(workThumbKeysFor('u', 'j')).toEqual(['outputs/u/j-thumb.webp', 'outputs/u/j-thumb-p1.webp', 'outputs/u/j-tile.webp', 'outputs/u/j-tile-p1.webp'])
+  })
+})

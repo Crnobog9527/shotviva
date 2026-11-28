@@ -34,11 +34,20 @@ describe('GET /api/files/[jobId]/thumb', () => {
   it('redirects the caller to the signed small copy, uncached, and returns no bytes', async () => {
     mocks.resolveJobThumb.mockResolvedValue('https://r2.example/signed-thumb')
     const response = await call()
-    expect(mocks.resolveJobThumb).toHaveBeenCalledWith(expect.anything(), { userId: 'u1', jobId: 'j1' })
+    expect(mocks.resolveJobThumb).toHaveBeenCalledWith(expect.anything(), { userId: 'u1', jobId: 'j1' }, 'thumb')
     expect(response.status).toBe(302)
     expect(response.headers.get('location')).toBe('https://r2.example/signed-thumb')
     expect(response.headers.get('cache-control')).toBe('private, no-store')
     expect((await response.arrayBuffer()).byteLength).toBe(0)
+  })
+
+  it('asks for the tile only on ?size=tile; any other size is the list copy', async () => {
+    mocks.resolveJobThumb.mockResolvedValue('https://r2.example/signed')
+    const at = (query: string) => GET(new NextRequest(`http://localhost:3000/api/files/j1/thumb${query}`), { params: Promise.resolve({ jobId: 'j1' }) })
+    await at('?size=tile')
+    expect(mocks.resolveJobThumb).toHaveBeenLastCalledWith(expect.anything(), { userId: 'u1', jobId: 'j1' }, 'tile')
+    await at('?size=huge')
+    expect(mocks.resolveJobThumb).toHaveBeenLastCalledWith(expect.anything(), { userId: 'u1', jobId: 'j1' }, 'thumb')
   })
 
   it('redirects to the full-file route on this site when there is no small copy', async () => {

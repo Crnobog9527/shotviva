@@ -1,7 +1,7 @@
 import type { CreditPool } from '@/core/billing/pools'
 import type { Job, JobVisibility } from '@/core/jobs'
 import { isCutOut } from '@/core/jobs/job-cut-out'
-import { thumbUrlFor } from '@/core/jobs/job-view'
+import { tileUrlFor } from '@/core/jobs/job-view'
 import { OUTPUT_ASPECTS, RESOLUTIONS, type OutputAspect, type Resolution } from '@/core/templates/output-options'
 import type { Translate } from '@/core/translate'
 
@@ -24,8 +24,8 @@ export type PhotoItem = {
   // A poster work (gallery-excluded, §9 第 7 条): private even when free; its edits are too.
   privateOnly?: boolean
   fileUrl: string | null
-  // The small copy lists show (ARCHITECTURE §8.3「作品小图」): the thumbnail route, or for Photos'
-  // first screen a signed URL of the copy itself. Null like fileUrl while the job runs.
+  // The small copy Photos' grid shows (ARCHITECTURE §8.3「作品小图」, the tile): the thumbnail route,
+  // or for Photos' first screen a signed URL of the copy itself. Null like fileUrl while the job runs.
   thumbUrl: string | null
   // A cut-out (transparent background): downloads offer 白底 / 透明底. null when unknown.
   transparent?: boolean | null
@@ -57,7 +57,7 @@ export function toPhotoItem(job: Job, templates: TemplateLookup, fileUrl: string
     visibility: job.visibility,
     privateOnly: job.galleryExcluded ?? false,
     fileUrl,
-    thumbUrl: fileUrl ? (signedThumb ?? thumbUrlFor(job.id)) : null,
+    thumbUrl: fileUrl ? (signedThumb ?? tileUrlFor(job.id)) : null,
     transparent: isCutOut(job),
     batchId: job.batchId ?? null,
     batchPosition: batchPosition(job.inputs.batch_position),
