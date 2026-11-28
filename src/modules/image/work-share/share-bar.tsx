@@ -9,6 +9,4 @@ import type { BulkDeleteAction, CreateShareAction } from './share-types'
 const ShareBarBody = dynamic(() => import('./share-bar-body').then((mod) => mod.ShareBarBody), { ssr: false })
 
 // The props go through as they are: this file rides in Photos' first load, the body does not.
-export function ShareBar(props: { create: CreateShareAction; remove?: BulkDeleteAction }) {
-  return useShareSelect()?.selecting ? <ShareBarBody {...props} /> : null
-}
+export const ShareBar = (props: { create: CreateShareAction; remove?: BulkDeleteAction }) => (useShareSelect()?.selecting ? <ShareBarBody {...props} /> : null)
