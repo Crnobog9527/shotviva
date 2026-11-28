@@ -8,7 +8,7 @@ import { cn } from '@/core/ui/cn'
 import { Reveal } from '@/core/ui/reveal-item'
 
 import { hasStills, isCompareCategory } from './catalogue-template'
-import { phoneFirst, shelfMembers } from './catalogue-shelves'
+import { phoneFirst, SHELF_LIMIT, shelfMembers } from './catalogue-shelves'
 import type { CatalogueSeries } from './catalogue-view'
 import { COVER_SIZES, phone } from './cover-sizes'
 import { TemplateCard } from './template-card'
@@ -39,8 +39,11 @@ export function SeriesShelf({ series, first, priority, onOpen, onOpenSeries }: P
   const section = useRef<HTMLElement>(null)
   const [expanded, setExpanded] = useState(false)
   const total = series.members.length
+  // `expanded` is the phone's state only. From md the row never follows it: the cards past
+  // SHELF_LIMIT are hidden there and 「+N 个」 stays, so a phone turned to landscape after 「展开」
+  // (where the button is gone) still shows the ordinary row.
   const shown = expanded ? series.members : shelfMembers(series)
-  const more = total - shown.length
+  const more = total - shelfMembers(series).length
   const compare = shown.every((template) => isCompareCategory(template) && hasStills(template))
   const folded = compare ? total : phoneFirst(total)
   const headingId = `create-shelf-${series.id}`
@@ -61,7 +64,7 @@ export function SeriesShelf({ series, first, priority, onOpen, onOpenSeries }: P
       </Reveal>
       <ul ref={rail} className={compare ? COMPARE_LIST : RAIL_LIST}>
         {shown.map((template, index) => (
-          <li key={template.id} className={compare ? undefined : cn(RAIL_ITEM, index >= folded && !expanded && 'max-md:hidden')}>
+          <li key={template.id} className={compare ? undefined : cn(RAIL_ITEM, index >= folded && !expanded && 'max-md:hidden', index >= SHELF_LIMIT && 'md:hidden')}>
             <TemplateCard template={template} onOpen={onOpen} eager={first && index === 0} priority={priority && index === 0} sizes={compare ? COMPARE_SIZES : RAIL_SIZES} />
           </li>
         ))}
